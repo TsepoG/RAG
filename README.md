@@ -30,22 +30,25 @@ Values already exported in your shell win over `.env`.
 
 ## Scripts
 
-| Script                        | What it does                                                                        |
-| ----------------------------- | ----------------------------------------------------------------------------------- |
-| `npm start`                   | Run `src/index.js`                                                                  |
-| `npm run lint`                | ESLint with JSDoc and SonarJS rules; zero warnings allowed                          |
-| `npm run lint:fix`            | ESLint with auto-fix                                                                |
-| `npm run format`              | Prettier, write                                                                     |
-| `npm run format:check`        | Prettier, check only                                                                |
-| `npm run typecheck`           | `tsc --noEmit` over the JSDoc types (`jsconfig.json`)                               |
-| `npm test`                    | Vitest, once                                                                        |
-| `npm run test:watch`          | Vitest in watch mode                                                                |
-| `npm run test:coverage`       | Vitest with coverage; fails below 90% for lines, branches, functions and statements |
-| `npm run ask -- "<question>"` | Ask Copilot a question; streams the answer, then lists the tools used               |
-| `npm run models`              | List the models your Copilot account can use                                        |
-| `npm run mcp:tools`           | List both MCP servers' tools and write `docs/mcp-tools.md`                          |
-| `npm run test:live`           | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)   |
-| `npm run verify`              | lint, format check, typecheck and coverage in sequence; stops at the first failure  |
+| Script                                                     | What it does                                                                             |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `npm start`                                                | Run `src/index.js`                                                                       |
+| `npm run lint`                                             | ESLint with JSDoc and SonarJS rules; zero warnings allowed                               |
+| `npm run lint:fix`                                         | ESLint with auto-fix                                                                     |
+| `npm run format`                                           | Prettier, write                                                                          |
+| `npm run format:check`                                     | Prettier, check only                                                                     |
+| `npm run typecheck`                                        | `tsc --noEmit` over the JSDoc types (`jsconfig.json`)                                    |
+| `npm test`                                                 | Vitest, once                                                                             |
+| `npm run test:watch`                                       | Vitest in watch mode                                                                     |
+| `npm run test:coverage`                                    | Vitest with coverage; fails below 90% for lines, branches, functions and statements      |
+| `npm run ask -- [--role <id>] "<question>"`                | Ask a question as a role; prints the answer, its sources and the tools used              |
+| `npm run roles`                                            | List the role profiles in `roles/`                                                       |
+| `npm run models`                                           | List the models your Copilot account can use                                             |
+| `npm run mcp:tools`                                        | List both MCP servers' tools and write `docs/mcp-tools.md`                               |
+| `npm run mcp:sample -- <tool> '<json args>' [--as <name>]` | Call one allow-listed tool and save its raw result to `test/fixtures/raw/` (git-ignored) |
+| `npm run fixtures:sanitise`                                | Turn the raw samples into `test/fixtures/mcp/*.json` with no real names or content       |
+| `npm run test:live`                                        | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)        |
+| `npm run verify`                                           | lint, format check, typecheck and coverage in sequence; stops at the first failure       |
 
 Run `npm run verify` before every commit and PR.
 
@@ -112,13 +115,66 @@ no models; leave `COPILOT_MODEL` unset to use the default.
 
 ```bash
 npm run ask -- "How does the checkout flow work in the shop-api repo?"
+npm run ask -- --role product_owner "What does the refund feature do?"
 ```
 
-The answer streams to stdout, followed by the sources Copilot cited, a "Tools used" list (server,
-tool, a short argument summary and duration; never secrets or page content) and the model and time
-taken. Logs go to stderr as JSON. Exit codes: `0` success; `1` for a missing question, bad
-config, no Copilot login or a Copilot error (one line on stderr); `2` when the question exceeds
-`ASK_TIMEOUT_MS`.
+`--role` picks who the answer is written for (default `developer`). The command prints a progress
+line, then the answer once it has been checked, a numbered **Sources** list, an **Also consulted**
+list, a "Tools used" list (server, tool, a short argument summary and duration; never secrets or
+page content) and the role, model and time taken. Logs go to stderr as JSON. Exit codes: `0`
+success; `1` for a missing question, an unknown role, bad config, no Copilot login or a Copilot
+error (one line on stderr); `2` when the question exceeds `ASK_TIMEOUT_MS`.
+
+### Roles
+
+`npm run roles` lists the profiles in [roles/](roles). There are five: `developer`,
+`business_analyst`, `qa`, `product_owner` and `project_manager`. Each is a YAML file checked at
+startup (a bad file names the file and field). A profile sets the audience, a depth from 1 to 3,
+the vocabulary to use and the words to avoid, which source to search first, the shape of the answer
+and examples. All roles are grounded the same way: the part of the system message about grounding,
+safety and citations is identical for every role, and only the role block changes how the answer
+is written. Depth 1 roles (product owner, project manager) get plain business language, with no
+code or file paths in the answer or the Sources list.
+
+### How citations work
+
+- Every page or file the model reads is given a key: `C1`, `C2`… for Confluence pages, `G1`, `G2`…
+  for GitHub files, folders, commits and releases. The tool result is wrapped in a
+  `<source key="…">` tag, and any `<source` text inside the content is defused so content cannot
+  claim a key.
+- The model cites with `[C1]` or `[C1][G2]` after a sentence. After the answer, the app checks
+  every key. A key that was never given out is removed from the text and reported, not shown as a
+  citation.
+- The **Sources** list is built by the app, never by the model. A Confluence entry links to the
+  page and records its version (and notes a page not updated in over a year). A GitHub entry is
+  pinned to a 40-character commit SHA, so the link keeps showing what the model saw. The commit
+  comes from the result itself or from the repository's head commit; if neither is found the link
+  is to the default branch and says it is not pinned.
+- Search hits and lists (`searchConfluence`, `search_code`, `list_commits`, `list_releases`) are
+  not sources: they appear under **Also consulted** and cannot be cited.
+- A folder listing is a source for which files and folders exist, not for what is inside a file.
+  The check that a claim about a file's contents was backed by reading that file is not done yet
+  (planned for Phase 4).
+- Confluence content that is not in `CONFLUENCE_SPACE_KEYS`, or whose space cannot be determined,
+  is replaced by a notice before the model sees it. If the check itself fails, the content is
+  replaced too.
+- Each question gets two `search_code` calls. An empty code search tells the model to browse
+  folders instead.
+- Large results: the Copilot runtime's own "large output" handling is turned off, because it hides
+  a long page behind a file pointer the model cannot read. Instead each source is cut at 24,000
+  characters and the model is told when that happens.
+- Set `ATLASSIAN_CLOUD_ID` to save the model two calls: it is then used for every Confluence call.
+
+### Test fixtures
+
+The extractors that read MCP results are built on real tool results with the content removed.
+`npm run mcp:sample` calls one allow-listed tool (through the same scope check as the assistant) and
+saves the raw result under `test/fixtures/raw/`, which is git-ignored. `npm run fixtures:sanitise`
+rewrites those into `test/fixtures/mcp/*.json`: names, sites, spaces and URLs are mapped to
+placeholders, text and code are replaced, and the command fails, naming the file and the kind of
+leak, if any real name, email or account id is left. Review the sanitised files before committing
+them. `search_code.synthetic.json` is hand-written, because the real search returned no hits for
+the repository used; it is marked as synthetic.
 
 ### How read-only is enforced
 
@@ -162,13 +218,17 @@ create each token.
 
 ```
 src/
-  answer/    askQuestion: runs one question through Copilot and collects the answer and tool calls
-  cli/       ask, models and mcp:tools commands (wiring only)
+  answer/    askQuestion: runs one question through Copilot; validated result, report, argument parsing
+  citations/ source registry, wrapping, labels, citation checking, extractors for each tool result
+  cli/       ask, roles, models, mcp:tools, mcp:sample and fixtures:sanitise commands (wiring only)
   config/    validated config loader (loadConfig, redactConfig, buildRuntimeEnv)
-  copilot/   Copilot client, session config and system message
+  copilot/   Copilot client, session config and system message (shared base plus role block)
   errors/    AppError and its subclasses
+  fixtures/  the fixture sanitiser and its leak check
+  github/    looks up a repository's head commit, to pin links
   logger/    pino logger factory with secret redaction
-  mcp/       server config, tool allow-list, scope hooks, permission handler, tool discovery
+  mcp/       server config, tool allow-list, scope and post-tool hooks, permission handler, discovery
+  roles/     role schema and loader (profiles are in the top-level roles/ folder)
   index.js   entry point: loads .env, loads config, logs a startup line
 test/        mirrors src/; test/helpers holds shared test utilities; test/live runs on demand
 docs/        roadmap, system design, coding principles and one file per phase
