@@ -109,6 +109,10 @@ and ask.
   (`status`, `diff`, `log`) and stage files with `git add` when asked.
 - At each natural stopping point, Claude Code stops, summarises what changed and
   proposes a Conventional Commit message for the owner to use.
+- No AI attribution anywhere: suggested commit messages, PR titles and PR
+  descriptions never include `Co-Authored-By:` trailers, "Generated with Claude
+  Code" lines or similar. `.claude/settings.json` sets
+  `"attribution": { "commit": "", "pr": "" }` to back this up.
 - One branch and one PR per phase (or smaller). Conventional Commit messages:
   `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`, `ci:`.
 - Small, focused commits that each leave `npm run verify` passing.
