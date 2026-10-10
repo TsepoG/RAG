@@ -1,8 +1,18 @@
 // @ts-check
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { loadConfig, redactConfig } from '../../src/config/index.js';
+import {
+  buildRuntimeEnv,
+  loadConfig,
+  loadEnvFileIfPresent,
+  redactConfig,
+} from '../../src/config/index.js';
 import { ConfigError } from '../../src/errors/index.js';
-import { FAKE_ATLASSIAN_TOKEN, FAKE_GITHUB_TOKEN, validEnv } from '../helpers/env.js';
+import {
+  FAKE_ATLASSIAN_TOKEN,
+  FAKE_COPILOT_TOKEN,
+  FAKE_GITHUB_TOKEN,
+  validEnv,
+} from '../helpers/env.js';
 
 /**
  * Runs loadConfig and returns the ConfigError it throws.
@@ -59,7 +69,13 @@ describe('loadConfig', () => {
 
   it('never puts a secret value in the error', () => {
     const error = loadFailure(
-      validEnv({ GITHUB_REPOS: 'not a repo', PORT: 'x', ATLASSIAN_EMAIL: 'bad' }),
+      validEnv({
+        GITHUB_REPOS: 'not a repo',
+        PORT: 'x',
+        ATLASSIAN_EMAIL: 'bad',
+        COPILOT_GITHUB_TOKEN: FAKE_COPILOT_TOKEN,
+        ASK_TIMEOUT_MS: 'soon',
+      }),
     );
     const everything = [error.message, JSON.stringify(error.issues), String(error.cause)].join(
       '\n',
@@ -67,7 +83,9 @@ describe('loadConfig', () => {
 
     expect(everything).not.toContain(FAKE_GITHUB_TOKEN);
     expect(everything).not.toContain(FAKE_ATLASSIAN_TOKEN);
+    expect(everything).not.toContain(FAKE_COPILOT_TOKEN);
     expect(everything).not.toContain('not a repo');
+    expect(everything).not.toContain('soon');
   });
 
   it('reads process.env when no environment is passed', () => {
@@ -81,12 +99,20 @@ describe('loadConfig', () => {
 
 describe('redactConfig', () => {
   it('masks every secret', () => {
-    const redacted = redactConfig(loadConfig(validEnv()));
+    const redacted = redactConfig(
+      loadConfig(validEnv({ COPILOT_GITHUB_TOKEN: FAKE_COPILOT_TOKEN })),
+    );
 
     expect(redacted.github.token).toBe('***');
     expect(redacted.atlassian.apiToken).toBe('***');
+    expect(redacted.copilot.githubToken).toBe('***');
     expect(JSON.stringify(redacted)).not.toContain(FAKE_GITHUB_TOKEN);
     expect(JSON.stringify(redacted)).not.toContain(FAKE_ATLASSIAN_TOKEN);
+    expect(JSON.stringify(redacted)).not.toContain(FAKE_COPILOT_TOKEN);
+  });
+
+  it('leaves the Copilot token unset when none is configured', () => {
+    expect(redactConfig(loadConfig(validEnv())).copilot.githubToken).toBeUndefined();
   });
 
   it('keeps everything that is not a secret', () => {
@@ -101,11 +127,106 @@ describe('redactConfig', () => {
   });
 
   it('does not change the config it was given', () => {
-    const config = loadConfig(validEnv());
+    const config = loadConfig(validEnv({ COPILOT_GITHUB_TOKEN: FAKE_COPILOT_TOKEN }));
 
     redactConfig(config);
 
     expect(config.github.token).toBe(FAKE_GITHUB_TOKEN);
     expect(config.atlassian.apiToken).toBe(FAKE_ATLASSIAN_TOKEN);
+    expect(config.copilot.githubToken).toBe(FAKE_COPILOT_TOKEN);
+  });
+});
+
+describe('buildRuntimeEnv', () => {
+  const withheld = [
+    'GITHUB_TOKEN',
+    'COPILOT_GITHUB_TOKEN',
+    'GH_TOKEN',
+    'GH_ENTERPRISE_TOKEN',
+    'GITHUB_ENTERPRISE_TOKEN',
+    'GITHUB_REPOS',
+    'ATLASSIAN_SITE_URL',
+    'ATLASSIAN_EMAIL',
+    'ATLASSIAN_API_TOKEN',
+    'CONFLUENCE_SPACE_KEYS',
+    'COPILOT_MODEL',
+    'ASK_TIMEOUT_MS',
+    'MAX_TOOL_CALLS',
+    'MCP_TIMEOUT_MS',
+  ];
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it.each(withheld)('withholds %s from the runtime', (name) => {
+    const runtimeEnv = buildRuntimeEnv({ [name]: 'secret-value', PATH: '/usr/bin' });
+
+    expect(runtimeEnv).not.toHaveProperty(name);
+  });
+
+  it('withholds a credential whatever the case of its name (Windows)', () => {
+    expect(buildRuntimeEnv({ gh_token: 'secret-value', Github_Token: 'secret-value' })).toEqual({});
+  });
+
+  it('keeps the variables the runtime needs to start', () => {
+    const env = { PATH: '/usr/bin', HOME: '/home/dev', NODE_ENV: 'test', LOG_LEVEL: 'debug' };
+
+    expect(buildRuntimeEnv({ ...env, GITHUB_TOKEN: 'secret-value' })).toEqual(env);
+  });
+
+  it('drops variables that are unset', () => {
+    expect(buildRuntimeEnv({ PATH: '/usr/bin', EMPTY: undefined })).toEqual({ PATH: '/usr/bin' });
+  });
+
+  it('returns a copy and leaves its input unchanged', () => {
+    const input = { PATH: '/usr/bin', GITHUB_TOKEN: 'secret-value' };
+
+    const runtimeEnv = buildRuntimeEnv(input);
+
+    expect(input).toEqual({ PATH: '/usr/bin', GITHUB_TOKEN: 'secret-value' });
+    expect(runtimeEnv).not.toBe(input);
+  });
+
+  it('reads process.env when no environment is passed', () => {
+    vi.stubEnv('GITHUB_TOKEN', 'secret-value');
+    vi.stubEnv('KEPT_BY_TEST', 'kept');
+
+    const runtimeEnv = buildRuntimeEnv();
+
+    expect(runtimeEnv).not.toHaveProperty('GITHUB_TOKEN');
+    expect(runtimeEnv.KEPT_BY_TEST).toBe('kept');
+  });
+});
+
+describe('loadEnvFileIfPresent', () => {
+  it('loads the file and reports it when it exists', () => {
+    const load = vi.fn();
+
+    const loaded = loadEnvFileIfPresent({ path: 'custom.env', exists: () => true, load });
+
+    expect(loaded).toBe(true);
+    expect(load).toHaveBeenCalledExactlyOnceWith('custom.env');
+  });
+
+  it('does nothing when the file is missing', () => {
+    const load = vi.fn();
+
+    const loaded = loadEnvFileIfPresent({ exists: () => false, load });
+
+    expect(loaded).toBe(false);
+    expect(load).not.toHaveBeenCalled();
+  });
+
+  it('looks for .env by default', () => {
+    const exists = vi.fn(() => false);
+
+    loadEnvFileIfPresent({ exists });
+
+    expect(exists).toHaveBeenCalledExactlyOnceWith('.env');
+  });
+
+  it('uses the real file system by default and tolerates a missing file', () => {
+    expect(loadEnvFileIfPresent({ path: 'no-such-file-for-this-test.env' })).toBe(false);
   });
 });

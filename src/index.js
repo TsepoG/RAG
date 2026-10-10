@@ -1,22 +1,10 @@
 // @ts-check
-import { existsSync } from 'node:fs';
-import { loadConfig, redactConfig } from './config/index.js';
+import { loadConfig, loadEnvFileIfPresent, redactConfig } from './config/index.js';
 import { ConfigError } from './errors/index.js';
 import { createLogger } from './logger/index.js';
 
-const ENV_FILE = '.env';
 const APP_NAME = 'role-aware-assistant';
 const CONFIG_ERROR_EXIT_CODE = 1;
-
-/**
- * Loads the local .env file, if there is one, into the process environment.
- * Variables already set in the shell win over the file.
- */
-function loadEnvFileIfPresent() {
-  if (existsSync(ENV_FILE)) {
-    process.loadEnvFile(ENV_FILE);
-  }
-}
 
 /**
  * Starts the app: reads config, then logs one redacted startup line.

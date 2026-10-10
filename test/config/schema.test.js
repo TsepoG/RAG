@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { configSchema } from '../../src/config/schema.js';
+import { configSchema, ENV_VARIABLE_NAMES } from '../../src/config/schema.js';
 import { validEnv } from '../helpers/env.js';
 
 /**
@@ -21,6 +21,10 @@ describe('configSchema parsing', () => {
         LOG_LEVEL: 'debug',
         PORT: '8080',
         COPILOT_MODEL: 'gpt-x',
+        COPILOT_GITHUB_TOKEN: 'fake-copilot-token-for-tests',
+        ASK_TIMEOUT_MS: '60000',
+        MAX_TOOL_CALLS: '8',
+        MCP_TIMEOUT_MS: '15000',
       }),
     );
 
@@ -35,7 +39,12 @@ describe('configSchema parsing', () => {
         apiToken: 'fake-atlassian-token-for-tests',
         spaceKeys: ['ENG', 'PROD'],
       },
-      copilot: { model: 'gpt-x' },
+      copilot: {
+        model: 'gpt-x',
+        githubToken: 'fake-copilot-token-for-tests',
+        askTimeoutMs: 60_000,
+      },
+      mcp: { maxToolCalls: 8, timeoutMs: 15_000 },
     });
   });
 
@@ -43,7 +52,8 @@ describe('configSchema parsing', () => {
     const result = configSchema.parse(validEnv());
 
     expect(result).toMatchObject({ nodeEnv: 'development', logLevel: 'info', port: 3000 });
-    expect(result.copilot.model).toBeUndefined();
+    expect(result.copilot).toEqual({ askTimeoutMs: 120_000 });
+    expect(result.mcp).toEqual({ maxToolCalls: 12, timeoutMs: 30_000 });
   });
 
   it('ignores variables it does not know about', () => {
@@ -178,5 +188,67 @@ describe('configSchema other fields', () => {
     expect(failures(validEnv({ COPILOT_MODEL: ' ' }))).toEqual([
       'COPILOT_MODEL: must not be empty when set',
     ]);
+  });
+});
+
+describe('configSchema numeric settings', () => {
+  const settings = [
+    { name: 'PORT', min: 1, max: 65_535 },
+    { name: 'ASK_TIMEOUT_MS', min: 5000, max: 600_000 },
+    { name: 'MAX_TOOL_CALLS', min: 1, max: 50 },
+    { name: 'MCP_TIMEOUT_MS', min: 1000, max: 120_000 },
+  ];
+  const rejections = settings.flatMap(({ name, min, max }) =>
+    [String(min - 1), String(max + 1), 'abc', '1.5', '', '-1', '1 2'].map((value) => ({
+      name,
+      value,
+      message: `${name}: must be an integer between ${min} and ${max}`,
+    })),
+  );
+
+  it.each(settings)('accepts the lowest and highest $name', ({ name, min, max }) => {
+    expect(failures(validEnv({ [name]: String(min) }))).toEqual([]);
+    expect(failures(validEnv({ [name]: String(max) }))).toEqual([]);
+  });
+
+  it.each(rejections)('rejects $name=$value with one message', ({ name, value, message }) => {
+    expect(failures(validEnv({ [name]: value }))).toEqual([message]);
+  });
+});
+
+describe('configSchema COPILOT_GITHUB_TOKEN', () => {
+  it('is optional', () => {
+    expect(configSchema.parse(validEnv()).copilot.githubToken).toBeUndefined();
+  });
+
+  it('is trimmed when set', () => {
+    const result = configSchema.parse(validEnv({ COPILOT_GITHUB_TOKEN: '  tok-123  ' }));
+
+    expect(result.copilot.githubToken).toBe('tok-123');
+  });
+
+  it('rejects a blank value', () => {
+    expect(failures(validEnv({ COPILOT_GITHUB_TOKEN: '   ' }))).toEqual([
+      'COPILOT_GITHUB_TOKEN: must not be empty when set',
+    ]);
+  });
+});
+
+describe('ENV_VARIABLE_NAMES', () => {
+  it('lists every variable the schema reads', () => {
+    expect(ENV_VARIABLE_NAMES).toEqual(
+      expect.arrayContaining([
+        'GITHUB_TOKEN',
+        'ATLASSIAN_API_TOKEN',
+        'COPILOT_GITHUB_TOKEN',
+        'ASK_TIMEOUT_MS',
+        'MAX_TOOL_CALLS',
+        'MCP_TIMEOUT_MS',
+      ]),
+    );
+  });
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(ENV_VARIABLE_NAMES)).toBe(true);
   });
 });
