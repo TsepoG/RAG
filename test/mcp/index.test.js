@@ -8,6 +8,7 @@ describe('mcp public entry point', () => {
       'ALLOWLIST',
       'ATLASSIAN_MCP_URL',
       'GITHUB_MCP_URL',
+      'RAW_DIRECTORY',
       'SERVER_KEYS',
       'buildMcpServers',
       'checkSample',
