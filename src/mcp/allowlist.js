@@ -90,6 +90,23 @@ export function parseQualifiedName(name) {
 }
 
 /**
+ * Works out which server and tool a name from the runtime refers to. The runtime is expected to
+ * report `<server>-<tool>`, but a bare tool name is accepted when exactly one server lists it.
+ * The result is not checked against the allow-list: pass it to {@link isAllowedTool}.
+ * @param {string} name - A tool name as the runtime reports it.
+ * @returns {{ server: string, tool: string } | undefined} The parts, or undefined when the name
+ *   cannot be tied to one known server.
+ */
+export function resolveTool(name) {
+  const qualified = parseQualifiedName(name);
+  if (qualified !== undefined) {
+    return qualified;
+  }
+  const owners = Object.keys(ALLOWLIST).filter((server) => ALLOWLIST[server].includes(name));
+  return owners.length === 1 ? { server: owners[0], tool: name } : undefined;
+}
+
+/**
  * Builds the `availableTools` filter that exposes exactly the allow-listed MCP tools.
  * @returns {string[]} Entries such as `mcp:atlassian-searchConfluence`, one per allowed tool.
  */

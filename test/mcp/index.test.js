@@ -13,12 +13,14 @@ describe('mcp public entry point', () => {
       'classifyTool',
       'collectToolReport',
       'createPermissionHandler',
+      'createToolHooks',
       'isAllowedTool',
       'isWriteToolName',
       'listServerTools',
       'parseQualifiedName',
       'qualifiedName',
       'renderToolsMarkdown',
+      'resolveTool',
       'toAvailableTools',
     ]);
   });

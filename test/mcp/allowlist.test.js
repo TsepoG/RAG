@@ -1,5 +1,4 @@
 // @ts-check
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   ALLOWLIST,
@@ -7,29 +6,12 @@ import {
   MCP_FILTER_PREFIX,
   parseQualifiedName,
   qualifiedName,
+  resolveTool,
   toAvailableTools,
 } from '../../src/mcp/allowlist.js';
 import { classifyTool, isWriteToolName } from '../../src/mcp/classify.js';
 import { SERVER_KEYS } from '../../src/mcp/servers.js';
-
-const DISCOVERY_FILE = new URL('../../docs/mcp-tools.md', import.meta.url);
-
-/**
- * Reads the tools listed in docs/mcp-tools.md.
- * @returns {Map<string, Map<string, string>>} For each server key, tool name to its class.
- */
-function discoveredTools() {
-  const servers = new Map();
-  for (const section of readFileSync(DISCOVERY_FILE, 'utf8').split(/^## /m).slice(1)) {
-    const key = section.split('\n', 1)[0].trim();
-    const tools = new Map();
-    for (const [, name, kind] of section.matchAll(/^\| `([^`]+)` \| (read|write) \|/gm)) {
-      tools.set(name, kind);
-    }
-    servers.set(key, tools);
-  }
-  return servers;
-}
+import { readDiscoveredTools } from '../helpers/discovery-doc.js';
 
 describe('ALLOWLIST contents', () => {
   it('allows exactly three Confluence tools on Atlassian', () => {
@@ -83,7 +65,7 @@ describe('ALLOWLIST is read-only', () => {
 });
 
 describe('ALLOWLIST matches docs/mcp-tools.md', () => {
-  const discovered = discoveredTools();
+  const discovered = readDiscoveredTools();
 
   it('found both servers in the discovery output', () => {
     expect([...discovered.keys()]).toEqual(['atlassian', 'github_repos']);
@@ -92,7 +74,7 @@ describe('ALLOWLIST matches docs/mcp-tools.md', () => {
   it.each(
     Object.entries(ALLOWLIST).flatMap(([server, tools]) => tools.map((tool) => [server, tool])),
   )('lists %s tool %s as read', (server, tool) => {
-    expect(discovered.get(server)?.get(tool)).toBe('read');
+    expect(discovered.get(server)?.get(tool)?.kind).toBe('read');
   });
 });
 
@@ -220,4 +202,34 @@ describe('toAvailableTools', () => {
   it('returns a new array each time', () => {
     expect(toAvailableTools()).not.toBe(toAvailableTools());
   });
+});
+
+describe('resolveTool', () => {
+  it.each(Object.entries(ALLOWLIST).flatMap(([s2, tools]) => tools.map((t) => [s2, t])))(
+    'resolves the qualified name of %s %s',
+    (server, tool) => {
+      expect(resolveTool(qualifiedName(server, tool))).toEqual({ server, tool });
+    },
+  );
+
+  it.each(Object.entries(ALLOWLIST).flatMap(([s2, tools]) => tools.map((t) => [s2, t])))(
+    'resolves the bare name of %s %s when only one server lists it',
+    (server, tool) => {
+      expect(resolveTool(tool)).toEqual({ server, tool });
+    },
+  );
+
+  it('still resolves a qualified name whose tool is not allowed, so the caller can refuse it', () => {
+    expect(resolveTool('github_repos-push_files')).toEqual({
+      server: 'github_repos',
+      tool: 'push_files',
+    });
+  });
+
+  it.each(['push_files', 'bash', 'view', 'executeRead', '', 'rogue-search_code'])(
+    'does not resolve %j',
+    (name) => {
+      expect(resolveTool(name)).toBeUndefined();
+    },
+  );
 });
