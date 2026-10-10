@@ -88,6 +88,11 @@ describe('askQuestion answer', () => {
     expect(session.sent).toEqual([{ prompt: 'Where is the retry logic?' }]);
     expect(result).toEqual({
       answer: 'The retry is in src/retry.js.',
+      role: 'tester',
+      sources: [],
+      alsoConsulted: [],
+      invalidKeys: [],
+      uncitedSourceKeys: [],
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,

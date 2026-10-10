@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 /**
  * What a fake session should do, beyond recording calls.
  * @typedef {object} FakeSessionBehaviour
- * @property {(emit: (type: string, data: Record<string, unknown>) => void) => void} [script] -
+ * @property {(emit: (type: string, data: Record<string, unknown>) => void) => void | Promise<void>} [script] -
  *   Called from `send`; emits the events the session would produce.
  * @property {Error} [sendError] - Makes `send` reject.
  * @property {Error} [abortError] - Makes `abort` reject.
@@ -56,7 +56,7 @@ export function createFakeSession({
       if (sendError) {
         throw sendError;
       }
-      script?.(emit);
+      await script?.(emit);
       return 'message-1';
     }),
     abort: vi.fn(async () => {
