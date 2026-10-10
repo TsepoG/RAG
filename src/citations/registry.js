@@ -18,12 +18,12 @@
  * @typedef {object} GithubSource
  * @property {'github'} type - Source type.
  * @property {string} repo - Repository as `owner/repo`.
- * @property {string} path - File path; empty for a commit or release.
+ * @property {string} path - File or folder path; empty for a commit, a release or the top folder.
  * @property {string} title - What to call it: the path, a short commit message or a tag name.
  * @property {string} commitSha - The commit the content is pinned to, or an empty string.
  * @property {string} url - Link to it, pinned to the commit when `pinned` is true.
  * @property {string} latestUrl - The same thing on the default branch.
- * @property {'file' | 'commit' | 'release'} kind - What it is.
+ * @property {'file' | 'directory' | 'commit' | 'release'} kind - What it is.
  * @property {boolean} pinned - True when the link names an exact commit.
  */
 

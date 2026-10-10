@@ -62,6 +62,7 @@ Invalid values are reported by variable name, never by value.
 | `GITHUB_TOKEN`          | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos |
 | `GITHUB_REPOS`          | yes      |               | Comma-separated `owner/repo` list, at least one                           |
 | `ATLASSIAN_SITE_URL`    | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed               |
+| `ATLASSIAN_CLOUD_ID`    | no       |               | Site cloudId (UUID); when set it is used on every Confluence call         |
 | `ATLASSIAN_AUTH_MODE`   | no       | `basic`       | `basic` (personal API token) or `bearer` (service-account API key)        |
 | `ATLASSIAN_EMAIL`       | basic    |               | Email of the account that owns the API token; not used in `bearer` mode   |
 | `ATLASSIAN_API_TOKEN`   | yes      |               | Atlassian API token or service-account API key (see Atlassian access)     |

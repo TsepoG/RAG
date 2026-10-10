@@ -119,6 +119,29 @@ describe('buildBaseMessage', () => {
   });
 });
 
+describe('buildBaseMessage cloudId and folders', () => {
+  const CLOUD_ID = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+
+  it('tells the model the cloudId and not to look it up, when one is configured', () => {
+    const base = buildBaseMessage({ ...SCOPE, cloudId: CLOUD_ID });
+
+    expect(base).toContain(`The cloudId of that site is ${CLOUD_ID}.`);
+    expect(base).toContain('Do not call getAccessibleAtlassianResources');
+    expect(base).not.toContain('getAccessibleAtlassianResources first');
+  });
+
+  it('leaves the lookup instruction as it was when no cloudId is configured', () => {
+    expect(buildBaseMessage(SCOPE)).toContain('getAccessibleAtlassianResources first');
+  });
+
+  it('says a folder listing can be cited for what exists but not for what is inside a file', () => {
+    const base = buildBaseMessage(SCOPE);
+
+    expect(base).toContain('A folder listing is a source');
+    expect(base).toContain('open a file before saying what it contains');
+  });
+});
+
 describe('buildRoleBlock', () => {
   it('says who the answer is for', () => {
     const block = buildRoleBlock(

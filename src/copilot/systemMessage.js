@@ -6,6 +6,8 @@
  * @property {ReadonlyArray<string>} spaceKeys - Confluence space keys the assistant may use.
  * @property {ReadonlyArray<string>} repos - GitHub repositories (`owner/repo`) it may use.
  * @property {string} siteUrl - The Atlassian site, so the right cloudId is chosen.
+ * @property {string} [cloudId] - The site's cloudId, when configured; the model is then told to use
+ *   it and not look it up.
  */
 
 /**
@@ -24,6 +26,17 @@ const DEPTH_GUIDANCE = Object.freeze({
 });
 
 /**
+ * Says how to get the cloudId the Confluence tools need.
+ * @param {string | undefined} cloudId - The configured cloudId, if any.
+ * @returns {string} The rule.
+ */
+function cloudIdRule(cloudId) {
+  return cloudId === undefined
+    ? '- Call getAccessibleAtlassianResources first to get the cloudId of that site; the other Confluence tools need it.'
+    : `- The cloudId of that site is ${cloudId}. Use it for every Confluence call. Do not call getAccessibleAtlassianResources to look it up.`;
+}
+
+/**
  * Builds the part of the system message that is the same for every role: grounding, safety,
  * search scoping and citation rules. Keeping it identical means a role changes how an answer is
  * written, never how carefully it is grounded. The hooks enforce the scoping rules, so a model
@@ -31,7 +44,7 @@ const DEPTH_GUIDANCE = Object.freeze({
  * @param {SystemMessageScope} scope - What the assistant may read.
  * @returns {string} The base text.
  */
-export function buildBaseMessage({ spaceKeys, repos, siteUrl }) {
+export function buildBaseMessage({ spaceKeys, repos, siteUrl, cloudId }) {
   return [
     "You answer questions about a team's Confluence documentation and GitHub code, using only the tools you have been given.",
     '',
@@ -48,7 +61,7 @@ export function buildBaseMessage({ spaceKeys, repos, siteUrl }) {
     '- Do not write a Sources list or any links to sources. The application adds the list of sources.',
     '',
     `Confluence (site ${siteUrl}, spaces ${spaceKeys.join(', ')}):`,
-    '- Call getAccessibleAtlassianResources first to get the cloudId of that site; the other Confluence tools need it.',
+    cloudIdRule(cloudId),
     '- Search with searchConfluence. Rovo search is not available. Every CQL query must be restricted to the spaces above, for example: space = KEY AND text ~ "term", or space in (KEY1, KEY2) AND text ~ "term".',
     '- Join CQL clauses with AND only. Do not use OR, NOT or parentheses, except in a space in (...) list. Do not pass cqlcontext.',
     `- Open a page with getConfluenceContent, passing a content_url like ${siteUrl}/wiki/spaces/KEY/pages/ID built from a search hit's url. Never use the short links that start with /x/. Never pass a content_id.`,
@@ -57,6 +70,7 @@ export function buildBaseMessage({ spaceKeys, repos, siteUrl }) {
     '- Tools that take owner and repo (get_file_contents, get_commit, list_commits, list_releases, get_latest_release) work only on the repositories above.',
     '- Every search_code query must include a repo:owner/name qualifier for one of those repositories. Do not use OR, org: or user: in a query.',
     '- If search_code returns no results, do not repeat it with other words. List folders with get_file_contents (path / or a folder name) and open the files instead.',
+    '- A folder listing is a source: cite it for which files and folders exist. It does not show what is inside a file, so open a file before saying what it contains.',
   ].join('\n');
 }
 

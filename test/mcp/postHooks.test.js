@@ -131,6 +131,28 @@ describe('onPostToolUse wraps what the model fetched', () => {
     });
   });
 
+  it('registers a folder listing as a source and wraps it, so claims about it can cite it', async () => {
+    const { hooks, registry } = setup();
+    const args = { owner: 'acme', repo: 'app', path: 'src' };
+
+    const result = await runFixture(
+      hooks,
+      'github_repos-get_file_contents',
+      'get_file_contents_dir',
+      args,
+    );
+
+    expect(
+      result.modifiedResult.textResultForLlm.startsWith('<source key="G1" type="github"'),
+    ).toBe(true);
+    expect(registry.get('G1')).toMatchObject({
+      kind: 'directory',
+      path: 'src',
+      url: `https://github.com/acme/app/tree/${COMMIT_SHA}/src`,
+      pinned: true,
+    });
+  });
+
   it('looks up the head commit for a file whose result names none, and pins to it', async () => {
     const resolveHead = vi.fn(async () => HEAD_SHA);
     const { hooks, registry } = setup({ resolveHead });

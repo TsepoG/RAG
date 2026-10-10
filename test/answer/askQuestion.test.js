@@ -284,6 +284,20 @@ describe('askQuestion session setup', () => {
     expect(decision.permissionDecision).toBe('deny');
   });
 
+  it('gives the hooks the configured cloudId, so Confluence calls use it', async () => {
+    const cloudId = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+    const { deps, client } = setup({ env: { ATLASSIAN_CLOUD_ID: cloudId } });
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+    const [{ hooks }] = client.configs;
+
+    const decision = hooks.onPreToolUse({
+      toolName: 'atlassian-searchConfluence',
+      toolArgs: { cql: 'space = ENG AND text ~ "x"', cloudId: '<fill>' },
+    });
+
+    expect(decision.modifiedArgs).toMatchObject({ cloudId });
+  });
+
   it('registers a working permission handler: a shell request is rejected', async () => {
     const { deps, client } = setup();
     await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);

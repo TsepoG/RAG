@@ -34,6 +34,18 @@ describe('friendlyLabel for GitHub files', () => {
   });
 });
 
+describe('friendlyLabel for folders', () => {
+  it.each([
+    ['src/refunds', 'Refunds folder'],
+    ['src/data_layer', 'Data layer folder'],
+    ['', 'Top-level folder'],
+  ])('names the folder %j as "%s"', (path, name) => {
+    expect(friendlyLabel(githubSource({ path, kind: 'directory' }))).toBe(
+      `${name} — code (payments-service)`,
+    );
+  });
+});
+
 describe('friendlyLabel for commits and releases', () => {
   it('names a commit by its short SHA', () => {
     const label = friendlyLabel(githubSource({ kind: 'commit', path: '' }));

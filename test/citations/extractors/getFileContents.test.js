@@ -44,16 +44,101 @@ describe('extractFileContents from a real fixture', () => {
 
     expect(resolveHead).not.toHaveBeenCalled();
   });
+});
 
-  it('treats a directory listing as nothing to cite', async () => {
-    const result = await extractFileContents(fixtureInput('get_file_contents_dir'), makeContext());
+describe('extractFileContents folder listings', () => {
+  const ROOT_ARGS = { owner: 'acme', repo: 'app', path: '/' };
 
-    expect(result).toMatchObject({
-      sources: [],
-      candidates: [],
-      blocked: false,
-      reason: 'directory',
+  it('registers a listing as a folder source pinned to the commit its entries name', async () => {
+    const resolveHead = vi.fn(async () => HEAD_SHA);
+
+    const result = await extractFileContents(
+      fixtureInput('get_file_contents_dir', ROOT_ARGS),
+      makeContext({ resolveHead }),
+    );
+
+    expect(result.sources).toEqual([
+      {
+        type: 'github',
+        repo: 'acme/app',
+        path: '',
+        title: '/',
+        commitSha: COMMIT_SHA,
+        url: `https://github.com/acme/app/tree/${COMMIT_SHA}`,
+        latestUrl: 'https://github.com/acme/app/tree/HEAD',
+        kind: 'directory',
+        pinned: true,
+      },
+    ]);
+    expect(result).toMatchObject({ blocked: false, candidates: [] });
+    expect(resolveHead).not.toHaveBeenCalled();
+  });
+
+  it('links a sub-folder with its path, ignoring slashes at either end', async () => {
+    const { sources } = await extractFileContents(
+      { ...fixtureInput('get_file_contents_dir'), args: { ...ROOT_ARGS, path: '/src/my dir/' } },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({
+      path: 'src/my dir',
+      title: 'src/my dir/',
+      url: `https://github.com/acme/app/tree/${COMMIT_SHA}/src/my%20dir`,
+      latestUrl: 'https://github.com/acme/app/tree/HEAD/src/my%20dir',
     });
+  });
+
+  it('looks up the head commit when no entry names one', async () => {
+    const { sources } = await extractFileContents({ args: ROOT_ARGS, text: '[]' }, makeContext());
+
+    expect(sources[0]).toMatchObject({
+      commitSha: HEAD_SHA,
+      pinned: true,
+      url: `https://github.com/acme/app/tree/${HEAD_SHA}`,
+    });
+  });
+
+  it('does not take a commit from the link of an entry in another repository', async () => {
+    const entry = { html_url: `https://github.com/other/repo/blob/${COMMIT_SHA}/a.js` };
+
+    const { sources } = await extractFileContents(
+      { args: ROOT_ARGS, text: JSON.stringify([entry]) },
+      makeContext({ resolveHead: async () => undefined }),
+    );
+
+    expect(sources[0]).toMatchObject({ commitSha: '', pinned: false });
+    expect(sources[0].url).toBe('https://github.com/acme/app/tree/HEAD');
+  });
+
+  it('does not take a branch name or a blob SHA for a commit', async () => {
+    const text = JSON.stringify([
+      { html_url: 'https://github.com/acme/app/blob/main/a.js', sha: BLOB_SHA },
+      { html_url: 'not a link' },
+      'not an object',
+    ]);
+
+    const { sources } = await extractFileContents(
+      { args: ROOT_ARGS, text },
+      makeContext({ resolveHead: async () => undefined }),
+    );
+
+    expect(sources[0]).toMatchObject({ commitSha: '' });
+    expect(JSON.stringify(sources)).not.toContain(BLOB_SHA);
+  });
+
+  it('makes no source for a repository that is not allowed', async () => {
+    const result = await extractFileContents(
+      { args: { owner: 'other', repo: 'repo', path: '/' }, text: '[]' },
+      makeContext(),
+    );
+
+    expect(result).toMatchObject({ sources: [], reason: 'repo-not-allowed' });
+  });
+
+  it('makes no source for text that starts like a listing but is not one', async () => {
+    const result = await extractFileContents({ args: ROOT_ARGS, text: '[oops' }, makeContext());
+
+    expect(result).toMatchObject({ sources: [], reason: 'unparseable' });
   });
 });
 
@@ -212,12 +297,12 @@ describe('extractFileContents paths and repositories', () => {
     },
   );
 
-  it('reads a directory listing with leading whitespace as a directory', async () => {
+  it('reads a listing with leading whitespace as a folder', async () => {
     const result = await extractFileContents(
       { args: ARGS, text: '\n  [{"type":"file"}]' },
       makeContext(),
     );
 
-    expect(result.reason).toBe('directory');
+    expect(result.sources[0]).toMatchObject({ kind: 'directory', path: 'docs/Guide.md' });
   });
 });

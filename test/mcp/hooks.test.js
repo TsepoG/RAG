@@ -622,3 +622,87 @@ describe('createToolHooks defaults', () => {
     ]);
   });
 });
+
+describe('onPreToolUse sets the cloudId on Confluence calls', () => {
+  const CLOUD_ID = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+  const search = { cql: 'space = ENG AND text ~ "retry"', limit: 5 };
+
+  /**
+   * Reads the arguments a decision asks the call to run with.
+   * @param {ToolHooks} hooks - The hooks.
+   * @param {string} tool - Tool name.
+   * @param {unknown} args - Arguments.
+   * @returns {unknown} The replacement arguments, if any.
+   */
+  const modified = (hooks, tool, args) =>
+    /** @type {{ modifiedArgs?: unknown }} */ (pre(hooks, tool, args)).modifiedArgs;
+
+  it('adds it when the model sent none', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    expect(modified(hooks, 'atlassian-searchConfluence', search)).toEqual({
+      ...search,
+      cloudId: CLOUD_ID,
+    });
+  });
+
+  it.each(['<fill>', 'wrong-id', '', 42])('replaces the value %j the model sent', (value) => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+    const args = { content_url: PAGE_IN_ENG, cloudId: value };
+
+    expect(modified(hooks, 'atlassian-getConfluenceContent', args)).toEqual({
+      content_url: PAGE_IN_ENG,
+      cloudId: CLOUD_ID,
+    });
+  });
+
+  it('still allows the call, and does not change the arguments object the model sent', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+    const args = { ...search };
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', args);
+
+    expect(decision.permissionDecision).toBe('allow');
+    expect(args).toEqual(search);
+  });
+
+  it('leaves the arguments alone when no cloudId is configured', () => {
+    const { hooks } = setup();
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', { ...search, cloudId: '<fill>' });
+
+    expect(decision).toEqual({ permissionDecision: 'allow' });
+  });
+
+  it.each([
+    ['atlassian-getAccessibleAtlassianResources', {}],
+    ['github_repos-get_file_contents', { owner: 'acme', repo: 'app' }],
+  ])('does not add it to %s', (tool, args) => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    expect(pre(hooks, tool, args)).toEqual({ permissionDecision: 'allow' });
+  });
+
+  it('checks the scope first, so a denied call is not rewritten', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', {
+      cql: 'space = OTHER AND text ~ "x"',
+    });
+
+    expect(decision.permissionDecision).toBe('deny');
+    expect(decision).not.toHaveProperty('modifiedArgs');
+  });
+
+  it('times the call whichever form of the arguments the post-tool hook reports', async () => {
+    const { hooks, lines, setTime } = setup({ cloudId: CLOUD_ID });
+    pre(hooks, 'atlassian-searchConfluence', search);
+    setTime(40);
+
+    await post(hooks, 'atlassian-searchConfluence', { ...search, cloudId: CLOUD_ID }, '{}');
+
+    expect(lines().find((line) => line.msg === 'tool call completed')).toMatchObject({
+      durationMs: 40,
+    });
+  });
+});

@@ -1,8 +1,10 @@
 // @ts-check
 import { isAllowedTool, resolveTool } from './allowlist.js';
+import { SERVER_KEYS } from './servers.js';
 import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL, MAX_CODE_SEARCHES } from './hints.js';
 import { createPostToolHooks } from './postHooks.js';
 import { buildScope, checkToolScope } from './scope.js';
+import { asRecord } from './scopeCommon.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
 /** @typedef {Parameters<NonNullable<SessionHooks['onPreToolUse']>>[0]} PreToolInput */
@@ -18,6 +20,8 @@ import { buildScope, checkToolScope } from './scope.js';
  * @property {ReadonlyArray<string>} spaceKeys - Allowed Confluence space keys.
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
+ * @property {string} [cloudId] - The Atlassian cloudId. When set, it replaces the one the model
+ *   passes to Confluence tools, whether missing, a placeholder or wrong.
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
  * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
  *   are recorded; a fresh one when omitted.
@@ -30,6 +34,9 @@ import { buildScope, checkToolScope } from './scope.js';
 
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
+
+/** Confluence tools that take a cloudId; getAccessibleAtlassianResources takes no arguments. */
+const CLOUD_ID_TOOLS = new Set(['searchConfluence', 'getConfluenceContent']);
 
 /** Said to the model when a call is refused for a reason it cannot act on. */
 const NOT_AVAILABLE = 'This tool is not available.';
@@ -90,6 +97,7 @@ function createPreToolHook({
   spaceKeys,
   siteUrl,
   maxToolCalls,
+  cloudId,
   logger,
   timer,
   checkScope = checkToolScope,
@@ -115,7 +123,8 @@ function createPreToolHook({
    * Decides on one call.
    * @param {string} toolName - Tool name as the runtime reported it.
    * @param {unknown} toolArgs - Tool arguments.
-   * @returns {{ permissionDecision: 'allow' | 'deny', permissionDecisionReason?: string }} The decision.
+   * @returns {{ permissionDecision: 'allow' | 'deny', permissionDecisionReason?: string, modifiedArgs?: unknown }}
+   *   The decision, with the arguments to run the call with when they were changed.
    */
   function decide(toolName, toolArgs) {
     // Every attempt counts, allowed or not, so a model stuck retrying a denied call still stops.
@@ -142,7 +151,17 @@ function createPreToolHook({
       codeSearches += 1;
     }
     timer.start(toolName, toolArgs);
-    return { permissionDecision: 'allow' };
+    if (
+      cloudId === undefined ||
+      target.server !== SERVER_KEYS.atlassian ||
+      !CLOUD_ID_TOOLS.has(target.tool)
+    ) {
+      return { permissionDecision: 'allow' };
+    }
+    const modifiedArgs = { ...asRecord(toolArgs), cloudId };
+    // The post-tool hook may be given either form of the arguments, so both are timed.
+    timer.start(toolName, modifiedArgs);
+    return { permissionDecision: 'allow', modifiedArgs };
   }
 
   return (input) => {

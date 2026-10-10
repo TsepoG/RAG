@@ -45,6 +45,7 @@ export function buildSessionConfig({ config, role, workingDirectory, hooks, onPe
         spaceKeys: config.atlassian.spaceKeys,
         repos: config.github.repos,
         siteUrl: config.atlassian.siteUrl,
+        cloudId: config.atlassian.cloudId,
       }),
     },
     mcpServers: buildMcpServers(config, ALLOWLIST),

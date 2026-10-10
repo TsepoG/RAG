@@ -120,6 +120,7 @@ export async function askQuestion({ question, role, onDelta }, deps) {
       repos: config.github.repos,
       spaceKeys: config.atlassian.spaceKeys,
       siteUrl: config.atlassian.siteUrl,
+      cloudId: config.atlassian.cloudId,
       maxToolCalls: config.mcp.maxToolCalls,
       secrets: listSecrets(config),
       registry,

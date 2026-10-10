@@ -61,6 +61,14 @@ describe('buildSessionConfig prompt and streaming', () => {
     });
   });
 
+  it('puts the configured cloudId in the system message', () => {
+    const cloudId = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+
+    const content = build({ ATLASSIAN_CLOUD_ID: cloudId }).systemMessage;
+
+    expect(JSON.stringify(content)).toContain(`The cloudId of that site is ${cloudId}.`);
+  });
+
   it('writes the system message for the role it is given', () => {
     const content = build({}, makeRole({ displayName: 'Auditor' })).systemMessage;
 

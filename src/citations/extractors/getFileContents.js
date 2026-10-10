@@ -6,6 +6,7 @@ import {
   repoFromArguments,
   asObject,
   asString,
+  parseJson,
 } from './shared.js';
 
 // The resource a file result names: repo://<owner>/<repo>/sha/<commit>/contents/<path>. The SHA in
@@ -13,6 +14,8 @@ import {
 // data). It is not the blob SHA that the "successfully downloaded" line and directory listings show.
 const RESOURCE_URI = /repo:\/\/([^/\s"]+\/[^/\s"]+)\/sha\/([0-9a-f]{40})\/contents\/([^\s"]+)/;
 const DIRECTORY_START = '[';
+// A listed entry's link names the commit the listing was read at: .../blob|tree/<commit>/<path>.
+const ENTRY_LINK = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|tree)\/([0-9a-f]{40})\//;
 
 /**
  * Percent-decodes a path, leaving it as it is when it is not validly encoded.
@@ -40,6 +43,35 @@ function blobUrl(repo, ref, path) {
 }
 
 /**
+ * Builds a github.com folder link for a path.
+ * @param {string} repo - `owner/repo`.
+ * @param {string} ref - A commit SHA, or HEAD for the default branch.
+ * @param {string} path - The folder path; empty for the top folder.
+ * @returns {string} The link.
+ */
+function treeUrl(repo, ref, path) {
+  const encoded = path === '' ? '' : `/${path.split('/').map(encodeURIComponent).join('/')}`;
+  return `https://github.com/${repo}/tree/${ref}${encoded}`;
+}
+
+/**
+ * Finds the commit a folder listing was read at, from the links of its entries. Only an entry of
+ * the same repository counts, and an entry's own blob SHA is never in that position of the link.
+ * @param {ReadonlyArray<unknown>} listing - The parsed listing.
+ * @param {string} repo - `owner/repo`.
+ * @returns {string | undefined} A full commit SHA, or undefined.
+ */
+function commitOfListing(listing, repo) {
+  for (const entry of listing) {
+    const link = ENTRY_LINK.exec(asString(asObject(entry).html_url));
+    if (link !== null && link[1].toLowerCase() === repo.toLowerCase()) {
+      return link[2];
+    }
+  }
+  return undefined;
+}
+
+/**
  * Looks up the head commit through the context, never letting a failure there escape.
  * @param {import('./shared.js').ExtractContext} context - The context.
  * @param {string} repo - `owner/repo`.
@@ -55,15 +87,56 @@ async function lookUpHead(context, repo) {
 }
 
 /**
+ * Reads a folder listing the model fetched. It is a source for which files and folders exist, and
+ * pinned like a file: to the commit its entries' links name, else the head commit, else not pinned.
+ * @param {import('./shared.js').ExtractInput} input - The arguments and text of the call.
+ * @param {import('./shared.js').ExtractContext} context - The context.
+ * @returns {Promise<import('./shared.js').Extraction>} The listing as a source, or nothing.
+ */
+async function extractDirectory({ args, text }, context) {
+  const listing = parseJson(text);
+  const repo = repoFromArguments(args);
+  if (!Array.isArray(listing)) {
+    return nothing('unparseable');
+  }
+  if (!isAllowedRepo(context.repos, repo) || repo === undefined) {
+    return nothing('repo-not-allowed');
+  }
+  const path = asString(asObject(args).path)
+    .split('/')
+    .filter((part) => part !== '')
+    .join('/');
+  const commitSha = commitOfListing(listing, repo) ?? (await lookUpHead(context, repo)) ?? '';
+  const pinned = commitSha !== '';
+  return {
+    sources: [
+      {
+        type: 'github',
+        repo,
+        path,
+        title: path === '' ? '/' : `${path}/`,
+        commitSha,
+        url: treeUrl(repo, pinned ? commitSha : 'HEAD', path),
+        latestUrl: treeUrl(repo, 'HEAD', path),
+        kind: 'directory',
+        pinned,
+      },
+    ],
+    candidates: [],
+    blocked: false,
+  };
+}
+
+/**
  * Reads a file the model fetched. The commit it is pinned to comes only from the resource named
  * in the result; a blob SHA is never used as one. When the result names no commit, the head commit
  * of the default branch is looked up, and when that fails the link is to the default branch and
- * marked as not pinned. A directory listing is not a source.
+ * marked as not pinned. A folder listing is read by extractDirectory.
  * @type {import('./shared.js').Extractor}
  */
 export async function extractFileContents({ args, text, log }, context) {
   if (text.trimStart().startsWith(DIRECTORY_START)) {
-    return nothing('directory');
+    return extractDirectory({ args, text }, context);
   }
   const named = RESOURCE_URI.exec(log ?? '');
   const repo = named?.[1] ?? repoFromArguments(args);
