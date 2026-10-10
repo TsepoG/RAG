@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createCitationRegistry } from '../../src/citations/index.js';
 import { createLogger } from '../../src/logger/index.js';
-import { createPostToolHooks } from '../../src/mcp/postHooks.js';
+import { CUT_NOTICE, createPostToolHooks, MAX_SOURCE_CHARS } from '../../src/mcp/postHooks.js';
 import { fixtureInput, HEAD_SHA } from '../helpers/extraction.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
@@ -191,6 +191,60 @@ describe('onPostToolUse wraps what the model fetched', () => {
     const text = result.modifiedResult.textResultForLlm;
     expect(text.match(/<[\s/]*source/gi)).toHaveLength(2);
     expect(text).not.toContain('<source key="C9"');
+  });
+
+  it('cuts a very long page to the limit, says so, and keeps the wrapper intact', async () => {
+    const { hooks } = setup();
+    const long = JSON.stringify({
+      data: {
+        id: '262439',
+        title: 'Long page',
+        body: { value: 'x'.repeat(MAX_SOURCE_CHARS * 2) },
+        metadata: { version: { number: 1 } },
+      },
+    });
+
+    const result = await run(hooks, 'atlassian-getConfluenceContent', PAGE, long);
+
+    const text = result.modifiedResult.textResultForLlm;
+    expect(text.startsWith('<source key="C1" type="confluence" title="Long page">\n')).toBe(true);
+    expect(text.endsWith(`${CUT_NOTICE}\n</source>`)).toBe(true);
+    expect(text.length).toBeLessThan(MAX_SOURCE_CHARS + 300);
+  });
+
+  it('still registers a page that is cut, and logs its full size', async () => {
+    const { hooks, registry, lines } = setup();
+    const long = JSON.stringify({
+      data: {
+        id: '262439',
+        title: 'Long page',
+        body: { value: 'x'.repeat(MAX_SOURCE_CHARS * 2) },
+        metadata: { version: { number: 1 } },
+      },
+    });
+
+    await run(hooks, 'atlassian-getConfluenceContent', PAGE, long);
+
+    expect(registry.get('C1')).toMatchObject({ id: '262439' });
+    expect(lines().find((line) => line.msg === 'tool call completed')).toMatchObject({
+      resultChars: long.length,
+    });
+  });
+
+  it('does not cut text that is exactly at the limit', async () => {
+    const { hooks } = setup();
+    const base = JSON.stringify({
+      data: { id: '262439', title: 'P', body: { value: '' }, metadata: { version: { number: 1 } } },
+    });
+    const exact = base.replace(
+      '"value":""',
+      `"value":"${'x'.repeat(MAX_SOURCE_CHARS - base.length)}"`,
+    );
+
+    const result = await run(hooks, 'atlassian-getConfluenceContent', PAGE, exact);
+
+    expect(exact).toHaveLength(MAX_SOURCE_CHARS);
+    expect(result.modifiedResult.textResultForLlm).not.toContain(CUT_NOTICE);
   });
 
   it('logs which keys were registered, never what the page said', async () => {

@@ -34,6 +34,24 @@ import { SERVER_KEYS } from './servers.js';
 /** Longest error text logged for a failed tool call. */
 const ERROR_TEXT_LIMIT = 300;
 
+/**
+ * Most characters of one source given to the model: about 6,000 tokens, so a few long pages fit in
+ * one answer's budget. Anything longer is cut, and the model is told so.
+ */
+export const MAX_SOURCE_CHARS = 24_000;
+
+/** Added where a source is cut, so the model does not take the end of the text for the end. */
+export const CUT_NOTICE = '\n[The rest of this content was cut because it is too long.]';
+
+/**
+ * Cuts text that is too long for one source.
+ * @param {string} text - What the tool returned.
+ * @returns {string} The text, or its first MAX_SOURCE_CHARS characters followed by a notice.
+ */
+function capLength(text) {
+  return text.length > MAX_SOURCE_CHARS ? `${text.slice(0, MAX_SOURCE_CHARS)}${CUT_NOTICE}` : text;
+}
+
 /** The result the model gets in place of Confluence content that must not reach it. */
 const REMOVED_RESULT = Object.freeze({
   textResultForLlm: removedNotice(),
@@ -121,7 +139,10 @@ export function createPostToolHooks({
       return undefined;
     }
     logger.info({ tool: input.toolName, keys }, 'sources registered');
-    const wrapped = wrapAsSource({ key: keys[0], type: source.type, title: source.title }, text);
+    const wrapped = wrapAsSource(
+      { key: keys[0], type: source.type, title: source.title },
+      capLength(text),
+    );
     return { modifiedResult: { ...input.toolResult, textResultForLlm: wrapped } };
   }
 

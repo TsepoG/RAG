@@ -131,6 +131,10 @@ describe('buildSessionConfig sandbox', () => {
     expect(build().workingDirectory).toBe(WORKING_DIRECTORY);
   });
 
+  it('does not let the runtime swap a long result for a temp file the model cannot read', () => {
+    expect(build().largeOutput).toEqual({ enabled: false });
+  });
+
   it('keeps no history, memory or discovered configuration', () => {
     const config = build();
 

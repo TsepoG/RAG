@@ -72,6 +72,8 @@ describe('buildBaseMessage', () => {
     'Join CQL clauses with AND only',
     'Do not pass cqlcontext',
     'content_url',
+    'a content_url like https://acme.atlassian.net/wiki/spaces/KEY/pages/ID built from a search hit',
+    'Never use the short links that start with /x/',
     'Never pass a content_id',
   ])('gives the Confluence rule %j', (fragment) => {
     expect(base).toContain(fragment);
@@ -81,6 +83,8 @@ describe('buildBaseMessage', () => {
     'repo:owner/name qualifier',
     'search_code',
     'Do not use OR, org: or user:',
+    'If search_code returns no results, do not repeat it with other words',
+    'List folders with get_file_contents',
     'get_file_contents, get_commit, list_commits, list_releases, get_latest_release',
   ])('gives the GitHub rule %j', (fragment) => {
     expect(base).toContain(fragment);

@@ -54,6 +54,10 @@ export function buildSessionConfig({ config, role, workingDirectory, hooks, onPe
     // One question per session, so there is nothing to compact, remember or resume.
     infiniteSessions: { enabled: false },
     memory: { enabled: false },
+    // Left on, the runtime writes any result over 50 KB to a temp file and gives the model a short
+    // pointer instead. The model has no file tool, so a long page would be unreadable, and the
+    // hooks could not wrap or check it. Off, the hooks see the whole result and cap it themselves.
+    largeOutput: { enabled: false },
     // "empty" mode already defaults these off; stating them keeps the intent visible and tested.
     enableConfigDiscovery: false,
     enableSkills: false,

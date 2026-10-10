@@ -50,11 +50,12 @@ export function buildBaseMessage({ spaceKeys, repos, siteUrl }) {
     '- Call getAccessibleAtlassianResources first to get the cloudId of that site; the other Confluence tools need it.',
     '- Search with searchConfluence. Rovo search is not available. Every CQL query must be restricted to the spaces above, for example: space = KEY AND text ~ "term", or space in (KEY1, KEY2) AND text ~ "term".',
     '- Join CQL clauses with AND only. Do not use OR, NOT or parentheses, except in a space in (...) list. Do not pass cqlcontext.',
-    '- Open a page with getConfluenceContent, passing the content_url from a search result. Never pass a content_id.',
+    `- Open a page with getConfluenceContent, passing a content_url like ${siteUrl}/wiki/spaces/KEY/pages/ID built from a search hit's url. Never use the short links that start with /x/. Never pass a content_id.`,
     '',
     `GitHub (repositories ${repos.join(', ')}):`,
     '- Tools that take owner and repo (get_file_contents, get_commit, list_commits, list_releases, get_latest_release) work only on the repositories above.',
     '- Every search_code query must include a repo:owner/name qualifier for one of those repositories. Do not use OR, org: or user: in a query.',
+    '- If search_code returns no results, do not repeat it with other words. List folders with get_file_contents (path / or a folder name) and open the files instead.',
   ].join('\n');
 }
 
