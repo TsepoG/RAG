@@ -9,6 +9,7 @@ import { createEventRecorder } from './events.js';
  * What to ask, and where to send the answer as it streams.
  * @typedef {object} AskInput
  * @property {string} question - The question.
+ * @property {import('../roles/index.js').Role} role - The role the answer is written for.
  * @property {(text: string) => void} [onDelta] - Receives each piece of the answer as it arrives.
  */
 
@@ -85,7 +86,7 @@ async function bestEffort(what, step, logger) {
  * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  */
-export async function askQuestion({ question, onDelta }, deps) {
+export async function askQuestion({ question, role, onDelta }, deps) {
   const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
@@ -108,7 +109,7 @@ export async function askQuestion({ question, onDelta }, deps) {
     });
     const onPermissionRequest = createPermissionHandler({ logger });
     open.session = await client.createSession(
-      buildSessionConfig({ config, workingDirectory, hooks, onPermissionRequest }),
+      buildSessionConfig({ config, role, workingDirectory, hooks, onPermissionRequest }),
     );
     events.attach(open.session);
     await open.session.send({ prompt: question });

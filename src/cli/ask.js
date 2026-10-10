@@ -1,10 +1,12 @@
 // @ts-check
 import { askQuestion } from '../answer/index.js';
 import { AskTimeoutError, AppError } from '../errors/index.js';
+import { getRole, loadRoles } from '../roles/index.js';
 import { describeError, EXIT_FAILURE, EXIT_TIMEOUT, loadSettings, withCopilot } from './shared.js';
 
 const USAGE = 'Usage: npm run ask -- "<question>"\n';
 const MS_PER_SECOND = 1000;
+const DEFAULT_ROLE = 'developer';
 
 /**
  * Formats one tool call as a line of the "Tools used" list.
@@ -43,9 +45,11 @@ async function main() {
   }
   try {
     const settings = loadSettings();
+    // Until --role is added, every question is answered for a developer.
+    const role = getRole(await loadRoles(), DEFAULT_ROLE);
     const result = await withCopilot(settings, ({ client, workingDirectory }) =>
       askQuestion(
-        { question, onDelta: (text) => process.stdout.write(text) },
+        { question, role, onDelta: (text) => process.stdout.write(text) },
         { client, workingDirectory, ...settings },
       ),
     );

@@ -10,6 +10,7 @@ import {
   FAKE_GITHUB_TOKEN,
   validEnv,
 } from '../helpers/env.js';
+import { makeRole, TEST_ROLE } from '../helpers/role.js';
 
 const WORKING_DIRECTORY = 'sandbox/work';
 const HOOKS = { onPreToolUse: () => ({ permissionDecision: /** @type {const} */ ('allow') }) };
@@ -18,11 +19,13 @@ const PERMISSION_HANDLER = () => ({ kind: /** @type {const} */ ('reject') });
 /**
  * Builds a session config from a fixture environment.
  * @param {Record<string, string | undefined>} [overrides] - Environment overrides.
+ * @param {import('../../src/roles/index.js').Role} [role] - The role.
  * @returns {ReturnType<typeof buildSessionConfig>} The session config.
  */
-function build(overrides = {}) {
+function build(overrides = {}, role = TEST_ROLE) {
   return buildSessionConfig({
     config: loadConfig(validEnv(overrides)),
+    role,
     workingDirectory: WORKING_DIRECTORY,
     hooks: HOOKS,
     onPermissionRequest: PERMISSION_HANDLER,
@@ -50,11 +53,18 @@ describe('buildSessionConfig prompt and streaming', () => {
     expect(systemMessage).toEqual({
       mode: 'append',
       content: buildSystemMessage({
+        role: TEST_ROLE,
         spaceKeys: ['ENG', 'PROD'],
         repos: ['acme/app', 'acme/docs'],
         siteUrl: 'https://acme.atlassian.net',
       }),
     });
+  });
+
+  it('writes the system message for the role it is given', () => {
+    const content = build({}, makeRole({ displayName: 'Auditor' })).systemMessage;
+
+    expect(JSON.stringify(content)).toContain('This answer is for a Auditor.');
   });
 
   it('names the application', () => {
