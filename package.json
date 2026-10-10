@@ -21,11 +21,13 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@github/copilot-sdk": "1.0.19",
     "pino": "^10.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^5.0.3",
     "@vitest/eslint-plugin": "^1.6.27",
