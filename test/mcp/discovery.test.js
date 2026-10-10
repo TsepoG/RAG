@@ -11,7 +11,7 @@ const ENDPOINT = { url: 'https://mcp.example/v1', headers: { Authorization: 'x' 
 
 /**
  * Builds a fake client whose listTools returns the given pages in order.
- * @param {Array<{ tools: Array<{ name: string, description?: string }>, nextCursor?: string }>} pages
+ * @param {Array<{ tools: import('../../src/mcp/discovery.js').ListedTool[], nextCursor?: string }>} pages
  *   Pages to return.
  * @returns {{ listTools: import('vitest').Mock, close: import('vitest').Mock }} The fake client.
  */
@@ -128,9 +128,22 @@ describe('collectToolReport', () => {
     const toolsByUrl = {
       'https://mcp.example/atlassian': [
         { name: 'createConfluencePage', description: 'Creates a page' },
-        { name: 'search', description: 'Searches', annotations: { readOnlyHint: true } },
+        {
+          name: 'search',
+          description: 'Searches',
+          annotations: { readOnlyHint: true },
+          inputSchema: { properties: { query: {}, limit: {} }, required: ['query'] },
+        },
       ],
-      'https://mcp.example/github': [{ name: 'get_file_contents' }],
+      'https://mcp.example/github': [
+        {
+          name: 'get_file_contents',
+          inputSchema: {
+            properties: { owner: {}, repo: {}, ref: {} },
+            required: ['owner', 'repo'],
+          },
+        },
+      ],
     };
     return async ({ url }) => fakeClient([{ tools: toolsByUrl[url] }]);
   }
@@ -151,12 +164,17 @@ describe('collectToolReport', () => {
       {
         name: 'createConfluencePage',
         description: 'Creates a page',
+        args: [],
         kind: 'write',
         reason: 'name contains the write verb "create"',
       },
       {
         name: 'search',
         description: 'Searches',
+        args: [
+          { name: 'query', required: true },
+          { name: 'limit', required: false },
+        ],
         kind: 'read',
         reason: 'no write verb in the name',
       },
@@ -166,6 +184,34 @@ describe('collectToolReport', () => {
       description: '',
       kind: 'read',
     });
+  });
+
+  it('reads argument names from the input schema and marks the required ones', async () => {
+    const [, github] = await collectToolReport(servers, connectByUrl());
+
+    expect(github.tools[0].args).toEqual([
+      { name: 'owner', required: true },
+      { name: 'repo', required: true },
+      { name: 'ref', required: false },
+    ]);
+  });
+
+  it('treats every argument as optional when the schema has no required list', async () => {
+    const connect = async () =>
+      fakeClient([{ tools: [{ name: 'search', inputSchema: { properties: { query: {} } } }] }]);
+
+    const [report] = await collectToolReport({ atlassian: { url: 'u' } }, connect);
+
+    expect(report.tools[0].args).toEqual([{ name: 'query', required: false }]);
+  });
+
+  it('reports no arguments for a tool with no schema or no properties', async () => {
+    const connect = async () =>
+      fakeClient([{ tools: [{ name: 'a' }, { name: 'b', inputSchema: {} }] }]);
+
+    const [report] = await collectToolReport({ atlassian: { url: 'u' } }, connect);
+
+    expect(report.tools.map((tool) => tool.args)).toEqual([[], []]);
   });
 
   it('collapses multi-line descriptions and escapes pipes', async () => {
@@ -207,12 +253,17 @@ describe('renderToolsMarkdown', () => {
         {
           name: 'createPage',
           description: 'Creates',
+          args: [],
           kind: /** @type {const} */ ('write'),
           reason: 'name contains the write verb "create"',
         },
         {
           name: 'search',
           description: 'Searches | text',
+          args: [
+            { name: 'query', required: true },
+            { name: 'limit', required: false },
+          ],
           kind: /** @type {const} */ ('read'),
           reason: 'no write verb in the name',
         },
@@ -221,36 +272,34 @@ describe('renderToolsMarkdown', () => {
     { key: 'github_repos', url: 'https://mcp.example/github', tools: [] },
   ];
 
-  it('states when it was generated and how', () => {
-    const markdown = renderToolsMarkdown(report, '2026-10-10T12:00:00.000Z');
-
-    expect(markdown).toContain('Generated 2026-10-10T12:00:00.000Z by `npm run mcp:tools`');
-  });
-
-  it('gives each server a heading, its URL and a count of read and write tools', () => {
-    const markdown = renderToolsMarkdown(report, 'now');
-
-    expect(markdown).toContain(
+  it.each([
+    [
+      'says when and how it was generated',
+      'Generated 2026-10-10T12:00:00.000Z by `npm run mcp:tools`',
+    ],
+    [
+      'gives each server a heading, its URL and a count of read and write tools',
       '## atlassian\n\nURL: https://mcp.example/atlassian\n\n2 tools: 1 read, 1 write.',
-    );
-  });
-
-  it('lists tools in a table with their class and reason', () => {
-    const markdown = renderToolsMarkdown(report, 'now');
-
-    expect(markdown).toContain('| Tool | Class | Why | Description |');
-    expect(markdown).toContain(
-      '| `createPage` | write | name contains the write verb "create" | Creates |',
-    );
-    expect(markdown).toContain('| `search` | read | no write verb in the name | Searches | text |');
-  });
-
-  it('says so when a server returned no tools', () => {
-    const markdown = renderToolsMarkdown(report, 'now');
-
-    expect(markdown).toContain(
+    ],
+    [
+      'has a table header with an Arguments column',
+      '| Tool | Class | Why | Arguments | Description |',
+    ],
+    [
+      'shows a write tool with no arguments',
+      '| `createPage` | write | name contains the write verb "create" | none | Creates |',
+    ],
+    [
+      'lists argument names, marking required ones with an asterisk',
+      '| `search` | read | no write verb in the name | `query`*, `limit` | Searches | text |',
+    ],
+    ['explains the asterisk', '* marks a required argument'],
+    [
+      'says so when a server returned no tools',
       '## github_repos\n\nURL: https://mcp.example/github\n\n0 tools: 0 read, 0 write.\n\nNo tools returned.',
-    );
+    ],
+  ])('%s', (_description, fragment) => {
+    expect(renderToolsMarkdown(report, '2026-10-10T12:00:00.000Z')).toContain(fragment);
   });
 
   it('ends with a newline-terminated section', () => {
