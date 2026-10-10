@@ -31,7 +31,7 @@ export default [
       globals: globals.node,
     },
   },
-  { ...jsdoc.configs['flat/recommended-error'], files: SRC_FILES },
+  { ...jsdoc.configs['flat/recommended-typescript-flavor-error'], files: SRC_FILES },
   {
     files: SRC_FILES,
     rules: {
