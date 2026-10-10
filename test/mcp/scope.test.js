@@ -7,7 +7,6 @@ import {
   checkRepoArguments,
   checkSearchCode,
   checkToolScope,
-  findSpaceKeys,
   SCOPED_ARGUMENTS,
 } from '../../src/mcp/scope.js';
 import { SERVER_KEYS } from '../../src/mcp/servers.js';
@@ -210,29 +209,6 @@ describe('checkConfluenceContent', () => {
 
   it('refuses missing arguments', () => {
     expect(verdict(checkConfluenceContent, undefined)).toBe('content-url');
-  });
-});
-
-describe('findSpaceKeys', () => {
-  it('finds each space once, in order of first appearance', () => {
-    const text = [
-      'See https://acme.atlassian.net/wiki/spaces/ENG/pages/1/A and',
-      '[link](https://acme.atlassian.net/wiki/spaces/HR/pages/2) and "/wiki/spaces/ENG/pages/3"',
-    ].join(' ');
-
-    expect(findSpaceKeys(text)).toEqual(['ENG', 'HR']);
-  });
-
-  it('stops a key at a quote, bracket, parenthesis or whitespace', () => {
-    expect(findSpaceKeys('"/wiki/spaces/A"')).toEqual(['A']);
-    expect(findSpaceKeys('(/wiki/spaces/B)')).toEqual(['B']);
-    expect(findSpaceKeys('[/wiki/spaces/C]')).toEqual(['C']);
-    expect(findSpaceKeys('/wiki/spaces/D next')).toEqual(['D']);
-  });
-
-  it('returns nothing for text without space links', () => {
-    expect(findSpaceKeys('no links here, only /wiki/pages/1')).toEqual([]);
-    expect(findSpaceKeys('')).toEqual([]);
   });
 });
 

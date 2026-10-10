@@ -1,8 +1,7 @@
 // @ts-check
-import { maskSecrets } from '../logger/index.js';
 import { isAllowedTool, resolveTool } from './allowlist.js';
-import { buildScope, checkToolScope, findSpaceKeys } from './scope.js';
-import { SERVER_KEYS } from './servers.js';
+import { createPostToolHooks } from './postHooks.js';
+import { buildScope, checkToolScope } from './scope.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
 /** @typedef {Parameters<NonNullable<SessionHooks['onPreToolUse']>>[0]} PreToolInput */
@@ -19,6 +18,10 @@ import { SERVER_KEYS } from './servers.js';
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
+ * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
+ *   are recorded; a fresh one when omitted.
+ * @property {(repo: string) => Promise<string | undefined>} [resolveHead] - Looks up a repository's
+ *   head commit, for pinning file links.
  * @property {HookLogger} logger - Where denials, completions and failures are logged.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
  * @property {typeof checkToolScope} [checkScope] - The scope check; defaults to the real one.
@@ -26,9 +29,6 @@ import { SERVER_KEYS } from './servers.js';
 
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
-
-/** Longest error text logged for a failed tool call. */
-const ERROR_TEXT_LIMIT = 300;
 
 /** Said to the model when a call is refused for a reason it cannot act on. */
 const NOT_AVAILABLE = 'This tool is not available.';
@@ -148,66 +148,9 @@ function createPreToolHook({
 }
 
 /**
- * Builds the hooks that run after a tool call. They only log: tool name, duration and size, never
- * the content a tool returned. A failure inside them is logged and never reaches the model.
- * @param {ToolHooksDeps & { timer: ReturnType<typeof createCallTimer> }} deps - Limits and helpers.
- * @returns {Pick<ToolHooks, 'onPostToolUse' | 'onPostToolUseFailure'>} The hooks.
- */
-function createPostToolHooks({ spaceKeys, logger, timer, secrets = [] }) {
-  const allowedSpaces = new Set(spaceKeys.map((key) => key.toLowerCase()));
-
-  /**
-   * Warns when a Confluence result mentions a space outside the allowed list. This is a backstop:
-   * the pre-tool hook already confines searches and fetches, so a hit is usually a link in a page.
-   * @param {string} toolName - Tool name as the runtime reported it.
-   * @param {string} text - What the tool returned.
-   */
-  function warnAboutStraySpaces(toolName, text) {
-    if (resolveTool(toolName)?.server !== SERVER_KEYS.atlassian) {
-      return;
-    }
-    const spaces = findSpaceKeys(text).filter((key) => !allowedSpaces.has(key.toLowerCase()));
-    if (spaces.length > 0) {
-      logger.warn(
-        { tool: toolName, spaces },
-        'confluence result mentions a space outside the allowed list',
-      );
-    }
-  }
-
-  return {
-    onPostToolUse(input) {
-      try {
-        const text = input.toolResult.textResultForLlm;
-        const resultChars = typeof text === 'string' ? text.length : 0;
-        const durationMs = timer.stop(input.toolName, input.toolArgs);
-        logger.info({ tool: input.toolName, durationMs, resultChars }, 'tool call completed');
-        if (typeof text === 'string') {
-          warnAboutStraySpaces(input.toolName, text);
-        }
-      } catch (error) {
-        logger.error({ err: error }, 'post-tool hook failed');
-      }
-    },
-    onPostToolUseFailure(input) {
-      try {
-        const durationMs = timer.stop(input.toolName, input.toolArgs);
-        const { error } = input;
-        const detail =
-          typeof error === 'string'
-            ? { errorChars: error.length, error: maskSecrets(error, secrets, ERROR_TEXT_LIMIT) }
-            : { errorChars: 0 };
-        logger.warn({ tool: input.toolName, durationMs, ...detail }, 'tool call failed');
-      } catch (error) {
-        logger.error({ err: error }, 'post-tool failure hook failed');
-      }
-    },
-  };
-}
-
-/**
  * Creates the hooks for one question: the pre-tool hook that allows or denies each call, and the
- * post-tool hooks that log it. Make a new set per question, because the call limit is per set.
+ * post-tool hooks that log it and register what it returned as sources. Make a new set per
+ * question, because the call limit and the registry are per set.
  * @param {ToolHooksDeps} deps - Limits, logger and optional clock and scope check.
  * @returns {ToolHooks} Hooks to register on the session.
  */
@@ -215,6 +158,6 @@ export function createToolHooks(deps) {
   const timer = createCallTimer(deps.clock ?? SYSTEM_CLOCK);
   return {
     onPreToolUse: createPreToolHook({ ...deps, timer }),
-    ...createPostToolHooks({ ...deps, timer }),
+    ...createPostToolHooks({ ...deps, clock: deps.clock ?? SYSTEM_CLOCK, timer }),
   };
 }

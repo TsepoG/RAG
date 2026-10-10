@@ -59,6 +59,7 @@ function pre(hooks, toolName, toolArgs) {
  * @param {string} toolName - Tool name.
  * @param {unknown} toolArgs - Tool arguments.
  * @param {unknown} text - What the tool returned.
+ * @returns {ReturnType<NonNullable<ToolHooks['onPostToolUse']>> | undefined} What the hook returns.
  */
 function post(hooks, toolName, toolArgs, text) {
   const input = {
@@ -66,7 +67,7 @@ function post(hooks, toolName, toolArgs, text) {
     toolArgs,
     toolResult: { textResultForLlm: text, resultType: 'success' },
   };
-  hooks.onPostToolUse?.(/** @type {never} */ (input), INVOCATION);
+  return hooks.onPostToolUse?.(/** @type {never} */ (input), INVOCATION);
 }
 
 /**
@@ -443,46 +444,6 @@ describe('onPostToolUse', () => {
       hooks.onPostToolUse?.(/** @type {never} */ ({ toolName: 'x' }), INVOCATION),
     ).not.toThrow();
     expect(lines().at(-1)).toMatchObject({ level: 'error', msg: 'post-tool hook failed' });
-  });
-});
-
-describe('onPostToolUse watches for Confluence results outside the allowed spaces', () => {
-  it('warns, naming the spaces, when a Confluence result mentions another space', () => {
-    const { hooks, lines } = setup();
-    const text = `${SITE}/wiki/spaces/ENG/pages/1 and ${SITE}/wiki/spaces/HR/pages/2`;
-
-    post(hooks, 'atlassian-searchConfluence', {}, text);
-
-    expect(lines().at(-1)).toMatchObject({
-      level: 'warn',
-      msg: 'confluence result mentions a space outside the allowed list',
-      tool: 'atlassian-searchConfluence',
-      spaces: ['HR'],
-    });
-  });
-
-  it('stays quiet when every space mentioned is allowed, whatever its case', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'atlassian-getConfluenceContent', {}, `${SITE}/wiki/spaces/eng/pages/1`);
-
-    expect(lines().filter((line) => line.level === 'warn')).toEqual([]);
-  });
-
-  it('does not look for spaces in GitHub results', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'github_repos-get_file_contents', {}, `${SITE}/wiki/spaces/HR/pages/2`);
-
-    expect(lines().filter((line) => line.level === 'warn')).toEqual([]);
-  });
-
-  it('does not log the surrounding text when it warns', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'atlassian-searchConfluence', {}, `CONFIDENTIAL ${SITE}/wiki/spaces/HR/pages/2`);
-
-    expect(JSON.stringify(lines())).not.toContain('CONFIDENTIAL');
   });
 });
 
