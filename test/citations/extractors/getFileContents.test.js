@@ -225,6 +225,36 @@ describe('extractFileContents fallback', () => {
   );
 });
 
+describe('extractFileContents leading slashes', () => {
+  it('links a file asked for as "/README.md" with a single slash, from the resource', async () => {
+    const log = logFor(`repo://acme/app/sha/${COMMIT_SHA}/contents//README.md`);
+
+    const { sources } = await extractFileContents(
+      { args: { ...ARGS, path: '/README.md' }, text: FILE_TEXT, log },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({
+      path: 'README.md',
+      title: 'README.md',
+      url: `https://github.com/acme/app/blob/${COMMIT_SHA}/README.md`,
+    });
+  });
+
+  it('gives the same key to a file asked for with and without the slash', async () => {
+    const withSlash = await extractFileContents(
+      { args: { ...ARGS, path: '/README.md' }, text: FILE_TEXT },
+      makeContext(),
+    );
+    const without = await extractFileContents(
+      { args: { ...ARGS, path: 'README.md' }, text: FILE_TEXT },
+      makeContext(),
+    );
+
+    expect(withSlash.sources).toEqual(without.sources);
+  });
+});
+
 describe('extractFileContents paths and repositories', () => {
   it('reads the repository and path from the resource, which wins over the arguments', async () => {
     const log = logFor(`repo://acme/app/sha/${COMMIT_SHA}/contents/src/real.js`);

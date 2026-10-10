@@ -14,6 +14,9 @@ import {
 // data). It is not the blob SHA that the "successfully downloaded" line and directory listings show.
 const RESOURCE_URI = /repo:\/\/([^/\s"]+\/[^/\s"]+)\/sha\/([0-9a-f]{40})\/contents\/([^\s"]+)/;
 const DIRECTORY_START = '[';
+// The model often asks for "/README.md"; the file is README.md, and a leading slash would put a
+// double slash in the link and make one file two sources.
+const LEADING_SLASHES = /^\/+/;
 // A listed entry's link names the commit the listing was read at: .../blob|tree/<commit>/<path>.
 const ENTRY_LINK = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|tree)\/([0-9a-f]{40})\//;
 
@@ -140,7 +143,8 @@ export async function extractFileContents({ args, text, log }, context) {
   }
   const named = RESOURCE_URI.exec(log ?? '');
   const repo = named?.[1] ?? repoFromArguments(args);
-  const path = named === null ? asString(asObject(args).path) : decodePath(named[3]);
+  const requested = named === null ? asString(asObject(args).path) : decodePath(named[3]);
+  const path = requested.replace(LEADING_SLASHES, '');
   if (path === '' || path.endsWith('/')) {
     return nothing('no-file-path');
   }
