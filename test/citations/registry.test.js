@@ -63,6 +63,18 @@ describe('createCitationRegistry keys', () => {
   });
 });
 
+describe('createCitationRegistry releases', () => {
+  it('tells two releases on the same commit apart by their tag', () => {
+    const registry = createCitationRegistry();
+    const release = (/** @type {string} */ title) =>
+      githubSource({ kind: 'release', path: '', title });
+
+    expect(registry.register(release('v1.0.0'))).toBe('G1');
+    expect(registry.register(release('v1.0.1'))).toBe('G2');
+    expect(registry.register(release('v1.0.0'))).toBe('G1');
+  });
+});
+
 describe('createCitationRegistry lookups', () => {
   it('finds a registered source by key, including its key', () => {
     const registry = createCitationRegistry();

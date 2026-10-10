@@ -1,0 +1,17 @@
+{
+  "_synthetic": "SYNTHETIC fixture, not a captured result. The real search_code returned no hits for the owner's repository, so this is built by hand from GitHub's documented code search response (items with name, path, sha, html_url and repository.full_name). Replace it with a real capture if the server ever returns hits.",
+  "server": "github_repos",
+  "tool": "search_code",
+  "arguments": {
+    "query": "refund repo:acme/app",
+    "perPage": 5
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"total_count\":3,\"incomplete_results\":false,\"items\":[{\"name\":\"refund_policy.ts\",\"path\":\"src/refunds/refund_policy.ts\",\"sha\":\"1111111111111111111111111111111111111111\",\"url\":\"https://api.github.com/repositories/1/contents/src/refunds/refund_policy.ts\",\"html_url\":\"https://github.com/acme/app/blob/ebf99bea1fdf70b3a206c622a5134068c73eb607/src/refunds/refund_policy.ts\",\"repository\":{\"id\":1,\"full_name\":\"acme/app\"},\"score\":1},{\"name\":\"approval.ts\",\"path\":\"src/refunds/approval.ts\",\"sha\":\"2222222222222222222222222222222222222222\",\"url\":\"https://api.github.com/repositories/1/contents/src/refunds/approval.ts\",\"html_url\":\"https://github.com/acme/app/blob/ebf99bea1fdf70b3a206c622a5134068c73eb607/src/refunds/approval.ts\",\"repository\":{\"id\":1,\"full_name\":\"acme/app\"},\"score\":1},{\"name\":\"refund.ts\",\"path\":\"lib/refund.ts\",\"sha\":\"3333333333333333333333333333333333333333\",\"url\":\"https://api.github.com/repositories/2/contents/lib/refund.ts\",\"html_url\":\"https://github.com/other/repo/blob/0123456789abcdef0123456789abcdef01234567/lib/refund.ts\",\"repository\":{\"id\":2,\"full_name\":\"other/repo\"},\"score\":1}]}"
+      }
+    ]
+  }
+}

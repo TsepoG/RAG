@@ -79,7 +79,9 @@ function identityOf(source) {
     return `confluence\u0000${source.id}\u0000${source.version}`;
   }
   const repo = source.repo.toLowerCase();
-  return ['github', repo, source.path, source.commitSha, source.kind].join('\u0000');
+  // Two releases can point at one commit, so a release is told apart by its tag too.
+  const tag = source.kind === 'release' ? source.title : '';
+  return ['github', repo, source.path, source.commitSha, source.kind, tag].join('\u0000');
 }
 
 /**
