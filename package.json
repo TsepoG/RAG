@@ -16,16 +16,22 @@
     "typecheck": "tsc --noEmit -p jsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.js",
     "test:coverage": "vitest run --coverage",
+    "ask": "node src/cli/ask.js",
+    "models": "node src/cli/models.js",
+    "mcp:tools": "node src/cli/mcpTools.js",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test:coverage",
     "prepare": "husky"
   },
   "dependencies": {
+    "@github/copilot-sdk": "1.0.19",
     "pino": "^10.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@types/node": "^24.19.2",
     "@vitest/coverage-v8": "^5.0.3",
     "@vitest/eslint-plugin": "^1.6.27",
@@ -43,9 +49,9 @@
   },
   "lint-staged": {
     "*.js": [
-      "eslint --fix --max-warnings=0",
-      "prettier --write"
+      "node node_modules/eslint/bin/eslint.js --fix --max-warnings=0",
+      "node node_modules/prettier/bin/prettier.cjs --write"
     ],
-    "*.{json,md,yml,yaml}": "prettier --write"
+    "*.{json,md,yml,yaml}": "node node_modules/prettier/bin/prettier.cjs --write"
   }
 }

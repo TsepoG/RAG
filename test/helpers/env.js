@@ -3,6 +3,7 @@
 /** Secret values used in fixtures, exported so tests can assert they never leak. */
 export const FAKE_GITHUB_TOKEN = 'fake-github-token-for-tests';
 export const FAKE_ATLASSIAN_TOKEN = 'fake-atlassian-token-for-tests';
+export const FAKE_COPILOT_TOKEN = 'fake-copilot-token-for-tests';
 
 /**
  * Builds a complete, valid environment, optionally overridden.

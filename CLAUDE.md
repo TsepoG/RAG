@@ -23,6 +23,9 @@ Confluence pages and code files it used and states how confident it is.
   `git rebase`, `git reset` or `git tag`. The repo owner makes every commit.
   When a piece of work is ready, stop, summarise the changes and suggest a
   Conventional Commit message.
+- Never add `Co-Authored-By:` trailers, "Generated with Claude Code" lines or
+  any other AI attribution to suggested commit messages, PR titles or PR
+  descriptions.
 
 ## Commands
 

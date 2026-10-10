@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createLogger,
   DEFAULT_LOG_LEVEL,
+  maskSecrets,
   REDACT_PATHS,
   REDACTED_VALUE,
 } from '../../src/logger/index.js';
@@ -81,12 +82,21 @@ describe('createLogger output', () => {
 });
 
 describe('createLogger redaction', () => {
-  const secretKeys = ['token', 'apiToken', 'authorization', 'password'];
+  const secretKeys = [
+    'token',
+    'apiToken',
+    'githubToken',
+    'authorization',
+    'Authorization',
+    'password',
+  ];
   /** @type {Array<{ where: string, wrap: (secret: Record<string, string>) => object }>} */
   const depths = [
     { where: 'the top level', wrap: (secret) => secret },
     { where: 'one level deep', wrap: (secret) => ({ github: secret }) },
     { where: 'two levels deep', wrap: (secret) => ({ config: { github: secret } }) },
+    { where: 'three levels deep', wrap: (secret) => ({ a: { b: { c: secret } } }) },
+    { where: 'four levels deep', wrap: (secret) => ({ a: { b: { c: { d: secret } } } }) },
   ];
   const cases = secretKeys.flatMap((key) =>
     depths.map(({ where, wrap }) => ({ key, where, wrap })),
@@ -110,8 +120,110 @@ describe('createLogger redaction', () => {
     expect(lines()[0]).toMatchObject({ token: '***', port: 3000 });
   });
 
-  it('lists every secret key at three depths', () => {
-    expect(REDACT_PATHS).toHaveLength(secretKeys.length * 3);
+  it('lists every secret key at five depths', () => {
+    expect(REDACT_PATHS).toHaveLength(secretKeys.length * 5);
     expect(REDACT_PATHS).toContain('*.*.apiToken');
+    expect(REDACT_PATHS).toContain('*.*.*.*.Authorization');
+  });
+});
+
+describe('createLogger redaction of MCP server headers', () => {
+  const basic = `Basic ${Buffer.from('dev@acme.example:atlassian-secret').toString('base64')}`;
+  const bearer = 'Bearer github-secret';
+  const mcpServers = {
+    atlassian: {
+      type: 'http',
+      url: 'https://mcp.atlassian.com/v2/mcp',
+      headers: { Authorization: basic },
+      tools: ['search'],
+    },
+    github_repos: {
+      type: 'http',
+      url: 'https://api.githubcopilot.com/mcp/',
+      headers: { Authorization: bearer, 'X-MCP-Readonly': 'true', 'X-MCP-Toolsets': 'repos' },
+      tools: ['get_file_contents'],
+    },
+  };
+
+  it.each([
+    ['logged directly', { mcpServers }],
+    ['logged inside a session config', { sessionConfig: { mcpServers } }],
+  ])('never writes either Authorization value when %s', (_description, payload) => {
+    const { logger, lines } = setup();
+
+    logger.info(payload, 'session config');
+
+    const output = JSON.stringify(lines()[0]);
+    expect(output).not.toContain(basic);
+    expect(output).not.toContain(bearer);
+    expect(output).not.toContain('atlassian-secret');
+    expect(output).not.toContain('github-secret');
+  });
+
+  it('keeps the headers and fields that are not secret', () => {
+    const { logger, lines } = setup();
+
+    logger.info({ mcpServers }, 'session config');
+
+    expect(lines()[0]).toMatchObject({
+      mcpServers: {
+        atlassian: { url: 'https://mcp.atlassian.com/v2/mcp', tools: ['search'] },
+        github_repos: { headers: { 'X-MCP-Readonly': 'true', 'X-MCP-Toolsets': 'repos' } },
+      },
+    });
+  });
+});
+
+describe('maskSecrets', () => {
+  const LIMIT = 300;
+
+  it('masks every occurrence of a configured secret', () => {
+    expect(maskSecrets('bad s3cret, retry with s3cret', ['s3cret'], LIMIT)).toBe(
+      'bad ***, retry with ***',
+    );
+  });
+
+  it('masks the longer secret first when one contains another', () => {
+    expect(maskSecrets('value abc-long-secret', ['abc', 'abc-long-secret'], LIMIT)).toBe(
+      'value ***',
+    );
+  });
+
+  it('ignores an empty secret instead of masking everything', () => {
+    expect(maskSecrets('nothing to hide', [''], LIMIT)).toBe('nothing to hide');
+  });
+
+  it.each([
+    'Authorization: Bearer abc.def-123',
+    'Authorization: Basic ZGV2QGFjbWU6c2VjcmV0',
+    'token ghp_abcdefghijklmnop was rejected',
+    'token gho_abcdefghijklmnop was rejected',
+    'token github_pat_11ABCDEF_0123456789 was rejected',
+    'token ATATT3xFfGF0abcdef-123= was rejected',
+  ])('masks a credential-shaped value in %j', (text) => {
+    const masked = maskSecrets(text, [], LIMIT);
+
+    expect(masked).toContain(REDACTED_VALUE);
+    expect(masked).not.toMatch(/abc.def|ZGV2|abcdefghijklmnop|0123456789|3xFfGF0/);
+  });
+
+  it('leaves ordinary text alone', () => {
+    expect(maskSecrets('HTTP 404: page not found', ['s3cret'], LIMIT)).toBe(
+      'HTTP 404: page not found',
+    );
+  });
+
+  it('keeps text of exactly the limit, and cuts longer text with a marker', () => {
+    expect(maskSecrets('x'.repeat(10), [], 10)).toBe('x'.repeat(10));
+    expect(maskSecrets('x'.repeat(11), [], 10)).toBe(`${'x'.repeat(9)}…`);
+  });
+
+  it('masks before cutting, so a secret that straddles the limit leaves no fragment', () => {
+    const text = `${'x'.repeat(8)}s3cret-value-here`;
+
+    const masked = maskSecrets(text, ['s3cret-value-here'], 10);
+
+    expect(masked).toBe(`${'x'.repeat(8)}***`.slice(0, 9) + '…');
+    expect(masked).not.toContain('s3');
   });
 });

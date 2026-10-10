@@ -40,6 +40,51 @@ export class ConfigError extends AppError {
 }
 
 /**
+ * Thrown when the Copilot SDK, its runtime or its authentication fails.
+ */
+export class CopilotError extends AppError {}
+
+/**
+ * Thrown when an MCP server cannot be reached or returns something unusable.
+ */
+export class McpError extends AppError {}
+
+/**
+ * Thrown when a tool call is refused because it is not on the read-only allow-list.
+ */
+export class ToolNotAllowedError extends AppError {
+  /**
+   * Creates the error and records which tool was refused.
+   * @param {string} server - Key of the MCP server the tool belongs to.
+   * @param {string} tool - Name of the refused tool.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(server, tool, options) {
+    super(`Tool "${tool}" on server "${server}" is not allowed`, options);
+    /** @type {string} */
+    this.server = server;
+    /** @type {string} */
+    this.tool = tool;
+  }
+}
+
+/**
+ * Thrown when a question does not finish within the configured time limit.
+ */
+export class AskTimeoutError extends AppError {
+  /**
+   * Creates the error and records the limit that was exceeded.
+   * @param {number} timeoutMs - The time limit, in milliseconds.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(timeoutMs, options) {
+    super(`The question did not finish within ${timeoutMs} ms`, options);
+    /** @type {number} */
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/**
  * Builds the message for a ConfigError, one line per issue.
  * @param {ReadonlyArray<ConfigIssue>} issues - Issues to describe.
  * @returns {string} Headline followed by a `- PATH: message` line per issue.

@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { configSchema } from '../../src/config/schema.js';
+import { configSchema, ENV_VARIABLE_NAMES } from '../../src/config/schema.js';
 import { validEnv } from '../helpers/env.js';
 
 /**
@@ -21,6 +21,10 @@ describe('configSchema parsing', () => {
         LOG_LEVEL: 'debug',
         PORT: '8080',
         COPILOT_MODEL: 'gpt-x',
+        COPILOT_GITHUB_TOKEN: 'fake-copilot-token-for-tests',
+        ASK_TIMEOUT_MS: '60000',
+        MAX_TOOL_CALLS: '8',
+        MCP_TIMEOUT_MS: '15000',
       }),
     );
 
@@ -31,11 +35,16 @@ describe('configSchema parsing', () => {
       github: { token: 'fake-github-token-for-tests', repos: ['acme/app', 'acme/docs'] },
       atlassian: {
         siteUrl: 'https://acme.atlassian.net',
-        email: 'dev@acme.example',
+        auth: { mode: 'basic', email: 'dev@acme.example' },
         apiToken: 'fake-atlassian-token-for-tests',
         spaceKeys: ['ENG', 'PROD'],
       },
-      copilot: { model: 'gpt-x' },
+      copilot: {
+        model: 'gpt-x',
+        githubToken: 'fake-copilot-token-for-tests',
+        askTimeoutMs: 60_000,
+      },
+      mcp: { maxToolCalls: 8, timeoutMs: 15_000 },
     });
   });
 
@@ -43,7 +52,8 @@ describe('configSchema parsing', () => {
     const result = configSchema.parse(validEnv());
 
     expect(result).toMatchObject({ nodeEnv: 'development', logLevel: 'info', port: 3000 });
-    expect(result.copilot.model).toBeUndefined();
+    expect(result.copilot).toEqual({ askTimeoutMs: 120_000 });
+    expect(result.mcp).toEqual({ maxToolCalls: 12, timeoutMs: 30_000 });
   });
 
   it('ignores variables it does not know about', () => {
@@ -56,7 +66,6 @@ describe('configSchema required variables', () => {
     'GITHUB_TOKEN',
     'GITHUB_REPOS',
     'ATLASSIAN_SITE_URL',
-    'ATLASSIAN_EMAIL',
     'ATLASSIAN_API_TOKEN',
     'CONFLUENCE_SPACE_KEYS',
   ];
@@ -79,7 +88,8 @@ describe('configSchema required variables', () => {
   it('reports every missing variable at once', () => {
     const paths = failures({}).map((entry) => entry.split(':')[0]);
 
-    expect(paths).toEqual(required);
+    // The email is required too, because basic auth is the default mode.
+    expect(paths).toEqual([...required, 'ATLASSIAN_EMAIL']);
   });
 });
 
@@ -142,6 +152,55 @@ describe('configSchema ATLASSIAN_SITE_URL', () => {
   });
 });
 
+describe('configSchema Atlassian auth mode', () => {
+  it('uses basic auth by default', () => {
+    expect(configSchema.parse(validEnv()).atlassian.auth).toEqual({
+      mode: 'basic',
+      email: 'dev@acme.example',
+    });
+  });
+
+  it('accepts bearer mode without an email and keeps only the mode', () => {
+    const env = validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined });
+
+    expect(configSchema.parse(env).atlassian.auth).toEqual({ mode: 'bearer' });
+  });
+
+  it('ignores an email in bearer mode', () => {
+    const env = validEnv({ ATLASSIAN_AUTH_MODE: 'bearer' });
+
+    expect(configSchema.parse(env).atlassian.auth).toEqual({ mode: 'bearer' });
+  });
+
+  it.each(['Bearer', 'token', 'oauth', ''])('rejects the auth mode %j', (mode) => {
+    expect(failures(validEnv({ ATLASSIAN_AUTH_MODE: mode }))).toEqual([
+      'ATLASSIAN_AUTH_MODE: must be one of basic, bearer',
+    ]);
+  });
+
+  it('requires the email in basic mode, saying why', () => {
+    expect(failures(validEnv({ ATLASSIAN_EMAIL: undefined }))).toEqual([
+      'ATLASSIAN_EMAIL: is required when ATLASSIAN_AUTH_MODE is basic',
+    ]);
+  });
+
+  it('reports a missing email together with other problems', () => {
+    expect(failures(validEnv({ ATLASSIAN_EMAIL: undefined, GITHUB_TOKEN: undefined }))).toEqual([
+      'GITHUB_TOKEN: is required',
+      'ATLASSIAN_EMAIL: is required when ATLASSIAN_AUTH_MODE is basic',
+    ]);
+  });
+
+  it.each([
+    ['blank', '   ', 'must not be empty'],
+    ['malformed', 'not-an-email', 'must be a valid email address'],
+  ])('still rejects a %s email in bearer mode', (_label, email, message) => {
+    expect(failures(validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: email }))).toEqual([
+      `ATLASSIAN_EMAIL: ${message}`,
+    ]);
+  });
+});
+
 describe('configSchema other fields', () => {
   it.each(['not-an-email', 'a@', '@b.co'])('rejects email %j', (email) => {
     expect(failures(validEnv({ ATLASSIAN_EMAIL: email }))).toEqual([
@@ -178,5 +237,68 @@ describe('configSchema other fields', () => {
     expect(failures(validEnv({ COPILOT_MODEL: ' ' }))).toEqual([
       'COPILOT_MODEL: must not be empty when set',
     ]);
+  });
+});
+
+describe('configSchema numeric settings', () => {
+  const settings = [
+    { name: 'PORT', min: 1, max: 65_535 },
+    { name: 'ASK_TIMEOUT_MS', min: 5000, max: 600_000 },
+    { name: 'MAX_TOOL_CALLS', min: 1, max: 50 },
+    { name: 'MCP_TIMEOUT_MS', min: 1000, max: 120_000 },
+  ];
+  const rejections = settings.flatMap(({ name, min, max }) =>
+    [String(min - 1), String(max + 1), 'abc', '1.5', '', '-1', '1 2'].map((value) => ({
+      name,
+      value,
+      message: `${name}: must be an integer between ${min} and ${max}`,
+    })),
+  );
+
+  it.each(settings)('accepts the lowest and highest $name', ({ name, min, max }) => {
+    expect(failures(validEnv({ [name]: String(min) }))).toEqual([]);
+    expect(failures(validEnv({ [name]: String(max) }))).toEqual([]);
+  });
+
+  it.each(rejections)('rejects $name=$value with one message', ({ name, value, message }) => {
+    expect(failures(validEnv({ [name]: value }))).toEqual([message]);
+  });
+});
+
+describe('configSchema COPILOT_GITHUB_TOKEN', () => {
+  it('is optional', () => {
+    expect(configSchema.parse(validEnv()).copilot.githubToken).toBeUndefined();
+  });
+
+  it('is trimmed when set', () => {
+    const result = configSchema.parse(validEnv({ COPILOT_GITHUB_TOKEN: '  tok-123  ' }));
+
+    expect(result.copilot.githubToken).toBe('tok-123');
+  });
+
+  it('rejects a blank value', () => {
+    expect(failures(validEnv({ COPILOT_GITHUB_TOKEN: '   ' }))).toEqual([
+      'COPILOT_GITHUB_TOKEN: must not be empty when set',
+    ]);
+  });
+});
+
+describe('ENV_VARIABLE_NAMES', () => {
+  it('lists every variable the schema reads', () => {
+    expect(ENV_VARIABLE_NAMES).toEqual(
+      expect.arrayContaining([
+        'GITHUB_TOKEN',
+        'ATLASSIAN_API_TOKEN',
+        'ATLASSIAN_AUTH_MODE',
+        'COPILOT_GITHUB_TOKEN',
+        'ASK_TIMEOUT_MS',
+        'MAX_TOOL_CALLS',
+        'MCP_TIMEOUT_MS',
+      ]),
+    );
+  });
+
+  it('is frozen', () => {
+    expect(Object.isFrozen(ENV_VARIABLE_NAMES)).toBe(true);
   });
 });
