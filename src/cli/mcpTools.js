@@ -28,7 +28,10 @@ async function connect({ url, headers, timeout }) {
 async function main() {
   loadEnvFileIfPresent();
   try {
-    const servers = buildMcpServers(loadConfig(), {});
+    const config = loadConfig();
+    process.stdout.write(`Atlassian auth: ${config.atlassian.auth.mode}
+`);
+    const servers = buildMcpServers(config, {});
     const report = await collectToolReport(servers, connect);
     await writeFile(OUTPUT_FILE, renderToolsMarkdown(report, new Date().toISOString()));
     report.forEach(({ key, tools }) => process.stdout.write(`${key}: ${tools.length} tools\n`));

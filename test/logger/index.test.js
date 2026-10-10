@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createLogger,
   DEFAULT_LOG_LEVEL,
+  maskSecrets,
   REDACT_PATHS,
   REDACTED_VALUE,
 } from '../../src/logger/index.js';
@@ -170,5 +171,59 @@ describe('createLogger redaction of MCP server headers', () => {
         github_repos: { headers: { 'X-MCP-Readonly': 'true', 'X-MCP-Toolsets': 'repos' } },
       },
     });
+  });
+});
+
+describe('maskSecrets', () => {
+  const LIMIT = 300;
+
+  it('masks every occurrence of a configured secret', () => {
+    expect(maskSecrets('bad s3cret, retry with s3cret', ['s3cret'], LIMIT)).toBe(
+      'bad ***, retry with ***',
+    );
+  });
+
+  it('masks the longer secret first when one contains another', () => {
+    expect(maskSecrets('value abc-long-secret', ['abc', 'abc-long-secret'], LIMIT)).toBe(
+      'value ***',
+    );
+  });
+
+  it('ignores an empty secret instead of masking everything', () => {
+    expect(maskSecrets('nothing to hide', [''], LIMIT)).toBe('nothing to hide');
+  });
+
+  it.each([
+    'Authorization: Bearer abc.def-123',
+    'Authorization: Basic ZGV2QGFjbWU6c2VjcmV0',
+    'token ghp_abcdefghijklmnop was rejected',
+    'token gho_abcdefghijklmnop was rejected',
+    'token github_pat_11ABCDEF_0123456789 was rejected',
+    'token ATATT3xFfGF0abcdef-123= was rejected',
+  ])('masks a credential-shaped value in %j', (text) => {
+    const masked = maskSecrets(text, [], LIMIT);
+
+    expect(masked).toContain(REDACTED_VALUE);
+    expect(masked).not.toMatch(/abc.def|ZGV2|abcdefghijklmnop|0123456789|3xFfGF0/);
+  });
+
+  it('leaves ordinary text alone', () => {
+    expect(maskSecrets('HTTP 404: page not found', ['s3cret'], LIMIT)).toBe(
+      'HTTP 404: page not found',
+    );
+  });
+
+  it('keeps text of exactly the limit, and cuts longer text with a marker', () => {
+    expect(maskSecrets('x'.repeat(10), [], 10)).toBe('x'.repeat(10));
+    expect(maskSecrets('x'.repeat(11), [], 10)).toBe(`${'x'.repeat(9)}…`);
+  });
+
+  it('masks before cutting, so a secret that straddles the limit leaves no fragment', () => {
+    const text = `${'x'.repeat(8)}s3cret-value-here`;
+
+    const masked = maskSecrets(text, ['s3cret-value-here'], 10);
+
+    expect(masked).toBe(`${'x'.repeat(8)}***`.slice(0, 9) + '…');
+    expect(masked).not.toContain('s3');
   });
 });

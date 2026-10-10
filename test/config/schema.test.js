@@ -35,7 +35,7 @@ describe('configSchema parsing', () => {
       github: { token: 'fake-github-token-for-tests', repos: ['acme/app', 'acme/docs'] },
       atlassian: {
         siteUrl: 'https://acme.atlassian.net',
-        email: 'dev@acme.example',
+        auth: { mode: 'basic', email: 'dev@acme.example' },
         apiToken: 'fake-atlassian-token-for-tests',
         spaceKeys: ['ENG', 'PROD'],
       },
@@ -66,7 +66,6 @@ describe('configSchema required variables', () => {
     'GITHUB_TOKEN',
     'GITHUB_REPOS',
     'ATLASSIAN_SITE_URL',
-    'ATLASSIAN_EMAIL',
     'ATLASSIAN_API_TOKEN',
     'CONFLUENCE_SPACE_KEYS',
   ];
@@ -89,7 +88,8 @@ describe('configSchema required variables', () => {
   it('reports every missing variable at once', () => {
     const paths = failures({}).map((entry) => entry.split(':')[0]);
 
-    expect(paths).toEqual(required);
+    // The email is required too, because basic auth is the default mode.
+    expect(paths).toEqual([...required, 'ATLASSIAN_EMAIL']);
   });
 });
 
@@ -149,6 +149,55 @@ describe('configSchema ATLASSIAN_SITE_URL', () => {
     );
 
     expect(atlassian.siteUrl).toBe('https://acme.atlassian.net');
+  });
+});
+
+describe('configSchema Atlassian auth mode', () => {
+  it('uses basic auth by default', () => {
+    expect(configSchema.parse(validEnv()).atlassian.auth).toEqual({
+      mode: 'basic',
+      email: 'dev@acme.example',
+    });
+  });
+
+  it('accepts bearer mode without an email and keeps only the mode', () => {
+    const env = validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined });
+
+    expect(configSchema.parse(env).atlassian.auth).toEqual({ mode: 'bearer' });
+  });
+
+  it('ignores an email in bearer mode', () => {
+    const env = validEnv({ ATLASSIAN_AUTH_MODE: 'bearer' });
+
+    expect(configSchema.parse(env).atlassian.auth).toEqual({ mode: 'bearer' });
+  });
+
+  it.each(['Bearer', 'token', 'oauth', ''])('rejects the auth mode %j', (mode) => {
+    expect(failures(validEnv({ ATLASSIAN_AUTH_MODE: mode }))).toEqual([
+      'ATLASSIAN_AUTH_MODE: must be one of basic, bearer',
+    ]);
+  });
+
+  it('requires the email in basic mode, saying why', () => {
+    expect(failures(validEnv({ ATLASSIAN_EMAIL: undefined }))).toEqual([
+      'ATLASSIAN_EMAIL: is required when ATLASSIAN_AUTH_MODE is basic',
+    ]);
+  });
+
+  it('reports a missing email together with other problems', () => {
+    expect(failures(validEnv({ ATLASSIAN_EMAIL: undefined, GITHUB_TOKEN: undefined }))).toEqual([
+      'GITHUB_TOKEN: is required',
+      'ATLASSIAN_EMAIL: is required when ATLASSIAN_AUTH_MODE is basic',
+    ]);
+  });
+
+  it.each([
+    ['blank', '   ', 'must not be empty'],
+    ['malformed', 'not-an-email', 'must be a valid email address'],
+  ])('still rejects a %s email in bearer mode', (_label, email, message) => {
+    expect(failures(validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: email }))).toEqual([
+      `ATLASSIAN_EMAIL: ${message}`,
+    ]);
   });
 });
 
@@ -240,6 +289,7 @@ describe('ENV_VARIABLE_NAMES', () => {
       expect.arrayContaining([
         'GITHUB_TOKEN',
         'ATLASSIAN_API_TOKEN',
+        'ATLASSIAN_AUTH_MODE',
         'COPILOT_GITHUB_TOKEN',
         'ASK_TIMEOUT_MS',
         'MAX_TOOL_CALLS',

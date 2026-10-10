@@ -57,10 +57,28 @@ Invalid values are reported by variable name, never by value.
 | `GITHUB_TOKEN`          | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos |
 | `GITHUB_REPOS`          | yes      |               | Comma-separated `owner/repo` list, at least one                           |
 | `ATLASSIAN_SITE_URL`    | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed               |
-| `ATLASSIAN_EMAIL`       | yes      |               | Email of the account that owns the API token                              |
-| `ATLASSIAN_API_TOKEN`   | yes      |               | Atlassian API token with Confluence read scopes                           |
+| `ATLASSIAN_AUTH_MODE`   | no       | `basic`       | `basic` (personal API token) or `bearer` (service-account API key)        |
+| `ATLASSIAN_EMAIL`       | basic    |               | Email of the account that owns the API token; not used in `bearer` mode   |
+| `ATLASSIAN_API_TOKEN`   | yes      |               | Atlassian API token or service-account API key (see Atlassian access)     |
 | `CONFLUENCE_SPACE_KEYS` | yes      |               | Comma-separated space keys, at least one                                  |
 | `COPILOT_MODEL`         | no       | none          | Non-empty model name when set; Phase 2 chooses a default                  |
+
+### Atlassian access
+
+Which mode to use depends on the kind of credential:
+
+| Credential              | `ATLASSIAN_AUTH_MODE` | `ATLASSIAN_EMAIL` | Header sent                 |
+| ----------------------- | --------------------- | ----------------- | --------------------------- |
+| Personal API token      | `basic` (default)     | required          | `Basic base64(email:token)` |
+| Service-account API key | `bearer`              | not used          | `Bearer <key>`              |
+
+- A service account needs Confluence product access and **view** permission on every space listed
+  in `CONFLUENCE_SPACE_KEYS`, or its searches return nothing.
+- The organization setting "Allow API token authentication" must be on for the Rovo MCP server.
+- The token needs the scopes the Rovo MCP server asks for: `read:me` and `read:account` (to find
+  the site), `search:confluence:agent-interface` and `read:confluence:agent-interface`.
+- When a tool call fails, the first 300 characters of the error are logged with secrets masked, so
+  a scope or permission problem shows up in the log.
 
 `.env` is git-ignored. `.env.example` lists every variable with a placeholder and says where to
 create each token.

@@ -2,6 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   buildRuntimeEnv,
+  encodeBasicCredentials,
+  listSecrets,
   loadConfig,
   loadEnvFileIfPresent,
   redactConfig,
@@ -111,6 +113,15 @@ describe('redactConfig', () => {
     expect(JSON.stringify(redacted)).not.toContain(FAKE_COPILOT_TOKEN);
   });
 
+  it('masks the API token in bearer mode too', () => {
+    const redacted = redactConfig(
+      loadConfig(validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined })),
+    );
+
+    expect(redacted.atlassian.apiToken).toBe('***');
+    expect(JSON.stringify(redacted)).not.toContain(FAKE_ATLASSIAN_TOKEN);
+  });
+
   it('leaves the Copilot token unset when none is configured', () => {
     expect(redactConfig(loadConfig(validEnv())).copilot.githubToken).toBeUndefined();
   });
@@ -121,7 +132,7 @@ describe('redactConfig', () => {
     const redacted = redactConfig(config);
 
     expect(redacted.github.repos).toEqual(config.github.repos);
-    expect(redacted.atlassian.email).toBe(config.atlassian.email);
+    expect(redacted.atlassian.auth).toEqual(config.atlassian.auth);
     expect(redacted.copilot.model).toBe('gpt-x');
     expect(redacted.port).toBe(config.port);
   });
@@ -137,6 +148,40 @@ describe('redactConfig', () => {
   });
 });
 
+describe('encodeBasicCredentials', () => {
+  it('encodes email:apiToken as base64', () => {
+    expect(encodeBasicCredentials('dev@acme.example', 'secret')).toBe(
+      Buffer.from('dev@acme.example:secret').toString('base64'),
+    );
+  });
+});
+
+describe('listSecrets', () => {
+  it('lists the GitHub token, the Atlassian token and the encoded Basic credential', () => {
+    const secrets = listSecrets(loadConfig(validEnv()));
+
+    expect(secrets).toEqual([
+      FAKE_GITHUB_TOKEN,
+      FAKE_ATLASSIAN_TOKEN,
+      encodeBasicCredentials('dev@acme.example', FAKE_ATLASSIAN_TOKEN),
+    ]);
+  });
+
+  it('includes the Copilot token when one is configured', () => {
+    const secrets = listSecrets(loadConfig(validEnv({ COPILOT_GITHUB_TOKEN: FAKE_COPILOT_TOKEN })));
+
+    expect(secrets).toContain(FAKE_COPILOT_TOKEN);
+  });
+
+  it('has no encoded credential in bearer mode, where there is no email to encode', () => {
+    const config = loadConfig(
+      validEnv({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined }),
+    );
+
+    expect(listSecrets(config)).toEqual([FAKE_GITHUB_TOKEN, FAKE_ATLASSIAN_TOKEN]);
+  });
+});
+
 describe('buildRuntimeEnv', () => {
   const withheld = [
     'GITHUB_TOKEN',
@@ -147,6 +192,7 @@ describe('buildRuntimeEnv', () => {
     'GITHUB_REPOS',
     'ATLASSIAN_SITE_URL',
     'ATLASSIAN_EMAIL',
+    'ATLASSIAN_AUTH_MODE',
     'ATLASSIAN_API_TOKEN',
     'CONFLUENCE_SPACE_KEYS',
     'COPILOT_MODEL',

@@ -1,4 +1,5 @@
 // @ts-check
+import { maskSecrets } from '../logger/index.js';
 import { isAllowedTool, resolveTool } from './allowlist.js';
 import { buildScope, checkToolScope, findSpaceKeys } from './scope.js';
 import { SERVER_KEYS } from './servers.js';
@@ -17,6 +18,7 @@ import { SERVER_KEYS } from './servers.js';
  * @property {ReadonlyArray<string>} spaceKeys - Allowed Confluence space keys.
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
+ * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
  * @property {HookLogger} logger - Where denials, completions and failures are logged.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
  * @property {typeof checkToolScope} [checkScope] - The scope check; defaults to the real one.
@@ -24,6 +26,9 @@ import { SERVER_KEYS } from './servers.js';
 
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
+
+/** Longest error text logged for a failed tool call. */
+const ERROR_TEXT_LIMIT = 300;
 
 /** Said to the model when a call is refused for a reason it cannot act on. */
 const NOT_AVAILABLE = 'This tool is not available.';
@@ -148,7 +153,7 @@ function createPreToolHook({
  * @param {ToolHooksDeps & { timer: ReturnType<typeof createCallTimer> }} deps - Limits and helpers.
  * @returns {Pick<ToolHooks, 'onPostToolUse' | 'onPostToolUseFailure'>} The hooks.
  */
-function createPostToolHooks({ spaceKeys, logger, timer }) {
+function createPostToolHooks({ spaceKeys, logger, timer, secrets = [] }) {
   const allowedSpaces = new Set(spaceKeys.map((key) => key.toLowerCase()));
 
   /**
@@ -187,8 +192,12 @@ function createPostToolHooks({ spaceKeys, logger, timer }) {
     onPostToolUseFailure(input) {
       try {
         const durationMs = timer.stop(input.toolName, input.toolArgs);
-        const errorChars = typeof input.error === 'string' ? input.error.length : 0;
-        logger.warn({ tool: input.toolName, durationMs, errorChars }, 'tool call failed');
+        const { error } = input;
+        const detail =
+          typeof error === 'string'
+            ? { errorChars: error.length, error: maskSecrets(error, secrets, ERROR_TEXT_LIMIT) }
+            : { errorChars: 0 };
+        logger.warn({ tool: input.toolName, durationMs, ...detail }, 'tool call failed');
       } catch (error) {
         logger.error({ err: error }, 'post-tool failure hook failed');
       }

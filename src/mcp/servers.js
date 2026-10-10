@@ -1,4 +1,5 @@
 // @ts-check
+import { encodeBasicCredentials } from '../config/index.js';
 
 /**
  * The tool names each MCP server exposes to Copilot, keyed by server key.
@@ -27,14 +28,15 @@ const GITHUB_READONLY_HEADERS = Object.freeze({
 });
 
 /**
- * Builds the Basic authorization header Atlassian accepts for API tokens.
- * @param {string} email - Account email.
- * @param {string} apiToken - Atlassian API token.
- * @returns {string} `Basic base64(email:apiToken)`.
+ * Builds the Authorization header for Atlassian. A personal API token is sent as Basic
+ * `email:token`; a service-account API key is sent as a Bearer token on its own.
+ * @param {import('../config/index.js').AppConfig['atlassian']} atlassian - Atlassian settings.
+ * @returns {string} The header value.
  */
-function atlassianAuthorization(email, apiToken) {
-  const credentials = Buffer.from(`${email}:${apiToken}`).toString('base64');
-  return `Basic ${credentials}`;
+function atlassianAuthorization({ auth, apiToken }) {
+  return auth.mode === 'bearer'
+    ? `Bearer ${apiToken}`
+    : `Basic ${encodeBasicCredentials(auth.email, apiToken)}`;
 }
 
 /**
@@ -51,7 +53,7 @@ export function buildMcpServers(config, toolNames) {
       type: HTTP_SERVER_TYPE,
       url: ATLASSIAN_MCP_URL,
       headers: {
-        Authorization: atlassianAuthorization(config.atlassian.email, config.atlassian.apiToken),
+        Authorization: atlassianAuthorization(config.atlassian),
       },
       tools: [...(toolNames[SERVER_KEYS.atlassian] ?? [])],
       timeout: timeoutMs,

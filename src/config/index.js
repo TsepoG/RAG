@@ -77,6 +77,33 @@ export function redactConfig(config) {
 }
 
 /**
+ * Encodes an email and API token the way HTTP Basic auth expects. One function builds both the
+ * header and the value that is masked in logs, so the two cannot drift apart.
+ * @param {string} email - Account email.
+ * @param {string} apiToken - Atlassian API token.
+ * @returns {string} `base64(email:apiToken)`.
+ */
+export function encodeBasicCredentials(email, apiToken) {
+  return Buffer.from(`${email}:${apiToken}`).toString('base64');
+}
+
+/**
+ * Lists every secret value in the config, so error text can have them masked. It includes the
+ * encoded Basic credential, which can show up in a message without its "Basic " prefix.
+ * @param {AppConfig} config - Validated config.
+ * @returns {string[]} The secrets; unset ones are left out.
+ */
+export function listSecrets(config) {
+  const { apiToken, auth } = config.atlassian;
+  return [
+    config.github.token,
+    apiToken,
+    ...(auth.mode === 'basic' ? [encodeBasicCredentials(auth.email, apiToken)] : []),
+    ...(config.copilot.githubToken === undefined ? [] : [config.copilot.githubToken]),
+  ];
+}
+
+/**
  * Builds the environment handed to the Copilot runtime process.
  * Without this the runtime inherits everything, including the MCP token in GITHUB_TOKEN, and
  * would use it as the Copilot credential. Credentials reach it only through explicit options.

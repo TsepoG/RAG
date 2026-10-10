@@ -11,6 +11,8 @@ const PORT_LIMITS = { min: 1, max: 65_535, fallback: 3000 };
 const ASK_TIMEOUT_LIMITS = { min: 5000, max: 600_000, fallback: 120_000 };
 const MAX_TOOL_CALLS_LIMITS = { min: 1, max: 50, fallback: 12 };
 const MCP_TIMEOUT_LIMITS = { min: 1000, max: 120_000, fallback: 30_000 };
+const ATLASSIAN_AUTH_MODES = ['basic', 'bearer'];
+const DEFAULT_ATLASSIAN_AUTH_MODE = 'basic';
 const LIST_SEPARATOR = ',';
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const ATLASSIAN_SITE_PATTERN = /^https:\/\/[a-z\d-]+\.atlassian\.net\/?$/i;
@@ -85,7 +87,11 @@ const envSchema = z.object({
       // origin drops any trailing slash and lower-cases the host.
       .transform((url) => new URL(url).origin),
   ),
-  ATLASSIAN_EMAIL: requiredString.pipe(z.email('must be a valid email address')),
+  ATLASSIAN_AUTH_MODE: z
+    .enum(ATLASSIAN_AUTH_MODES, { error: `must be one of ${ATLASSIAN_AUTH_MODES.join(', ')}` })
+    .default(DEFAULT_ATLASSIAN_AUTH_MODE),
+  // Only basic auth (email:token) needs it; the check that it is present then is below.
+  ATLASSIAN_EMAIL: requiredString.pipe(z.email('must be a valid email address')).optional(),
   ATLASSIAN_API_TOKEN: requiredString,
   CONFLUENCE_SPACE_KEYS: requiredList(
     'space key',
@@ -99,6 +105,36 @@ const envSchema = z.object({
   MCP_TIMEOUT_MS: integerInRange(MCP_TIMEOUT_LIMITS),
 });
 
+// Checked on the whole object so a missing email is reported together with any other problems.
+const envSchemaWithAuthRule = envSchema.superRefine(
+  (env, context) => {
+    if (env.ATLASSIAN_AUTH_MODE === 'basic' && env.ATLASSIAN_EMAIL === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ATLASSIAN_EMAIL'],
+        message: 'is required when ATLASSIAN_AUTH_MODE is basic',
+      });
+    }
+  },
+  {
+    when: (payload) =>
+      /** @type {Record<string, unknown>} */ (payload.value).ATLASSIAN_AUTH_MODE === 'basic',
+  },
+);
+
+/**
+ * Builds how to authenticate to Atlassian. A bearer key has no email, so the shape makes it
+ * impossible to build a Basic header without one.
+ * @param {{ ATLASSIAN_AUTH_MODE: string, ATLASSIAN_EMAIL?: string }} env - Parsed settings.
+ * @returns {{ mode: 'basic', email: string } | { mode: 'bearer' }} The auth settings.
+ */
+function atlassianAuth({ ATLASSIAN_AUTH_MODE: mode, ATLASSIAN_EMAIL: email }) {
+  // The refinement above guarantees an email in basic mode.
+  return mode === 'bearer'
+    ? { mode: 'bearer' }
+    : { mode: 'basic', email: /** @type {string} */ (email) };
+}
+
 /**
  * Names of every environment variable the app reads, for code that must know what to strip.
  * @type {ReadonlyArray<string>}
@@ -108,14 +144,14 @@ export const ENV_VARIABLE_NAMES = Object.freeze(Object.keys(envSchema.shape));
 /**
  * Schema for the process environment. Parsing yields the nested, typed config object.
  */
-export const configSchema = envSchema.transform((env) => ({
+export const configSchema = envSchemaWithAuthRule.transform((env) => ({
   nodeEnv: env.NODE_ENV,
   logLevel: env.LOG_LEVEL,
   port: env.PORT,
   github: { token: env.GITHUB_TOKEN, repos: env.GITHUB_REPOS },
   atlassian: {
     siteUrl: env.ATLASSIAN_SITE_URL,
-    email: env.ATLASSIAN_EMAIL,
+    auth: atlassianAuth(env),
     apiToken: env.ATLASSIAN_API_TOKEN,
     spaceKeys: env.CONFLUENCE_SPACE_KEYS,
   },

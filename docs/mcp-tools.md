@@ -1,6 +1,6 @@
 # MCP tools
 
-Generated 2026-10-10T15:37:43.155Z by `npm run mcp:tools`. Do not edit by hand; run it again to refresh.
+Generated 2026-10-10T17:26:39.025Z by `npm run mcp:tools`. Do not edit by hand; run it again to refresh.
 
 In the Arguments column, * marks a required argument. Hooks read these names, so a rename on
 the server shows up here first.

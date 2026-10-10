@@ -487,23 +487,50 @@ describe('onPostToolUse watches for Confluence results outside the allowed space
 });
 
 describe('onPostToolUseFailure', () => {
-  it('logs the tool, how long it ran and how long the error was, but not the error text', () => {
+  it('logs the tool, how long it ran, how long the error was, and its text', () => {
     const { hooks, lines, setTime } = setup();
     const args = { owner: 'acme', repo: 'app' };
 
     setTime(5);
     pre(hooks, 'github_repos-list_commits', args);
     setTime(105);
-    postFailure(hooks, 'github_repos-list_commits', args, 'HTTP 502: echoed ghp_not_logged');
+    postFailure(hooks, 'github_repos-list_commits', args, 'HTTP 502: bad gateway');
 
     expect(lines().at(-1)).toMatchObject({
       level: 'warn',
       msg: 'tool call failed',
       tool: 'github_repos-list_commits',
       durationMs: 100,
-      errorChars: 31,
+      errorChars: 21,
+      error: 'HTTP 502: bad gateway',
     });
-    expect(JSON.stringify(lines())).not.toContain('ghp_not_logged');
+  });
+
+  it('cuts a long error to 300 characters', () => {
+    const { hooks, lines } = setup();
+
+    postFailure(hooks, 'github_repos-list_commits', {}, 'e'.repeat(1000));
+
+    expect(lines().at(-1)).toMatchObject({ errorChars: 1000, error: `${'e'.repeat(299)}…` });
+  });
+
+  it('masks a configured secret inside the error text', () => {
+    const { hooks, lines } = setup({ secrets: ['s3cret-token'] });
+
+    postFailure(hooks, 'atlassian-searchConfluence', {}, 'denied for key s3cret-token (403)');
+
+    expect(lines().at(-1)).toMatchObject({ error: 'denied for key *** (403)' });
+    expect(JSON.stringify(lines())).not.toContain('s3cret-token');
+  });
+
+  it('masks a Bearer value and a token-shaped value even when no secret is configured', () => {
+    const { hooks, lines } = setup();
+
+    postFailure(hooks, 'atlassian-searchConfluence', {}, 'sent Bearer abc123 and ghp_echoedvalue');
+
+    const output = JSON.stringify(lines());
+    expect(output).not.toContain('abc123');
+    expect(output).not.toContain('ghp_echoedvalue');
   });
 
   it('counts a missing error message as empty', () => {
@@ -512,6 +539,7 @@ describe('onPostToolUseFailure', () => {
     postFailure(hooks, 'github_repos-list_commits', {}, undefined);
 
     expect(lines().at(-1)).toMatchObject({ errorChars: 0 });
+    expect(lines().at(-1)).not.toHaveProperty('error');
   });
 
   it('logs, and does not throw, when its input cannot be read', () => {

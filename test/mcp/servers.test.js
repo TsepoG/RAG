@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config/index.js';
+import { createLogger } from '../../src/logger/index.js';
 import {
   ATLASSIAN_MCP_URL,
   buildMcpServers,
@@ -13,6 +14,7 @@ import {
   FAKE_GITHUB_TOKEN,
   validEnv,
 } from '../helpers/env.js';
+import { createMemoryStream } from '../helpers/memory-stream.js';
 
 const TOOL_NAMES = {
   [SERVER_KEYS.atlassian]: ['search', 'getConfluenceContent'],
@@ -51,6 +53,21 @@ describe('buildMcpServers', () => {
     expect(Buffer.from(header.slice('Basic '.length), 'base64').toString()).toBe(
       `dev@acme.example:${FAKE_ATLASSIAN_TOKEN}`,
     );
+  });
+
+  it('sends a service-account key as a Bearer token, with no email involved', () => {
+    const servers = build({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined });
+
+    expect(servers.atlassian.headers).toEqual({ Authorization: `Bearer ${FAKE_ATLASSIAN_TOKEN}` });
+  });
+
+  it('never logs the Bearer key when the servers are logged', () => {
+    const { stream, lines } = createMemoryStream();
+    const servers = build({ ATLASSIAN_AUTH_MODE: 'bearer', ATLASSIAN_EMAIL: undefined });
+
+    createLogger({ destination: stream }).info({ mcpServers: servers }, 'session config');
+
+    expect(JSON.stringify(lines())).not.toContain(FAKE_ATLASSIAN_TOKEN);
   });
 
   it('sends the GitHub token as a Bearer token and asks for read-only repos tools', () => {

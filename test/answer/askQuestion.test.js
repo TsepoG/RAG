@@ -1,11 +1,11 @@
 // @ts-check
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { askQuestion } from '../../src/answer/askQuestion.js';
-import { loadConfig } from '../../src/config/index.js';
+import { encodeBasicCredentials, loadConfig } from '../../src/config/index.js';
 import { AppError, AskTimeoutError, CopilotError } from '../../src/errors/index.js';
 import { createLogger } from '../../src/logger/index.js';
 import { createFakeClient, createFakeSession } from '../helpers/fake-session.js';
-import { validEnv } from '../helpers/env.js';
+import { FAKE_ATLASSIAN_TOKEN, validEnv } from '../helpers/env.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
 const WORKING_DIRECTORY = 'sandbox/work';
@@ -278,6 +278,35 @@ describe('askQuestion session setup', () => {
     const decision = onPermissionRequest({ kind: 'shell' }, { sessionId: 's' });
 
     expect(decision.kind).toBe('reject');
+  });
+
+  it('masks the Atlassian token in the error text of a failed tool call', async () => {
+    const { deps, client, lines } = setup();
+    await askQuestion({ question: 'Hi?' }, deps);
+    const [{ hooks }] = client.configs;
+
+    hooks.onPostToolUseFailure({
+      toolName: 'atlassian-searchConfluence',
+      toolArgs: {},
+      error: `401 for ${FAKE_ATLASSIAN_TOKEN}`,
+    });
+
+    expect(lines().at(-1)).toMatchObject({ msg: 'tool call failed', error: '401 for ***' });
+  });
+
+  it('masks the encoded Basic credential, even without its prefix', async () => {
+    const { deps, client, lines } = setup();
+    await askQuestion({ question: 'Hi?' }, deps);
+    const [{ hooks }] = client.configs;
+    const encoded = encodeBasicCredentials('dev@acme.example', FAKE_ATLASSIAN_TOKEN);
+
+    hooks.onPostToolUseFailure({
+      toolName: 'atlassian-searchConfluence',
+      toolArgs: {},
+      error: `rejected ${encoded}`,
+    });
+
+    expect(JSON.stringify(lines())).not.toContain(encoded);
   });
 
   it('gives each question its own tool call budget', async () => {

@@ -1,6 +1,7 @@
 // @ts-check
 import { buildSessionConfig, finishesWithin } from '../copilot/index.js';
 import { AppError, AskTimeoutError, CopilotError } from '../errors/index.js';
+import { listSecrets } from '../config/index.js';
 import { createPermissionHandler, createToolHooks } from '../mcp/index.js';
 import { createEventRecorder } from './events.js';
 
@@ -101,6 +102,7 @@ export async function askQuestion({ question, onDelta }, deps) {
       spaceKeys: config.atlassian.spaceKeys,
       siteUrl: config.atlassian.siteUrl,
       maxToolCalls: config.mcp.maxToolCalls,
+      secrets: listSecrets(config),
       logger,
       clock,
     });
