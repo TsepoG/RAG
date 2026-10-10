@@ -4,3 +4,5 @@ coverage/
 .env.local
 .scannerwork/
 reports/
+# Raw MCP results captured by mcp:sample hold real page and code content.
+test/fixtures/raw/
