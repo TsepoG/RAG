@@ -6,6 +6,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 import { buildRuntimeEnv } from '../config/index.js';
 import { CopilotError } from '../errors/index.js';
 import { CLIENT_NAME } from './session.js';
+import { finishesWithin } from './timing.js';
 
 /** @typedef {import('@github/copilot-sdk').CopilotClientOptions} CopilotClientOptions */
 /** @typedef {Pick<import('../logger/index.js').Logger, 'warn'>} ClientLogger */
@@ -81,27 +82,6 @@ export function buildClientOptions(config, { baseDirectory, workingDirectory, en
     clientInfo: { applicationName: CLIENT_NAME },
     ...(githubToken === undefined ? { useLoggedInUser: true } : { gitHubToken: githubToken }),
   };
-}
-
-/**
- * Waits for a promise, but no longer than a limit.
- * @param {Promise<unknown>} work - The work to wait for.
- * @param {number} limitMs - Longest wait in milliseconds.
- * @returns {Promise<boolean>} True if the work finished in time, false if the wait timed out.
- */
-async function finishesWithin(work, limitMs) {
-  /** @type {NodeJS.Timeout | undefined} */
-  let timer;
-  const timeout = new Promise((resolve) => {
-    timer = setTimeout(resolve, limitMs, false);
-    // A timer that is still pending must not keep the process alive at exit.
-    timer.unref();
-  });
-  try {
-    return (await Promise.race([work.then(() => true), timeout])) === true;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**

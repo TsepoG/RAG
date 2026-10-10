@@ -13,6 +13,7 @@ describe('copilot public entry point', () => {
       'buildSystemMessage',
       'createCopilotClient',
       'ensureAuthenticated',
+      'finishesWithin',
     ]);
   });
 });
