@@ -20,13 +20,22 @@ export const DEFAULT_LOG_LEVEL = 'info';
 /** What a censored value is replaced with. */
 export const REDACTED_VALUE = '***';
 
-const SECRET_KEYS = ['token', 'apiToken', 'authorization', 'password'];
-// pino has no recursive wildcard, so cover the key at the top level and up to two levels deep,
-// which is as deep as the config object nests.
-const WILDCARD_PREFIXES = ['', '*.', '*.*.'];
+// Both spellings of authorization: pino paths are case-sensitive and HTTP header objects usually
+// use "Authorization".
+const SECRET_KEYS = [
+  'token',
+  'apiToken',
+  'githubToken',
+  'authorization',
+  'Authorization',
+  'password',
+];
+// pino has no recursive wildcard, so cover each key at the top level and up to four levels down.
+// That reaches sessionConfig.mcpServers.<server>.headers.Authorization, the deepest shape we log.
+const WILDCARD_PREFIXES = ['', '*.', '*.*.', '*.*.*.', '*.*.*.*.'];
 
 /**
- * Every path pino must censor: each secret key at the top level and nested one and two deep.
+ * Every path pino must censor: each secret key at the top level and nested up to four levels deep.
  * @type {ReadonlyArray<string>}
  */
 export const REDACT_PATHS = Object.freeze(
