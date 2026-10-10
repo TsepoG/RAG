@@ -14,7 +14,8 @@ export default defineConfig({
       // Entry-point wiring only: it loads .env, calls the tested units and exits. Excluding it is
       // the one exception CODING_PRINCIPLES §6 allows; sonar.coverage.exclusions mirrors it.
       exclude: ['src/index.js'],
-      reporter: ['text', 'lcov', 'html'],
+      // lcov feeds SonarQube; json-summary feeds the CI job summary.
+      reporter: ['text', 'lcov', 'html', 'json-summary'],
       reportsDirectory: 'coverage',
       thresholds: {
         lines: COVERAGE_THRESHOLD,
