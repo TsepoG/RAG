@@ -212,6 +212,79 @@ describe('onPreToolUse enforces the Confluence space scope', () => {
   });
 });
 
+describe('onPreToolUse limits code searches to two per question', () => {
+  const search = { query: 'repo:acme/app refund' };
+  const HINT =
+    'Code search returned no results; this repository may not be indexed. Browse with get_file_contents on directories instead of repeating search_code.';
+
+  it('allows two code searches and denies the third with the hint', () => {
+    const { hooks, lines } = setup();
+
+    const decisions = [1, 2, 3].map(() => pre(hooks, 'github_repos-search_code', search));
+
+    expect(decisions.map((decision) => decision.permissionDecision)).toEqual([
+      'allow',
+      'allow',
+      'deny',
+    ]);
+    expect(decisions[2].permissionDecisionReason).toBe(HINT);
+    expect(lines().at(-1)).toMatchObject({ reason: 'search-limit' });
+  });
+
+  it('keeps denying every code search after the second', () => {
+    const { hooks } = setup({ maxToolCalls: 10 });
+
+    const decisions = Array.from({ length: 5 }, () =>
+      pre(hooks, 'github_repos-search_code', search),
+    );
+
+    expect(decisions.slice(2).every((decision) => decision.permissionDecision === 'deny')).toBe(
+      true,
+    );
+  });
+
+  it('does not limit the other tools, which are how the model is told to browse instead', () => {
+    const { hooks } = setup();
+    [1, 2, 3].forEach(() => pre(hooks, 'github_repos-search_code', search));
+
+    const decision = pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' });
+
+    expect(decision.permissionDecision).toBe('allow');
+  });
+
+  it('does not use up a search on a query the scope check refuses', () => {
+    const { hooks } = setup();
+
+    const refused = [1, 2, 3].map(() =>
+      pre(hooks, 'github_repos-search_code', { query: 'refund' }),
+    );
+    const allowed = [1, 2].map(() => pre(hooks, 'github_repos-search_code', search));
+
+    expect(refused.every((decision) => decision.permissionDecision === 'deny')).toBe(true);
+    expect(allowed.map((decision) => decision.permissionDecision)).toEqual(['allow', 'allow']);
+  });
+
+  it('still counts a denied search towards the limit on all tool calls', () => {
+    const { hooks } = setup({ maxToolCalls: 3 });
+
+    pre(hooks, 'github_repos-search_code', search);
+    pre(hooks, 'github_repos-search_code', search);
+    pre(hooks, 'github_repos-search_code', search);
+    const next = pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' });
+
+    expect(next.permissionDecisionReason).toContain('limit of 3 tool calls');
+  });
+
+  it('gives each question its own two searches', () => {
+    const first = setup().hooks;
+    const second = setup().hooks;
+    [1, 2].forEach(() => pre(first, 'github_repos-search_code', search));
+
+    expect(pre(first, 'github_repos-search_code', search).permissionDecision).toBe('deny');
+    expect(pre(second, 'github_repos-search_code', search).permissionDecision).toBe('allow');
+  });
+});
+
 describe('onPreToolUse limits the number of tool calls', () => {
   const valid = { owner: 'acme', repo: 'app' };
 

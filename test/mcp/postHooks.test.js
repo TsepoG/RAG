@@ -402,6 +402,67 @@ describe('onPostToolUse notes search hits as candidates', () => {
   });
 });
 
+describe('onPostToolUse tells the model when a code search finds nothing', () => {
+  const HINT =
+    'Code search returned no results; this repository may not be indexed. Browse with get_file_contents on directories instead of repeating search_code.';
+
+  it('adds the hint after a code search with no results, and does not change the result', async () => {
+    const { hooks } = setup();
+
+    const result = await runFixture(hooks, 'github_repos-search_code', 'search_code');
+
+    expect(result).toEqual({ additionalContext: HINT });
+  });
+
+  it('adds the hint after every empty code search', async () => {
+    const { hooks } = setup();
+
+    const results = [
+      await runFixture(hooks, 'github_repos-search_code', 'search_code'),
+      await runFixture(hooks, 'github_repos-search_code', 'search_code'),
+    ];
+
+    expect(results).toEqual([{ additionalContext: HINT }, { additionalContext: HINT }]);
+  });
+
+  it('adds no hint when the search found something', async () => {
+    const { hooks } = setup();
+
+    const result = await runFixture(hooks, 'github_repos-search_code', 'search_code.synthetic');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('adds no hint when hits were found but all left out', async () => {
+    const { hooks } = setup({ repos: ['nobody/nothing'] });
+
+    expect(
+      await runFixture(hooks, 'github_repos-search_code', 'search_code.synthetic'),
+    ).toBeUndefined();
+  });
+
+  it('adds no hint for a result it cannot read', async () => {
+    const { hooks } = setup();
+
+    expect(await run(hooks, 'github_repos-search_code', {}, 'not json')).toBeUndefined();
+  });
+
+  it.each([
+    ['github_repos-list_commits', '[]'],
+    ['github_repos-list_releases', '[]'],
+    ['atlassian-searchConfluence', '{"data":{"results":[]}}'],
+  ])('adds no hint for an empty result of %s', async (toolName, text) => {
+    const { hooks } = setup();
+
+    expect(await run(hooks, toolName, {}, text)).toBeUndefined();
+  });
+
+  it('keeps the hint on the same advice as the limit on searches', async () => {
+    expect(HINT).toContain('get_file_contents');
+    expect(HINT).toContain('repeating search_code');
+  });
+});
+
 describe('onPostToolUse leaves other results alone', () => {
   it('does nothing for the site lookup', async () => {
     const { hooks, registry } = setup();

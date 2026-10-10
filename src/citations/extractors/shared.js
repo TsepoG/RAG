@@ -42,6 +42,9 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 const GITHUB_REPO_IN_URL = /^https:\/\/github\.com\/([^/]+\/[^/]+)\//;
 const MONTHS_BEFORE_STALE = 12;
 
+/** The reason given for a search that returned no results at all. */
+export const NO_RESULTS = 'no-results';
+
 /**
  * Builds the result for content that must not reach the model.
  * @param {string} reason - Why, for the log; never the content.

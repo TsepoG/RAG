@@ -5,7 +5,7 @@
 /** @typedef {import('./registry.js').RegisteredSource} RegisteredSource */
 /** @typedef {import('./registry.js').Candidate} Candidate */
 
-export { getExtractor, MAX_CANDIDATES } from './extractors/index.js';
+export { getExtractor, MAX_CANDIDATES, NO_RESULTS } from './extractors/index.js';
 export { friendlyLabel } from './labels.js';
 export { createCitationRegistry, isKeyShaped } from './registry.js';
 export { validateCitations } from './validate.js';

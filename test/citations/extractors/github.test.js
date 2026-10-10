@@ -269,10 +269,27 @@ describe('extractReleaseList', () => {
 });
 
 describe('extractCodeSearch', () => {
-  it('finds nothing in the real result, which had no hits', async () => {
+  it('finds nothing in the real result, which had no hits, and says so', async () => {
     const result = await extractCodeSearch(fixtureInput('search_code'), makeContext());
 
-    expect(result).toMatchObject({ sources: [], candidates: [], blocked: false });
+    expect(result).toMatchObject({
+      sources: [],
+      candidates: [],
+      blocked: false,
+      reason: 'no-results',
+    });
+  });
+
+  it('says there were no results for an empty list of hits, not for hits that were left out', async () => {
+    const empty = await extractCodeSearch({ args: {}, text: json({ items: [] }) }, makeContext());
+    const leftOut = await extractCodeSearch(
+      fixtureInput('search_code.synthetic'),
+      makeContext({ repos: ['nobody/nothing'] }),
+    );
+
+    expect(empty.reason).toBe('no-results');
+    expect(leftOut.candidates).toEqual([]);
+    expect(leftOut.reason).toBeUndefined();
   });
 
   it('makes candidates of the hits in the synthetic fixture, leaving out a repository not allowed', async () => {

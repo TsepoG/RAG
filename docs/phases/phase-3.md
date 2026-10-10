@@ -158,8 +158,9 @@ src/
 - [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
 - [ ] Five role files exist, validate at startup, and `npm run roles` lists them.
 - [ ] The same real question asked with `--role developer` and
-      `--role product_owner` gives visibly different answers (code detail vs
-      plain business language) that cite the same sources. Paste both in the PR.
+      `--role product_owner` gives answers that both draw on Confluence and
+      GitHub, agree on the facts, and differ in depth and wording (code detail
+      vs plain business language). Paste both in the PR.
 - [ ] Every key in a real answer resolves to a numbered source with a working
       link; GitHub file links contain a 40-character commit SHA.
 - [ ] A page from outside `CONFLUENCE_SPACE_KEYS` never appears in sources and

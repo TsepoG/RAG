@@ -1,5 +1,6 @@
 // @ts-check
 import { isAllowedTool, resolveTool } from './allowlist.js';
+import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL, MAX_CODE_SEARCHES } from './hints.js';
 import { createPostToolHooks } from './postHooks.js';
 import { buildScope, checkToolScope } from './scope.js';
 
@@ -95,6 +96,8 @@ function createPreToolHook({
 }) {
   const scope = buildScope({ repos, spaceKeys, siteUrl });
   let attempts = 0;
+  // Only searches that passed the scope check count, so a badly formed query does not use one up.
+  let codeSearches = 0;
 
   /**
    * Refuses a call and logs it. Only the tool name and a reason code are logged, never arguments.
@@ -131,6 +134,12 @@ function createPreToolHook({
     const scoped = checkScope(target, toolArgs, scope);
     if (!scoped.ok) {
       return refuse(toolName, scoped.code, scoped.reason);
+    }
+    if (target.tool === CODE_SEARCH_TOOL) {
+      if (codeSearches >= MAX_CODE_SEARCHES) {
+        return refuse(toolName, 'search-limit', CODE_SEARCH_HINT);
+      }
+      codeSearches += 1;
     }
     timer.start(toolName, toolArgs);
     return { permissionDecision: 'allow' };

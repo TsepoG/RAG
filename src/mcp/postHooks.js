@@ -2,11 +2,13 @@
 import {
   createCitationRegistry,
   getExtractor,
+  NO_RESULTS,
   removedNotice,
   wrapAsSource,
 } from '../citations/index.js';
 import { maskSecrets } from '../logger/index.js';
 import { resolveTool } from './allowlist.js';
+import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL } from './hints.js';
 import { SERVER_KEYS } from './servers.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
@@ -112,12 +114,13 @@ export function createPostToolHooks({
    * Reads one tool result and decides what the model is given instead.
    * @param {{ toolName: string, toolArgs: unknown, toolResult: ToolResultObject }} input - The hook input.
    * @param {string} text - The text of the result.
-   * @returns {Promise<{ modifiedResult: ToolResultObject } | undefined>} A replacement, or nothing.
+   * @returns {Promise<{ modifiedResult?: ToolResultObject, additionalContext?: string } | undefined>} A
+   *   replacement result, a note for the model, or nothing.
    */
   async function handle(input, text) {
     const target = resolveTool(input.toolName);
     const extractor = target === undefined ? undefined : getExtractor(target);
-    if (extractor === undefined) {
+    if (target === undefined || extractor === undefined) {
       return undefined;
     }
     const { sessionLog } = input.toolResult;
@@ -136,7 +139,10 @@ export function createPostToolHooks({
     const keys = extraction.sources.map((source) => registry.register(source));
     const [source] = extraction.sources;
     if (source === undefined) {
-      return undefined;
+      // An empty code search is common for this server, and repeating it only uses up calls.
+      return extraction.reason === NO_RESULTS && target.tool === CODE_SEARCH_TOOL
+        ? { additionalContext: CODE_SEARCH_HINT }
+        : undefined;
     }
     logger.info({ tool: input.toolName, keys }, 'sources registered');
     const wrapped = wrapAsSource(

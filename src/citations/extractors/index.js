@@ -8,7 +8,7 @@ import { extractReleaseList } from './listReleases.js';
 import { extractCodeSearch } from './searchCode.js';
 import { extractConfluenceSearch } from './searchConfluence.js';
 
-export { MAX_CANDIDATES } from './shared.js';
+export { MAX_CANDIDATES, NO_RESULTS } from './shared.js';
 
 /** @typedef {import('./shared.js').Extractor} Extractor */
 /** @typedef {import('./shared.js').ExtractContext} ExtractContext */

@@ -6,6 +6,7 @@ describe('citations public entry point', () => {
   it('exports the registry, wrapping, labels and validation', () => {
     expect(Object.keys(citations).sort()).toEqual([
       'MAX_CANDIDATES',
+      'NO_RESULTS',
       'createCitationRegistry',
       'friendlyLabel',
       'getExtractor',

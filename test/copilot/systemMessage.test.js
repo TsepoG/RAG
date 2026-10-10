@@ -43,6 +43,12 @@ describe('buildBaseMessage', () => {
     expect(base).toContain('do not guess');
   });
 
+  it('tells the model to consult both Confluence and GitHub unless the question is about one', () => {
+    expect(base).toContain(
+      'Unless the question is clearly only about documentation or only about code, consult both Confluence and GitHub before answering.',
+    );
+  });
+
   it('says the assistant is read-only', () => {
     expect(base).toContain('You cannot change anything.');
     expect(base).toContain('read-only');
