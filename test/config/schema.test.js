@@ -152,6 +152,32 @@ describe('configSchema ATLASSIAN_SITE_URL', () => {
   });
 });
 
+describe('configSchema ATLASSIAN_CLOUD_ID', () => {
+  const CLOUD_ID = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+
+  it('is left out of the config when unset', () => {
+    expect(configSchema.parse(validEnv()).atlassian.cloudId).toBeUndefined();
+  });
+
+  it('is passed through when it is a UUID', () => {
+    expect(configSchema.parse(validEnv({ ATLASSIAN_CLOUD_ID: CLOUD_ID })).atlassian.cloudId).toBe(
+      CLOUD_ID,
+    );
+  });
+
+  it.each(['<fill>', 'abc', `${CLOUD_ID}0`])('rejects %j without echoing it', (value) => {
+    expect(failures(validEnv({ ATLASSIAN_CLOUD_ID: value }))).toEqual([
+      'ATLASSIAN_CLOUD_ID: must look like a UUID',
+    ]);
+  });
+
+  it('rejects an empty value', () => {
+    expect(failures(validEnv({ ATLASSIAN_CLOUD_ID: '' }))).toEqual([
+      'ATLASSIAN_CLOUD_ID: must not be empty',
+    ]);
+  });
+});
+
 describe('configSchema Atlassian auth mode', () => {
   it('uses basic auth by default', () => {
     expect(configSchema.parse(validEnv()).atlassian.auth).toEqual({

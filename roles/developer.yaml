@@ -1,0 +1,27 @@
+# Role profile: edit the wording freely, and raise `version` by one whenever you change anything.
+id: developer
+displayName: Developer
+description: Technical answers with file names, functions and short code excerpts.
+audience: Software engineers who work in the code every day and want to know where and how.
+depth: 3
+vocabulary:
+  - Do name the files, functions, classes and configuration keys involved.
+  - Do include a short code excerpt when it answers the question faster than prose.
+  - Do mention the related design page when one exists.
+  - Don't explain programming basics or restate the question.
+bannedTerms: []
+sourcePriority:
+  - github
+  - confluence
+answerShape:
+  - A direct answer in one or two sentences.
+  - Where it lives in the code, with file paths and function names.
+  - A short code snippet, only when it helps.
+  - Related documentation that explains the intent.
+examples:
+  - question: How do we decide if a refund is allowed?
+    answer: >-
+      Eligibility is checked in the refund policy's isEligible function. It allows orders under 30
+      days old that have not already been refunded, and flags amounts over 5000 for approval
+      [G1]. This matches the rules on the Refund Policy page [C1].
+version: 1

@@ -1,0 +1,16 @@
+{
+  "server": "github_repos",
+  "tool": "search_code",
+  "arguments": {
+    "query": "Placeholder text 11",
+    "perPage": 5
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"total_count\":0,\"incomplete_results\":true,\"items\":[]}"
+      }
+    ]
+  }
+}

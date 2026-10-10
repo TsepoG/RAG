@@ -4,6 +4,7 @@ import { askQuestion } from '../../src/answer/index.js';
 import { loadConfig, loadEnvFileIfPresent } from '../../src/config/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../../src/copilot/index.js';
 import { createLogger } from '../../src/logger/index.js';
+import { getRole, loadRoles } from '../../src/roles/index.js';
 import { ALLOWLIST, isWriteToolName } from '../../src/mcp/index.js';
 
 const LIVE_TIMEOUT_MS = 180_000;
@@ -15,11 +16,14 @@ const FOREIGN_REPO = 'octocat/Hello-World';
 let config;
 /** @type {Awaited<ReturnType<typeof createCopilotClient>>} */
 let handle;
+/** @type {import('../../src/roles/index.js').Role} */
+let role;
 const logger = createLogger({ level: 'silent' });
 
 beforeAll(async () => {
   loadEnvFileIfPresent();
   config = loadConfig();
+  role = getRole(await loadRoles(), 'developer');
   handle = await createCopilotClient(config, { logger });
   await ensureAuthenticated(handle.client);
 }, LIVE_TIMEOUT_MS);
@@ -35,7 +39,7 @@ afterAll(async () => {
  */
 function ask(question) {
   return askQuestion(
-    { question },
+    { question, role },
     { client: handle.client, workingDirectory: handle.workingDirectory, config, logger },
   );
 }

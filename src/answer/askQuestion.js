@@ -1,14 +1,18 @@
 // @ts-check
+import { createCitationRegistry } from '../citations/index.js';
+import { listSecrets } from '../config/index.js';
 import { buildSessionConfig, finishesWithin } from '../copilot/index.js';
 import { AppError, AskTimeoutError, CopilotError } from '../errors/index.js';
-import { listSecrets } from '../config/index.js';
+import { createCommitResolver } from '../github/index.js';
 import { createPermissionHandler, createToolHooks } from '../mcp/index.js';
 import { createEventRecorder } from './events.js';
+import { assembleAnswer } from './result.js';
 
 /**
  * What to ask, and where to send the answer as it streams.
  * @typedef {object} AskInput
  * @property {string} question - The question.
+ * @property {import('../roles/index.js').Role} role - The role the answer is written for.
  * @property {(text: string) => void} [onDelta] - Receives each piece of the answer as it arrives.
  */
 
@@ -20,12 +24,19 @@ import { createEventRecorder } from './events.js';
  * @property {import('../config/index.js').AppConfig} config - Validated config.
  * @property {import('../logger/index.js').Logger} logger - Where hooks and cleanup log.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
+ * @property {typeof fetch} [fetch] - Used to look up commits; defaults to the global fetch.
  */
 
 /**
- * The outcome of a question.
+ * The outcome of a question, shaped like the final event the web UI will stream.
  * @typedef {object} AskResult
- * @property {string} answer - The answer text.
+ * @property {string} answer - The answer, with invented citation keys removed.
+ * @property {string} role - The id of the role it was written for.
+ * @property {import('./result.js').CitedSource[]} sources - The sources the answer cites, in key order.
+ * @property {import('./result.js').ConsultedItem[]} alsoConsulted - Sources fetched but not cited,
+ *   then search hits that were not fetched; at most ten.
+ * @property {string[]} invalidKeys - Keys the answer used that were never registered.
+ * @property {string[]} uncitedSourceKeys - Keys of fetched sources the answer did not cite.
  * @property {import('./toolCalls.js').ToolCallRecord[]} toolCalls - The tool calls made, in order.
  * @property {string | undefined} model - The model that answered, when Copilot reported it.
  * @property {number} durationMs - How long the whole question took.
@@ -85,14 +96,22 @@ async function bestEffort(what, step, logger) {
  * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  */
-export async function askQuestion({ question, onDelta }, deps) {
-  const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK } = deps;
+export async function askQuestion({ question, role, onDelta }, deps) {
+  const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK, fetch } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
   }
   const startedAt = clock.now();
   const events = createEventRecorder({ clock, onDelta });
   const deadline = createDeadline(config.copilot.askTimeoutMs);
+  // Per question, so one question's sources, keys and commit lookups never leak into another's.
+  const registry = createCitationRegistry();
+  const commits = createCommitResolver({
+    token: config.github.token,
+    repos: config.github.repos,
+    fetch,
+    logger,
+  });
   // Held in an object because the session is created inside the closure below.
   const open = /** @type {{ session?: AskSession }} */ ({});
 
@@ -101,14 +120,17 @@ export async function askQuestion({ question, onDelta }, deps) {
       repos: config.github.repos,
       spaceKeys: config.atlassian.spaceKeys,
       siteUrl: config.atlassian.siteUrl,
+      cloudId: config.atlassian.cloudId,
       maxToolCalls: config.mcp.maxToolCalls,
       secrets: listSecrets(config),
+      registry,
+      resolveHead: commits.resolveHead,
       logger,
       clock,
     });
     const onPermissionRequest = createPermissionHandler({ logger });
     open.session = await client.createSession(
-      buildSessionConfig({ config, workingDirectory, hooks, onPermissionRequest }),
+      buildSessionConfig({ config, role, workingDirectory, hooks, onPermissionRequest }),
     );
     events.attach(open.session);
     await open.session.send({ prompt: question });
@@ -120,7 +142,13 @@ export async function askQuestion({ question, onDelta }, deps) {
     if (!outcome.ok) {
       throw outcome.error;
     }
-    return { ...events.result(), durationMs: clock.now() - startedAt };
+    const { answer, toolCalls, model } = events.result();
+    return {
+      ...assembleAnswer({ answer, role, registry }),
+      toolCalls,
+      model,
+      durationMs: clock.now() - startedAt,
+    };
   } catch (error) {
     if (error instanceof AskTimeoutError && open.session !== undefined) {
       const { session } = open;

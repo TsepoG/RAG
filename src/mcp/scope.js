@@ -25,7 +25,6 @@ export const SCOPED_ARGUMENTS = Object.freeze({
 /** Path of a Confluence Cloud page URL, capturing the space key. */
 const CONFLUENCE_SPACE_PATH = /^\/wiki\/spaces\/([^/]+)\//i;
 /** Space paths anywhere in a block of text, used to look for strays in tool results. */
-const CONFLUENCE_SPACE_IN_TEXT = /\/wiki\/spaces\/([^/\s"')\]>]+)/gi;
 const GITHUB_QUALIFIER = /^(-?)(repo|org|user):(.*)$/i;
 const GITHUB_QUERY_PART = /"[^"]*"|\S+/g;
 const PARENTHESES = /[()]/g;
@@ -162,15 +161,6 @@ export function checkConfluenceContent(args, scope) {
   return scope.spaceKeys.has(safeDecode(space).toLowerCase())
     ? OK
     : deny('content-space-not-allowed', `Space ${space} is not in the allowed list.`);
-}
-
-/**
- * Finds Confluence space keys mentioned in text, such as a tool result.
- * @param {string} text - Any text.
- * @returns {string[]} The distinct space keys found, in order of first appearance.
- */
-export function findSpaceKeys(text) {
-  return [...new Set([...text.matchAll(CONFLUENCE_SPACE_IN_TEXT)].map((match) => match[1]))];
 }
 
 /**

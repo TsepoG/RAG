@@ -6,6 +6,7 @@ import {
   ConfigError,
   CopilotError,
   McpError,
+  RoleNotFoundError,
   ToolNotAllowedError,
 } from '../../src/errors/index.js';
 
@@ -168,5 +169,31 @@ describe('AskTimeoutError', () => {
     const cause = new Error('aborted');
 
     expect(new AskTimeoutError(5_000, { cause }).cause).toBe(cause);
+  });
+});
+
+describe('RoleNotFoundError', () => {
+  it('is an AppError that lists the valid roles in its message', () => {
+    const error = new RoleNotFoundError('boss', ['developer', 'qa']);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('RoleNotFoundError');
+    expect(error.message).toBe('Unknown role "boss". Valid roles: developer, qa');
+  });
+
+  it('records the id that was asked for and a frozen copy of the valid ids', () => {
+    const valid = ['developer', 'qa'];
+    const error = new RoleNotFoundError('boss', valid);
+    valid.push('later');
+
+    expect(error.roleId).toBe('boss');
+    expect(error.validIds).toEqual(['developer', 'qa']);
+    expect(Object.isFrozen(error.validIds)).toBe(true);
+  });
+
+  it('keeps the wrapped error as its cause', () => {
+    const cause = new Error('x');
+
+    expect(new RoleNotFoundError('a', [], { cause }).cause).toBe(cause);
   });
 });

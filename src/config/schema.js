@@ -17,6 +17,7 @@ const LIST_SEPARATOR = ',';
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const ATLASSIAN_SITE_PATTERN = /^https:\/\/[a-z\d-]+\.atlassian\.net\/?$/i;
 const INTEGER_PATTERN = /^\d+$/;
+const CLOUD_ID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 
 const requiredString = z
   .string({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a string') })
@@ -92,6 +93,10 @@ const envSchema = z.object({
     .default(DEFAULT_ATLASSIAN_AUTH_MODE),
   // Only basic auth (email:token) needs it; the check that it is present then is below.
   ATLASSIAN_EMAIL: requiredString.pipe(z.email('must be a valid email address')).optional(),
+  // Optional: when set, every Confluence call uses it, so the model never has to look it up.
+  ATLASSIAN_CLOUD_ID: requiredString
+    .pipe(z.string().regex(CLOUD_ID_PATTERN, 'must look like a UUID'))
+    .optional(),
   ATLASSIAN_API_TOKEN: requiredString,
   CONFLUENCE_SPACE_KEYS: requiredList(
     'space key',
@@ -151,6 +156,7 @@ export const configSchema = envSchemaWithAuthRule.transform((env) => ({
   github: { token: env.GITHUB_TOKEN, repos: env.GITHUB_REPOS },
   atlassian: {
     siteUrl: env.ATLASSIAN_SITE_URL,
+    cloudId: env.ATLASSIAN_CLOUD_ID,
     auth: atlassianAuth(env),
     apiToken: env.ATLASSIAN_API_TOKEN,
     spaceKeys: env.CONFLUENCE_SPACE_KEYS,

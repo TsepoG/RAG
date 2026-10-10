@@ -59,6 +59,7 @@ function pre(hooks, toolName, toolArgs) {
  * @param {string} toolName - Tool name.
  * @param {unknown} toolArgs - Tool arguments.
  * @param {unknown} text - What the tool returned.
+ * @returns {ReturnType<NonNullable<ToolHooks['onPostToolUse']>> | undefined} What the hook returns.
  */
 function post(hooks, toolName, toolArgs, text) {
   const input = {
@@ -66,7 +67,7 @@ function post(hooks, toolName, toolArgs, text) {
     toolArgs,
     toolResult: { textResultForLlm: text, resultType: 'success' },
   };
-  hooks.onPostToolUse?.(/** @type {never} */ (input), INVOCATION);
+  return hooks.onPostToolUse?.(/** @type {never} */ (input), INVOCATION);
 }
 
 /**
@@ -208,6 +209,79 @@ describe('onPreToolUse enforces the Confluence space scope', () => {
 
     expect(pre(hooks, 'atlassian-getConfluenceContent', args).permissionDecision).toBe('deny');
     expect(lines()[0]).toMatchObject({ reason: code });
+  });
+});
+
+describe('onPreToolUse limits code searches to two per question', () => {
+  const search = { query: 'repo:acme/app refund' };
+  const HINT =
+    'Code search returned no results; this repository may not be indexed. Browse with get_file_contents on directories instead of repeating search_code.';
+
+  it('allows two code searches and denies the third with the hint', () => {
+    const { hooks, lines } = setup();
+
+    const decisions = [1, 2, 3].map(() => pre(hooks, 'github_repos-search_code', search));
+
+    expect(decisions.map((decision) => decision.permissionDecision)).toEqual([
+      'allow',
+      'allow',
+      'deny',
+    ]);
+    expect(decisions[2].permissionDecisionReason).toBe(HINT);
+    expect(lines().at(-1)).toMatchObject({ reason: 'search-limit' });
+  });
+
+  it('keeps denying every code search after the second', () => {
+    const { hooks } = setup({ maxToolCalls: 10 });
+
+    const decisions = Array.from({ length: 5 }, () =>
+      pre(hooks, 'github_repos-search_code', search),
+    );
+
+    expect(decisions.slice(2).every((decision) => decision.permissionDecision === 'deny')).toBe(
+      true,
+    );
+  });
+
+  it('does not limit the other tools, which are how the model is told to browse instead', () => {
+    const { hooks } = setup();
+    [1, 2, 3].forEach(() => pre(hooks, 'github_repos-search_code', search));
+
+    const decision = pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' });
+
+    expect(decision.permissionDecision).toBe('allow');
+  });
+
+  it('does not use up a search on a query the scope check refuses', () => {
+    const { hooks } = setup();
+
+    const refused = [1, 2, 3].map(() =>
+      pre(hooks, 'github_repos-search_code', { query: 'refund' }),
+    );
+    const allowed = [1, 2].map(() => pre(hooks, 'github_repos-search_code', search));
+
+    expect(refused.every((decision) => decision.permissionDecision === 'deny')).toBe(true);
+    expect(allowed.map((decision) => decision.permissionDecision)).toEqual(['allow', 'allow']);
+  });
+
+  it('still counts a denied search towards the limit on all tool calls', () => {
+    const { hooks } = setup({ maxToolCalls: 3 });
+
+    pre(hooks, 'github_repos-search_code', search);
+    pre(hooks, 'github_repos-search_code', search);
+    pre(hooks, 'github_repos-search_code', search);
+    const next = pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' });
+
+    expect(next.permissionDecisionReason).toContain('limit of 3 tool calls');
+  });
+
+  it('gives each question its own two searches', () => {
+    const first = setup().hooks;
+    const second = setup().hooks;
+    [1, 2].forEach(() => pre(first, 'github_repos-search_code', search));
+
+    expect(pre(first, 'github_repos-search_code', search).permissionDecision).toBe('deny');
+    expect(pre(second, 'github_repos-search_code', search).permissionDecision).toBe('allow');
   });
 });
 
@@ -446,46 +520,6 @@ describe('onPostToolUse', () => {
   });
 });
 
-describe('onPostToolUse watches for Confluence results outside the allowed spaces', () => {
-  it('warns, naming the spaces, when a Confluence result mentions another space', () => {
-    const { hooks, lines } = setup();
-    const text = `${SITE}/wiki/spaces/ENG/pages/1 and ${SITE}/wiki/spaces/HR/pages/2`;
-
-    post(hooks, 'atlassian-searchConfluence', {}, text);
-
-    expect(lines().at(-1)).toMatchObject({
-      level: 'warn',
-      msg: 'confluence result mentions a space outside the allowed list',
-      tool: 'atlassian-searchConfluence',
-      spaces: ['HR'],
-    });
-  });
-
-  it('stays quiet when every space mentioned is allowed, whatever its case', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'atlassian-getConfluenceContent', {}, `${SITE}/wiki/spaces/eng/pages/1`);
-
-    expect(lines().filter((line) => line.level === 'warn')).toEqual([]);
-  });
-
-  it('does not look for spaces in GitHub results', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'github_repos-get_file_contents', {}, `${SITE}/wiki/spaces/HR/pages/2`);
-
-    expect(lines().filter((line) => line.level === 'warn')).toEqual([]);
-  });
-
-  it('does not log the surrounding text when it warns', () => {
-    const { hooks, lines } = setup();
-
-    post(hooks, 'atlassian-searchConfluence', {}, `CONFIDENTIAL ${SITE}/wiki/spaces/HR/pages/2`);
-
-    expect(JSON.stringify(lines())).not.toContain('CONFIDENTIAL');
-  });
-});
-
 describe('onPostToolUseFailure', () => {
   it('logs the tool, how long it ran, how long the error was, and its text', () => {
     const { hooks, lines, setTime } = setup();
@@ -586,5 +620,89 @@ describe('createToolHooks defaults', () => {
       'onPostToolUseFailure',
       'onPreToolUse',
     ]);
+  });
+});
+
+describe('onPreToolUse sets the cloudId on Confluence calls', () => {
+  const CLOUD_ID = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+  const search = { cql: 'space = ENG AND text ~ "retry"', limit: 5 };
+
+  /**
+   * Reads the arguments a decision asks the call to run with.
+   * @param {ToolHooks} hooks - The hooks.
+   * @param {string} tool - Tool name.
+   * @param {unknown} args - Arguments.
+   * @returns {unknown} The replacement arguments, if any.
+   */
+  const modified = (hooks, tool, args) =>
+    /** @type {{ modifiedArgs?: unknown }} */ (pre(hooks, tool, args)).modifiedArgs;
+
+  it('adds it when the model sent none', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    expect(modified(hooks, 'atlassian-searchConfluence', search)).toEqual({
+      ...search,
+      cloudId: CLOUD_ID,
+    });
+  });
+
+  it.each(['<fill>', 'wrong-id', '', 42])('replaces the value %j the model sent', (value) => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+    const args = { content_url: PAGE_IN_ENG, cloudId: value };
+
+    expect(modified(hooks, 'atlassian-getConfluenceContent', args)).toEqual({
+      content_url: PAGE_IN_ENG,
+      cloudId: CLOUD_ID,
+    });
+  });
+
+  it('still allows the call, and does not change the arguments object the model sent', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+    const args = { ...search };
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', args);
+
+    expect(decision.permissionDecision).toBe('allow');
+    expect(args).toEqual(search);
+  });
+
+  it('leaves the arguments alone when no cloudId is configured', () => {
+    const { hooks } = setup();
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', { ...search, cloudId: '<fill>' });
+
+    expect(decision).toEqual({ permissionDecision: 'allow' });
+  });
+
+  it.each([
+    ['atlassian-getAccessibleAtlassianResources', {}],
+    ['github_repos-get_file_contents', { owner: 'acme', repo: 'app' }],
+  ])('does not add it to %s', (tool, args) => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    expect(pre(hooks, tool, args)).toEqual({ permissionDecision: 'allow' });
+  });
+
+  it('checks the scope first, so a denied call is not rewritten', () => {
+    const { hooks } = setup({ cloudId: CLOUD_ID });
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', {
+      cql: 'space = OTHER AND text ~ "x"',
+    });
+
+    expect(decision.permissionDecision).toBe('deny');
+    expect(decision).not.toHaveProperty('modifiedArgs');
+  });
+
+  it('times the call whichever form of the arguments the post-tool hook reports', async () => {
+    const { hooks, lines, setTime } = setup({ cloudId: CLOUD_ID });
+    pre(hooks, 'atlassian-searchConfluence', search);
+    setTime(40);
+
+    await post(hooks, 'atlassian-searchConfluence', { ...search, cloudId: CLOUD_ID }, '{}');
+
+    expect(lines().find((line) => line.msg === 'tool call completed')).toMatchObject({
+      durationMs: 40,
+    });
   });
 });

@@ -1,8 +1,10 @@
 // @ts-check
-import { maskSecrets } from '../logger/index.js';
 import { isAllowedTool, resolveTool } from './allowlist.js';
-import { buildScope, checkToolScope, findSpaceKeys } from './scope.js';
 import { SERVER_KEYS } from './servers.js';
+import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL, MAX_CODE_SEARCHES } from './hints.js';
+import { createPostToolHooks } from './postHooks.js';
+import { buildScope, checkToolScope } from './scope.js';
+import { asRecord } from './scopeCommon.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
 /** @typedef {Parameters<NonNullable<SessionHooks['onPreToolUse']>>[0]} PreToolInput */
@@ -18,7 +20,13 @@ import { SERVER_KEYS } from './servers.js';
  * @property {ReadonlyArray<string>} spaceKeys - Allowed Confluence space keys.
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
+ * @property {string} [cloudId] - The Atlassian cloudId. When set, it replaces the one the model
+ *   passes to Confluence tools, whether missing, a placeholder or wrong.
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
+ * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
+ *   are recorded; a fresh one when omitted.
+ * @property {(repo: string) => Promise<string | undefined>} [resolveHead] - Looks up a repository's
+ *   head commit, for pinning file links.
  * @property {HookLogger} logger - Where denials, completions and failures are logged.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
  * @property {typeof checkToolScope} [checkScope] - The scope check; defaults to the real one.
@@ -27,8 +35,8 @@ import { SERVER_KEYS } from './servers.js';
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
 
-/** Longest error text logged for a failed tool call. */
-const ERROR_TEXT_LIMIT = 300;
+/** Confluence tools that take a cloudId; getAccessibleAtlassianResources takes no arguments. */
+const CLOUD_ID_TOOLS = new Set(['searchConfluence', 'getConfluenceContent']);
 
 /** Said to the model when a call is refused for a reason it cannot act on. */
 const NOT_AVAILABLE = 'This tool is not available.';
@@ -89,12 +97,15 @@ function createPreToolHook({
   spaceKeys,
   siteUrl,
   maxToolCalls,
+  cloudId,
   logger,
   timer,
   checkScope = checkToolScope,
 }) {
   const scope = buildScope({ repos, spaceKeys, siteUrl });
   let attempts = 0;
+  // Only searches that passed the scope check count, so a badly formed query does not use one up.
+  let codeSearches = 0;
 
   /**
    * Refuses a call and logs it. Only the tool name and a reason code are logged, never arguments.
@@ -112,7 +123,8 @@ function createPreToolHook({
    * Decides on one call.
    * @param {string} toolName - Tool name as the runtime reported it.
    * @param {unknown} toolArgs - Tool arguments.
-   * @returns {{ permissionDecision: 'allow' | 'deny', permissionDecisionReason?: string }} The decision.
+   * @returns {{ permissionDecision: 'allow' | 'deny', permissionDecisionReason?: string, modifiedArgs?: unknown }}
+   *   The decision, with the arguments to run the call with when they were changed.
    */
   function decide(toolName, toolArgs) {
     // Every attempt counts, allowed or not, so a model stuck retrying a denied call still stops.
@@ -132,8 +144,24 @@ function createPreToolHook({
     if (!scoped.ok) {
       return refuse(toolName, scoped.code, scoped.reason);
     }
+    if (target.tool === CODE_SEARCH_TOOL) {
+      if (codeSearches >= MAX_CODE_SEARCHES) {
+        return refuse(toolName, 'search-limit', CODE_SEARCH_HINT);
+      }
+      codeSearches += 1;
+    }
     timer.start(toolName, toolArgs);
-    return { permissionDecision: 'allow' };
+    if (
+      cloudId === undefined ||
+      target.server !== SERVER_KEYS.atlassian ||
+      !CLOUD_ID_TOOLS.has(target.tool)
+    ) {
+      return { permissionDecision: 'allow' };
+    }
+    const modifiedArgs = { ...asRecord(toolArgs), cloudId };
+    // The post-tool hook may be given either form of the arguments, so both are timed.
+    timer.start(toolName, modifiedArgs);
+    return { permissionDecision: 'allow', modifiedArgs };
   }
 
   return (input) => {
@@ -148,66 +176,9 @@ function createPreToolHook({
 }
 
 /**
- * Builds the hooks that run after a tool call. They only log: tool name, duration and size, never
- * the content a tool returned. A failure inside them is logged and never reaches the model.
- * @param {ToolHooksDeps & { timer: ReturnType<typeof createCallTimer> }} deps - Limits and helpers.
- * @returns {Pick<ToolHooks, 'onPostToolUse' | 'onPostToolUseFailure'>} The hooks.
- */
-function createPostToolHooks({ spaceKeys, logger, timer, secrets = [] }) {
-  const allowedSpaces = new Set(spaceKeys.map((key) => key.toLowerCase()));
-
-  /**
-   * Warns when a Confluence result mentions a space outside the allowed list. This is a backstop:
-   * the pre-tool hook already confines searches and fetches, so a hit is usually a link in a page.
-   * @param {string} toolName - Tool name as the runtime reported it.
-   * @param {string} text - What the tool returned.
-   */
-  function warnAboutStraySpaces(toolName, text) {
-    if (resolveTool(toolName)?.server !== SERVER_KEYS.atlassian) {
-      return;
-    }
-    const spaces = findSpaceKeys(text).filter((key) => !allowedSpaces.has(key.toLowerCase()));
-    if (spaces.length > 0) {
-      logger.warn(
-        { tool: toolName, spaces },
-        'confluence result mentions a space outside the allowed list',
-      );
-    }
-  }
-
-  return {
-    onPostToolUse(input) {
-      try {
-        const text = input.toolResult.textResultForLlm;
-        const resultChars = typeof text === 'string' ? text.length : 0;
-        const durationMs = timer.stop(input.toolName, input.toolArgs);
-        logger.info({ tool: input.toolName, durationMs, resultChars }, 'tool call completed');
-        if (typeof text === 'string') {
-          warnAboutStraySpaces(input.toolName, text);
-        }
-      } catch (error) {
-        logger.error({ err: error }, 'post-tool hook failed');
-      }
-    },
-    onPostToolUseFailure(input) {
-      try {
-        const durationMs = timer.stop(input.toolName, input.toolArgs);
-        const { error } = input;
-        const detail =
-          typeof error === 'string'
-            ? { errorChars: error.length, error: maskSecrets(error, secrets, ERROR_TEXT_LIMIT) }
-            : { errorChars: 0 };
-        logger.warn({ tool: input.toolName, durationMs, ...detail }, 'tool call failed');
-      } catch (error) {
-        logger.error({ err: error }, 'post-tool failure hook failed');
-      }
-    },
-  };
-}
-
-/**
  * Creates the hooks for one question: the pre-tool hook that allows or denies each call, and the
- * post-tool hooks that log it. Make a new set per question, because the call limit is per set.
+ * post-tool hooks that log it and register what it returned as sources. Make a new set per
+ * question, because the call limit and the registry are per set.
  * @param {ToolHooksDeps} deps - Limits, logger and optional clock and scope check.
  * @returns {ToolHooks} Hooks to register on the session.
  */
@@ -215,6 +186,6 @@ export function createToolHooks(deps) {
   const timer = createCallTimer(deps.clock ?? SYSTEM_CLOCK);
   return {
     onPreToolUse: createPreToolHook({ ...deps, timer }),
-    ...createPostToolHooks({ ...deps, timer }),
+    ...createPostToolHooks({ ...deps, clock: deps.clock ?? SYSTEM_CLOCK, timer }),
   };
 }

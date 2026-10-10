@@ -6,6 +6,7 @@ import { AppError, AskTimeoutError, CopilotError } from '../../src/errors/index.
 import { createLogger } from '../../src/logger/index.js';
 import { createFakeClient, createFakeSession } from '../helpers/fake-session.js';
 import { FAKE_ATLASSIAN_TOKEN, validEnv } from '../helpers/env.js';
+import { TEST_ROLE } from '../helpers/role.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
 const WORKING_DIRECTORY = 'sandbox/work';
@@ -54,7 +55,9 @@ describe('askQuestion input', () => {
     async (question) => {
       const { deps, client } = setup();
 
-      const failure = await askQuestion({ question }, deps).catch((error) => error);
+      const failure = await askQuestion({ role: TEST_ROLE, question }, deps).catch(
+        (error) => error,
+      );
 
       expect(failure).toBeInstanceOf(AppError);
       expect(failure.message).toBe('A question is required');
@@ -75,13 +78,21 @@ describe('askQuestion answer', () => {
     const { deps, setTime } = setup({ session });
     setTime(1000);
 
-    const resultPromise = askQuestion({ question: 'Where is the retry logic?' }, deps);
+    const resultPromise = askQuestion(
+      { role: TEST_ROLE, question: 'Where is the retry logic?' },
+      deps,
+    );
     setTime(1750);
     const result = await resultPromise;
 
     expect(session.sent).toEqual([{ prompt: 'Where is the retry logic?' }]);
     expect(result).toEqual({
       answer: 'The retry is in src/retry.js.',
+      role: 'tester',
+      sources: [],
+      alsoConsulted: [],
+      invalidKeys: [],
+      uncitedSourceKeys: [],
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,
@@ -100,7 +111,10 @@ describe('askQuestion answer', () => {
     const { deps } = setup({ session });
     const pieces = /** @type {string[]} */ ([]);
 
-    await askQuestion({ question: 'Hi?', onDelta: (text) => pieces.push(text) }, deps);
+    await askQuestion(
+      { role: TEST_ROLE, question: 'Hi?', onDelta: (text) => pieces.push(text) },
+      deps,
+    );
 
     expect(pieces).toEqual(['Hel', 'lo']);
   });
@@ -115,7 +129,7 @@ describe('askQuestion answer', () => {
     });
     const { deps } = setup({ session });
 
-    const { answer } = await askQuestion({ question: 'Hi?' }, deps);
+    const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(answer).toBe('Streamed only');
   });
@@ -133,7 +147,7 @@ describe('askQuestion answer', () => {
     });
     const { deps } = setup({ session });
 
-    const { answer } = await askQuestion({ question: 'Hi?' }, deps);
+    const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(answer).toBe('Found it.');
   });
@@ -173,7 +187,7 @@ describe('askQuestion answer', () => {
     });
     const { deps } = setup({ session });
 
-    const { model } = await askQuestion({ question: 'Hi?' }, deps);
+    const { model } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(model).toBe(expected);
   });
@@ -199,7 +213,7 @@ describe('askQuestion tool calls', () => {
     });
     setTime(1000);
 
-    const result = await askQuestion({ question: 'Hi?' }, deps);
+    const result = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(result.toolCalls).toEqual([
       {
@@ -234,7 +248,7 @@ describe('askQuestion tool calls', () => {
       }),
     });
 
-    const { toolCalls } = await askQuestion({ question: 'Hi?' }, deps);
+    const { toolCalls } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(toolCalls.map(({ tool, success }) => [tool, success])).toEqual([
       ['a', false],
@@ -247,7 +261,7 @@ describe('askQuestion session setup', () => {
   it('opens one session in the working directory with the sandbox config', async () => {
     const { deps, client } = setup();
 
-    await askQuestion({ question: 'Hi?' }, { ...deps, client: client });
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, { ...deps, client: client });
 
     expect(client.createSession).toHaveBeenCalledOnce();
     const [config] = client.configs;
@@ -259,7 +273,7 @@ describe('askQuestion session setup', () => {
 
   it('registers working hooks: a call outside the allowed repositories is denied', async () => {
     const { deps, client } = setup();
-    await askQuestion({ question: 'Hi?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
     const [{ hooks }] = client.configs;
 
     const decision = hooks.onPreToolUse({
@@ -270,9 +284,23 @@ describe('askQuestion session setup', () => {
     expect(decision.permissionDecision).toBe('deny');
   });
 
+  it('gives the hooks the configured cloudId, so Confluence calls use it', async () => {
+    const cloudId = '82b58a78-f056-49aa-a740-c3c946f68f8b';
+    const { deps, client } = setup({ env: { ATLASSIAN_CLOUD_ID: cloudId } });
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+    const [{ hooks }] = client.configs;
+
+    const decision = hooks.onPreToolUse({
+      toolName: 'atlassian-searchConfluence',
+      toolArgs: { cql: 'space = ENG AND text ~ "x"', cloudId: '<fill>' },
+    });
+
+    expect(decision.modifiedArgs).toMatchObject({ cloudId });
+  });
+
   it('registers a working permission handler: a shell request is rejected', async () => {
     const { deps, client } = setup();
-    await askQuestion({ question: 'Hi?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
     const [{ onPermissionRequest }] = client.configs;
 
     const decision = onPermissionRequest({ kind: 'shell' }, { sessionId: 's' });
@@ -282,7 +310,7 @@ describe('askQuestion session setup', () => {
 
   it('masks the Atlassian token in the error text of a failed tool call', async () => {
     const { deps, client, lines } = setup();
-    await askQuestion({ question: 'Hi?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
     const [{ hooks }] = client.configs;
 
     hooks.onPostToolUseFailure({
@@ -296,7 +324,7 @@ describe('askQuestion session setup', () => {
 
   it('masks the encoded Basic credential, even without its prefix', async () => {
     const { deps, client, lines } = setup();
-    await askQuestion({ question: 'Hi?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
     const [{ hooks }] = client.configs;
     const encoded = encodeBasicCredentials('dev@acme.example', FAKE_ATLASSIAN_TOKEN);
 
@@ -315,8 +343,8 @@ describe('askQuestion session setup', () => {
       toolName: 'github_repos-list_commits',
       toolArgs: { owner: 'acme', repo: 'app' },
     };
-    await askQuestion({ question: 'First?' }, deps);
-    await askQuestion({ question: 'Second?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'First?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Second?' }, deps);
     const [first, second] = client.configs;
 
     first.hooks.onPreToolUse(call);
@@ -341,7 +369,9 @@ describe('askQuestion failures', () => {
     });
     const { deps } = setup({ session });
 
-    const failure = await askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const failure = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch(
+      (error) => error,
+    );
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.message).toBe('Copilot reported an error (rate_limit 429): Too many requests');
@@ -355,7 +385,7 @@ describe('askQuestion failures', () => {
     });
     const { deps } = setup({ session });
 
-    await expect(askQuestion({ question: 'Hi?' }, deps)).rejects.toThrow(
+    await expect(askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps)).rejects.toThrow(
       'Copilot reported an error (unknown): Something broke',
     );
   });
@@ -369,14 +399,16 @@ describe('askQuestion failures', () => {
     });
     const { deps } = setup({ session });
 
-    await expect(askQuestion({ question: 'Hi?' }, deps)).rejects.toThrow('first');
+    await expect(askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps)).rejects.toThrow('first');
   });
 
   it('wraps a failure to send in a CopilotError with the cause', async () => {
     const cause = new Error('connection reset');
     const { deps } = setup({ session: createFakeSession({ sendError: cause }) });
 
-    const failure = await askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const failure = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch(
+      (error) => error,
+    );
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.message).toBe('Copilot could not answer the question');
@@ -387,7 +419,9 @@ describe('askQuestion failures', () => {
     const cause = new Error('not authenticated');
     const { deps, session } = setup({ createFailure: cause });
 
-    const failure = await askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const failure = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch(
+      (error) => error,
+    );
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.cause).toBe(cause);
@@ -407,6 +441,7 @@ describe('askQuestion failures', () => {
     const failure = await askQuestion(
       {
         question: 'Hi?',
+        role: TEST_ROLE,
         onDelta: () => {
           throw cause;
         },
@@ -432,7 +467,7 @@ describe('askQuestion failures', () => {
     const session = createFakeSession(behaviour);
     const { deps } = setup({ session });
 
-    await askQuestion({ question: 'Hi?' }, deps).catch(() => undefined);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch(() => undefined);
 
     expect(session.disconnect).toHaveBeenCalledOnce();
   });
@@ -444,7 +479,10 @@ describe('askQuestion cleanup', () => {
     const { deps } = setup({ session });
     const pieces = /** @type {string[]} */ ([]);
 
-    await askQuestion({ question: 'Hi?', onDelta: (text) => pieces.push(text) }, deps);
+    await askQuestion(
+      { role: TEST_ROLE, question: 'Hi?', onDelta: (text) => pieces.push(text) },
+      deps,
+    );
     session.emit('assistant.message_delta', { deltaContent: 'late' });
 
     expect(session.disconnect).toHaveBeenCalledOnce();
@@ -462,7 +500,7 @@ describe('askQuestion cleanup', () => {
     });
     const { deps, lines } = setup({ session });
 
-    const { answer } = await askQuestion({ question: 'Hi?' }, deps);
+    const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(answer).toBe('answer');
     expect(lines()).toContainEqual(
@@ -478,7 +516,7 @@ describe('askQuestion cleanup', () => {
     });
     const { deps, lines } = setup({ session });
 
-    const pending = askQuestion({ question: 'Hi?' }, deps);
+    const pending = askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
     await vi.advanceTimersByTimeAsync(5000);
     await pending;
 
@@ -494,7 +532,7 @@ describe('askQuestion timeout', () => {
     const session = createFakeSession();
     const { deps } = setup({ session, env: { ASK_TIMEOUT_MS: '8000' } });
 
-    const outcome = askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const outcome = askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch((error) => error);
     await vi.advanceTimersByTimeAsync(8000);
     const failure = await outcome;
 
@@ -512,7 +550,7 @@ describe('askQuestion timeout', () => {
     });
     let settled = false;
 
-    const outcome = askQuestion({ question: 'Hi?' }, deps)
+    const outcome = askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps)
       .catch((error) => error)
       .then((value) => {
         settled = true;
@@ -531,7 +569,7 @@ describe('askQuestion timeout', () => {
     const { deps } = setup({ session, env: { ASK_TIMEOUT_MS: '6000' } });
     deps.client = { createSession: () => new Promise(() => undefined) };
 
-    const outcome = askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const outcome = askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch((error) => error);
     await vi.advanceTimersByTimeAsync(6000);
     const failure = await outcome;
 
@@ -545,7 +583,7 @@ describe('askQuestion timeout', () => {
     const session = createFakeSession({ abortError: new Error('abort failed') });
     const { deps, lines } = setup({ session, env: { ASK_TIMEOUT_MS: '5000' } });
 
-    const outcome = askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const outcome = askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch((error) => error);
     await vi.advanceTimersByTimeAsync(5000);
     const failure = await outcome;
 
@@ -561,7 +599,7 @@ describe('askQuestion timeout', () => {
     const session = createFakeSession({ script: (emit) => emit('session.idle', {}) });
     const { deps } = setup({ session });
 
-    await askQuestion({ question: 'Hi?' }, deps);
+    await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -573,7 +611,7 @@ describe('askQuestion defaults', () => {
     const { deps } = setup({ session });
     const withoutClock = { ...deps, clock: undefined };
 
-    const { durationMs } = await askQuestion({ question: 'Hi?' }, withoutClock);
+    const { durationMs } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, withoutClock);
 
     expect(durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -586,7 +624,9 @@ describe('askQuestion defaults', () => {
     });
     const { deps } = setup({ session });
 
-    const failure = await askQuestion({ question: 'Hi?' }, deps).catch((error) => error);
+    const failure = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps).catch(
+      (error) => error,
+    );
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.cause).toBe(cause);

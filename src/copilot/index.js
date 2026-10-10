@@ -6,5 +6,5 @@ export {
   ensureAuthenticated,
 } from './client.js';
 export { buildSessionConfig, CLIENT_NAME, EXCLUDED_TOOLS } from './session.js';
-export { buildSystemMessage } from './systemMessage.js';
+export { buildBaseMessage, buildRoleBlock, buildSystemMessage } from './systemMessage.js';
 export { finishesWithin } from './timing.js';

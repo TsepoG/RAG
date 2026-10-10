@@ -1,0 +1,16 @@
+{
+  "server": "github_repos",
+  "tool": "get_latest_release",
+  "arguments": {
+    "owner": "Placeholder text 1",
+    "repo": "Placeholder text 2"
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"tag_name\":\"Placeholder text 5\",\"target_commitish\":\"ebf99bea1fdf70b3a206c622a5134068c73eb607\",\"name\":\"part-54\",\"body\":\"Body text 1\",\"draft\":false,\"prerelease\":false,\"immutable\":false,\"id\":387989201,\"created_at\":\"2026-09-13T18:14:35Z\",\"published_at\":\"2026-09-13T18:15:31Z\",\"updated_at\":\"2026-09-13T18:15:31Z\",\"url\":\"https://api.github.com/repos/acme/app/releases/387989201\",\"html_url\":\"https://github.com/acme/app/releases/tag/part-54\",\"assets_url\":\"https://api.github.com/repos/acme/app/releases/387989201/part-55\",\"assets\":[],\"upload_url\":\"https://example.com/placeholder\",\"zipball_url\":\"https://api.github.com/repos/acme/app/part-56/part-54\",\"tarball_url\":\"https://api.github.com/repos/acme/app/part-57/part-54\",\"author\":{\"login\":\"user3\",\"id\":900003,\"user_view_type\":\"public\",\"node_id\":\"Person 3\",\"avatar_url\":\"https://example.com/placeholder\",\"html_url\":\"https://github.com/part-58/part-59\",\"gravatar_id\":\"\",\"type\":\"Bot\",\"site_admin\":false,\"url\":\"https://api.github.com/part-60/part-61\",\"events_url\":\"https://api.github.com/part-60/part-61/part-62/part-63\",\"following_url\":\"https://api.github.com/part-60/part-61/part-64/part-65\",\"followers_url\":\"https://api.github.com/part-60/part-61/part-66\",\"gists_url\":\"https://api.github.com/part-60/part-61/part-67/part-68\",\"organizations_url\":\"https://api.github.com/part-60/part-61/part-69\",\"received_events_url\":\"https://api.github.com/part-60/part-61/part-70\",\"repos_url\":\"https://api.github.com/part-60/part-61/repos\",\"starred_url\":\"https://api.github.com/part-60/part-61/part-71/part-72/part-73\",\"subscriptions_url\":\"https://api.github.com/part-60/part-61/part-74\"},\"node_id\":\"Placeholder text 6\"}"
+      }
+    ]
+  }
+}

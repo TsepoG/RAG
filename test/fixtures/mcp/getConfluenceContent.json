@@ -1,0 +1,18 @@
+{
+  "server": "atlassian",
+  "tool": "getConfluenceContent",
+  "arguments": {
+    "cloudId": "00000000-0000-4000-8000-000000000001",
+    "content_url": "https://acme.atlassian.net/wiki/spaces/ENG/pages/262439",
+    "detail": "full"
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"data\":{\"id\":\"262439\",\"type\":\"page\",\"title\":\"Page title 1\",\"status\":\"current\",\"spaceId\":\"327684\",\"snapshotToken\":\"Placeholder text 7\",\"detail\":\"full\",\"body\":{\"format\":\"html\",\"value\":\"Placeholder text 8\"},\"metadata\":{\"hasSpaceInstructions\":false,\"totalViews\":1,\"authorId\":\"account-1\",\"version\":{\"number\":1,\"createdAt\":\"2026-10-10T10:54:29.040Z\",\"message\":\"\"}}}}"
+      }
+    ],
+    "isError": false
+  }
+}
