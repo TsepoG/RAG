@@ -8,7 +8,7 @@ and ask.
 
 - JavaScript, ES modules only (`"type": "module"`, `import`/`export`). No
   CommonJS, no TypeScript source files.
-- Node.js 22.12 or later (`.nvmrc` pins the version). Use built-ins first
+- Node.js `^22.22.2 || >=24.15.0` (`.nvmrc` pins 24; the dev tooling needs it). Use built-ins first
   (`node:fs/promises`, `node:path`, `fetch`, `AbortController`) before adding
   a dependency.
 - Every source file starts with `// @ts-check`. Types are written in JSDoc and

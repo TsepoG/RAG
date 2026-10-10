@@ -27,7 +27,7 @@ profiles, citations, the web UI. Do not install `@github/copilot-sdk` yet.
 
 | Area | Decision |
 | --- | --- |
-| Runtime | Node.js 24 LTS in `.nvmrc`; `"engines": { "node": ">=22.12" }` (the Copilot SDK needs ^20.19 or >=22.12) |
+| Runtime | Node.js 24 LTS in `.nvmrc`; `"engines": { "node": "^22.22.2 || >=24.15.0" }` (the latest ESLint, eslint-plugin-jsdoc and lint-staged need it; the Copilot SDK itself needs only ^20.19 or >=22.12) |
 | Modules | ESM only, `"type": "module"`, named exports |
 | Types | JSDoc + `// @ts-check`, checked with `tsc --noEmit` (`allowJs`, `checkJs`, `strict`, `module`/`moduleResolution` `nodenext`) |
 | Lint | ESLint 9+ flat config: `@eslint/js` recommended, `eslint-plugin-jsdoc` (flat recommended-error, plus `require-jsdoc` for exported functions/classes), `eslint-plugin-sonarjs` recommended, `eslint-plugin-n` recommended-module, `@vitest/eslint-plugin` for `test/`, `eslint-config-prettier` last; `no-console: error` in `src/` |

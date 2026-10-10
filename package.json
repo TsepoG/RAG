@@ -1,0 +1,44 @@
+{
+  "name": "role-aware-knowledge-assistant",
+  "version": "0.1.0",
+  "description": "Local, role-aware RAG assistant answering from Confluence and GitHub via MCP.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.22.2 || >=24.15.0"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test:coverage",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "pino": "^10.4.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^65.2.4",
+    "eslint-plugin-n": "^18.4.1",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "globals": "^17.13.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
+  }
+}
