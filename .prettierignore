@@ -1,0 +1,6 @@
+coverage/
+docs/
+CLAUDE.md
+package-lock.json
+.scannerwork/
+reports/

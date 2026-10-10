@@ -1,0 +1,26 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+    ignore:
+      # @typescript-eslint (pulled in by the lint plugins) requires typescript <6.1.0, so a
+      # TypeScript major would break npm install. Remove this once that range allows it.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'ci(deps)'
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
