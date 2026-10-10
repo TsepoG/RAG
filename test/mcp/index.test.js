@@ -12,6 +12,7 @@ describe('mcp public entry point', () => {
       'buildMcpServers',
       'classifyTool',
       'collectToolReport',
+      'createPermissionHandler',
       'isAllowedTool',
       'isWriteToolName',
       'listServerTools',
