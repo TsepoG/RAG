@@ -1,0 +1,17 @@
+{
+  "server": "github_repos",
+  "tool": "list_releases",
+  "arguments": {
+    "owner": "Placeholder text 1",
+    "repo": "Placeholder text 2",
+    "perPage": 3
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"id\":387989201,\"tag_name\":\"Placeholder text 5\",\"name\":\"part-54\",\"body\":\"Body text 1\",\"html_url\":\"https://github.com/acme/app/releases/tag/part-54\",\"published_at\":\"2026-09-13T18:15:31Z\",\"prerelease\":false,\"draft\":false,\"author\":{\"login\":\"user3\",\"id\":900003,\"profile_url\":\"https://github.com/part-58/part-59\",\"avatar_url\":\"https://example.com/placeholder\"}},{\"id\":387888207,\"tag_name\":\"Placeholder text 9\",\"name\":\"part-75\",\"body\":\"Body text 2\",\"html_url\":\"https://github.com/acme/app/releases/tag/part-75\",\"published_at\":\"2026-09-13T12:09:39Z\",\"prerelease\":false,\"draft\":false,\"author\":{\"login\":\"user3\",\"id\":900003,\"profile_url\":\"https://github.com/part-58/part-59\",\"avatar_url\":\"https://example.com/placeholder\"}},{\"id\":387575282,\"tag_name\":\"Placeholder text 10\",\"name\":\"part-76\",\"body\":\"Body text 3\",\"html_url\":\"https://github.com/acme/app/releases/tag/part-76\",\"published_at\":\"2026-09-12T13:11:23Z\",\"prerelease\":false,\"draft\":false,\"author\":{\"login\":\"user3\",\"id\":900003,\"profile_url\":\"https://github.com/part-58/part-59\",\"avatar_url\":\"https://example.com/placeholder\"}}]"
+      }
+    ]
+  }
+}

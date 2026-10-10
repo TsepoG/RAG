@@ -1,0 +1,25 @@
+{
+  "server": "github_repos",
+  "tool": "get_file_contents",
+  "arguments": {
+    "owner": "Placeholder text 1",
+    "repo": "Placeholder text 2",
+    "path": "part-48.md"
+  },
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Placeholder text 3"
+      },
+      {
+        "type": "resource",
+        "resource": {
+          "uri": "repo://acme/app/sha/ebf99bea1fdf70b3a206c622a5134068c73eb607/contents/part-48.md",
+          "mimeType": "text/plain; charset=utf-8",
+          "text": "Placeholder text 4"
+        }
+      }
+    ]
+  }
+}
