@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p jsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:live": "vitest run --config vitest.live.config.js",
     "test:coverage": "vitest run --coverage",
     "ask": "node src/cli/ask.js",
     "models": "node src/cli/models.js",

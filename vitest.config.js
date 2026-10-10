@@ -7,6 +7,8 @@ const COVERAGE_THRESHOLD = 90;
 export default defineConfig({
   test: {
     include: ['test/**/*.test.js'],
+    // Live tests call real services; `npm run test:live` runs them with vitest.live.config.js.
+    exclude: ['test/live/**', 'node_modules/**'],
     coverage: {
       provider: 'v8',
       // Listing src explicitly makes files that no test imports count as uncovered.
