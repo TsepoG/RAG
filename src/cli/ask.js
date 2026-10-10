@@ -1,64 +1,49 @@
 // @ts-check
-import { askQuestion } from '../answer/index.js';
-import { AskTimeoutError, AppError } from '../errors/index.js';
+import {
+  ASK_USAGE,
+  askQuestion,
+  DEFAULT_ROLE_ID,
+  describeInvalidKeys,
+  formatReport,
+  parseAskArguments,
+} from '../answer/index.js';
+import { AppError, AskTimeoutError } from '../errors/index.js';
 import { getRole, loadRoles } from '../roles/index.js';
 import { describeError, EXIT_FAILURE, EXIT_TIMEOUT, loadSettings, withCopilot } from './shared.js';
 
-const USAGE = 'Usage: npm run ask -- "<question>"\n';
-const MS_PER_SECOND = 1000;
-const DEFAULT_ROLE = 'developer';
-
 /**
- * Formats one tool call as a line of the "Tools used" list.
- * @param {import('../answer/toolCalls.js').ToolCallRecord} call - The call.
- * @returns {string} The line.
- */
-function formatToolCall({ server, tool, summary, durationMs, success }) {
-  const took = durationMs === undefined ? 'no result' : `${durationMs} ms`;
-  const failed = success === false ? ', failed' : '';
-  const args = summary === '' ? '' : ` (${summary})`;
-  return `  - ${server} / ${tool}${args} [${took}${failed}]\n`;
-}
-
-/**
- * Prints the tools used and the footer after the streamed answer.
- * @param {import('../answer/askQuestion.js').AskResult} result - The outcome of the question.
- */
-function printFooter({ toolCalls, model, durationMs }) {
-  process.stdout.write('\n\nTools used:\n');
-  process.stdout.write(
-    toolCalls.length === 0 ? '  (none)\n' : toolCalls.map(formatToolCall).join(''),
-  );
-  const seconds = (durationMs / MS_PER_SECOND).toFixed(1);
-  process.stdout.write(`\nModel: ${model ?? 'unknown'} | ${seconds}s\n`);
-}
-
-/**
- * Asks the question given on the command line and streams the answer to stdout.
+ * Asks the question given on the command line, for the chosen role, and prints the checked
+ * answer with its sources. The answer is printed once it has been checked, not as it streams,
+ * so what is shown is exactly what was validated.
  */
 async function main() {
-  const question = process.argv.slice(2).join(' ').trim();
-  if (question === '') {
-    process.stderr.write(USAGE);
-    process.exitCode = EXIT_FAILURE;
-    return;
-  }
   try {
+    const { question, role: requestedRole } = parseAskArguments(process.argv.slice(2));
+    if (question === '') {
+      process.stderr.write(`${ASK_USAGE}\n`);
+      process.exitCode = EXIT_FAILURE;
+      return;
+    }
+    const roles = await loadRoles();
+    const role = getRole(roles, requestedRole ?? DEFAULT_ROLE_ID);
+    if (requestedRole === undefined) {
+      process.stderr.write(`No --role given; answering as ${role.id}.\n`);
+    }
     const settings = loadSettings();
-    // Until --role is added, every question is answered for a developer.
-    const role = getRole(await loadRoles(), DEFAULT_ROLE);
+    process.stderr.write(`Asking as ${role.displayName}...\n`);
     const result = await withCopilot(settings, ({ client, workingDirectory }) =>
-      askQuestion(
-        { question, role, onDelta: (text) => process.stdout.write(text) },
-        { client, workingDirectory, ...settings },
-      ),
+      askQuestion({ question, role }, { client, workingDirectory, ...settings }),
     );
-    printFooter(result);
+    const removed = describeInvalidKeys(result.invalidKeys);
+    if (removed !== undefined) {
+      process.stderr.write(`${removed}\n`);
+    }
+    process.stdout.write(formatReport({ result, role }));
   } catch (error) {
     if (!(error instanceof AppError)) {
       throw error;
     }
-    process.stderr.write(`\n${describeError(error)}\n`);
+    process.stderr.write(`${describeError(error)}\n`);
     process.exitCode = error instanceof AskTimeoutError ? EXIT_TIMEOUT : EXIT_FAILURE;
   }
 }
