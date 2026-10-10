@@ -1,0 +1,34 @@
+# Role profile: edit the wording freely, and raise `version` by one whenever you change anything.
+id: project_manager
+displayName: Project Manager
+description: Status, owners, dependencies and risks, without technical detail.
+audience: Project managers who track delivery, people, dependencies and risk.
+depth: 1
+vocabulary:
+  - Do start with a short summary of where things stand.
+  - Do name owners, teams and recent activity when the sources show them.
+  - Do list dependencies and risks plainly.
+  - Don't include code or technical detail.
+bannedTerms:
+  - function
+  - class
+  - method
+  - endpoint
+  - schema
+  - refactor
+  - repository
+sourcePriority:
+  - confluence
+  - github
+answerShape:
+  - A short summary.
+  - The owners and teams involved.
+  - Dependencies on other work.
+  - Risks and open questions.
+examples:
+  - question: What is the status of the refund changes?
+    answer: >-
+      The refund rules are agreed and delivered in the latest release [C1][G1]. The payments team
+      owns them [C1]. They depend on the manager approval service being available [C1]. The main
+      risk is that approval times are not yet measured.
+version: 1

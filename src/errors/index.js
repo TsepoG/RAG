@@ -85,6 +85,25 @@ export class AskTimeoutError extends AppError {
 }
 
 /**
+ * Thrown when a role id is not one of the loaded roles.
+ */
+export class RoleNotFoundError extends AppError {
+  /**
+   * Creates the error and lists the roles that do exist.
+   * @param {string} id - The role id that was asked for.
+   * @param {ReadonlyArray<string>} validIds - The ids that can be used.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(id, validIds, options) {
+    super(`Unknown role "${id}". Valid roles: ${validIds.join(', ')}`, options);
+    /** @type {string} */
+    this.roleId = id;
+    /** @type {ReadonlyArray<string>} */
+    this.validIds = Object.freeze([...validIds]);
+  }
+}
+
+/**
  * Builds the message for a ConfigError, one line per issue.
  * @param {ReadonlyArray<ConfigIssue>} issues - Issues to describe.
  * @returns {string} Headline followed by a `- PATH: message` line per issue.
