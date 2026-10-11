@@ -10,3 +10,4 @@ export { sourceMatches } from './match.js';
 export { CASE_TAGS, caseSchema, SOURCE_TYPES } from './schema.js';
 export { ERROR_STATUS, scoreCase, scoreFailure } from './score.js';
 export { percentile, summarise } from './summarise.js';
+export { createRequestGuard, estimateRequests } from './budget.js';
