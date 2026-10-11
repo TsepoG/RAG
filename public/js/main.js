@@ -7,6 +7,8 @@ import { focusSource } from './sources.js';
 import { fromServerEvent, INITIAL_STATE, isBusy, next } from './state.js';
 import { loadRole, saveRole } from './storage.js';
 
+// Promises started from an event are marked `void`: ask, submitFeedback and loadRoleChoices catch
+// their own failures and show them on the page.
 // Wiring only: this file connects the tested page modules to the browser's events and the network,
 // and holds no logic of its own that is worth a test. It is checked by hand and by the live test.
 
@@ -122,7 +124,7 @@ refs.form.addEventListener('submit', (event) => {
   const question = /** @type {HTMLTextAreaElement} */ (refs.question).value.trim();
   const roleId = /** @type {HTMLSelectElement} */ (refs.role).value;
   if (question !== '') {
-    ask({ question, roleId, detailLevel: 'default' });
+    void ask({ question, roleId, detailLevel: 'default' });
   }
 });
 
@@ -158,7 +160,7 @@ refs.feedbackForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const answerId = state.answer?.answerId;
   if (answerId !== undefined) {
-    submitFeedback(answerId, 'down', readFeedbackDetails(refs));
+    void submitFeedback(answerId, 'down', readFeedbackDetails(refs));
   }
 });
 refs.result.addEventListener('click', (event) => {
@@ -168,5 +170,6 @@ refs.result.addEventListener('click', (event) => {
   }
 });
 
-loadRoleChoices();
+// These handle their own failures, so nothing is left to catch here.
+void loadRoleChoices();
 showState(refs, state);
