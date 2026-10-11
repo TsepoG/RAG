@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @ts-check
 import { beforeEach, describe, expect, it } from 'vitest';
-import { showRoles, showState } from '../../../public/js/render.js';
+import { moveFocus, showRoles, showState } from '../../../public/js/render.js';
 import { INITIAL_STATE, next } from '../../../public/js/state.js';
 import { loadPage, makePayload } from '../../helpers/page.js';
 
@@ -205,5 +205,81 @@ describe('showState', () => {
     showState(refs, { ...INITIAL_STATE, phase: 'done' });
 
     expect(refs.followUp.hidden).toBe(true);
+  });
+});
+
+describe('moveFocus', () => {
+  const asking = run([ASK]);
+  const done = run([ASK, { type: 'done', payload: makePayload() }]);
+
+  it('moves focus from Ask to Stop when a question starts, so it is not lost on a disabled button', () => {
+    showState(refs, asking);
+    /** @type {HTMLElement} */ (refs.ask).focus();
+
+    moveFocus(refs, INITIAL_STATE, asking);
+
+    expect(document.activeElement).toBe(refs.stop);
+  });
+
+  it('leaves focus in the question box when the question was sent with Enter', () => {
+    showState(refs, asking);
+    /** @type {HTMLElement} */ (refs.question).focus();
+
+    moveFocus(refs, INITIAL_STATE, asking);
+
+    expect(document.activeElement).toBe(refs.question);
+  });
+
+  it('does not move focus again while the question goes on', () => {
+    const streaming = run([ASK, { type: 'token', text: 'x' }]);
+    /** @type {HTMLSelectElement} */ (refs.role).disabled = false;
+    refs.role.focus();
+
+    moveFocus(refs, asking, streaming);
+
+    expect(document.activeElement).toBe(refs.role);
+  });
+
+  it('moves focus to the banner when an answer arrives', () => {
+    showState(refs, done);
+
+    moveFocus(refs, asking, done);
+
+    expect(document.activeElement).toBe(refs.banner);
+  });
+
+  it('moves focus to the question box when the answer is a clarifying question', () => {
+    const clarify = run([
+      ASK,
+      { type: 'done', payload: makePayload({ result: { status: 'clarify' } }) },
+    ]);
+
+    moveFocus(refs, asking, clarify);
+
+    expect(document.activeElement).toBe(refs.question);
+  });
+
+  it('moves focus to the retry button after a failure', () => {
+    const failed = run([ASK, { type: 'error', kind: 'timeout', message: 'm' }]);
+
+    moveFocus(refs, asking, failed);
+
+    expect(document.activeElement).toBe(refs.retry);
+  });
+
+  it('moves focus to the question box after Stop, ready for a new question', () => {
+    moveFocus(refs, asking, run([ASK, { type: 'stop' }]));
+
+    expect(document.activeElement).toBe(refs.question);
+  });
+
+  it('does nothing when the phase has not changed, or the page goes back to idle', () => {
+    /** @type {HTMLSelectElement} */ (refs.role).disabled = false;
+    refs.role.focus();
+
+    moveFocus(refs, done, done);
+    moveFocus(refs, done, INITIAL_STATE);
+
+    expect(document.activeElement).toBe(refs.role);
   });
 });

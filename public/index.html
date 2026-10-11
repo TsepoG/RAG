@@ -15,6 +15,8 @@
       <p class="tagline">Answers from your Confluence pages and code, with the sources shown.</p>
     </header>
 
+    <noscript><p class="error">This page needs JavaScript to ask questions.</p></noscript>
+
     <main>
       <form id="ask-form" class="ask" autocomplete="off">
         <div class="field">
@@ -58,7 +60,7 @@
           <button type="button" id="retry">Try again</button>
         </div>
 
-        <div id="banner" class="banner" hidden>
+        <div id="banner" class="banner" tabindex="-1" hidden>
           <p class="banner-line">
             <span id="banner-badge" class="badge"></span>
             <span id="banner-text"></span>

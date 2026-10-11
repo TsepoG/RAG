@@ -78,6 +78,14 @@ describe('public/index.html', () => {
     }
   });
 
+  it('can take focus on the banner, so focus can move there when an answer arrives', () => {
+    expect(loadPage().banner.getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('tells a visitor without JavaScript that it is needed', () => {
+    expect(inertPage().querySelector('noscript')?.textContent).toContain('needs JavaScript');
+  });
+
   it('declares its language and a viewport', () => {
     expect(PAGE_HTML).toContain('<html lang="en">');
     expect(PAGE_HTML).toContain('name="viewport"');

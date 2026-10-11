@@ -2,7 +2,7 @@
 import { ApiError, askStream, fetchRoles, sendFeedback } from './api.js';
 import { markRating, readFeedbackDetails, showFeedbackStatus } from './feedback.js';
 import { findRefs } from './refs.js';
-import { showRoles, showState } from './render.js';
+import { moveFocus, showRoles, showState } from './render.js';
 import { focusSource } from './sources.js';
 import { fromServerEvent, INITIAL_STATE, isBusy, next } from './state.js';
 import { loadRole, saveRole } from './storage.js';
@@ -26,6 +26,7 @@ function dispatch(action) {
   state = next(state, action);
   if (state !== before) {
     showState(refs, state);
+    moveFocus(refs, before, state);
   }
 }
 
@@ -59,9 +60,6 @@ async function ask({ question, roleId, detailLevel }) {
       const message = error instanceof ApiError ? error.message : 'Something went wrong.';
       dispatch({ type: 'error', kind: 'request', message });
     }
-  }
-  if (state.phase === 'done' && state.answer?.result.status === 'clarify') {
-    refs.question.focus();
   }
 }
 

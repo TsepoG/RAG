@@ -132,3 +132,32 @@ export function showState(refs, state) {
     showEnded(refs, state);
   }
 }
+
+/**
+ * Moves keyboard focus when the page changes, so it is never left on something that has just been
+ * disabled or hidden. While a question runs, focus goes to Stop if it was on Ask. When the
+ * question ends, focus goes to where the result starts: the banner for an answer, the retry button
+ * for a failure, and the question box when the person should type again (a clarifying question, or
+ * after Stop).
+ * @param {import('./refs.js').PageRefs} refs - The page's elements.
+ * @param {import('./state.js').PageState} before - The state before.
+ * @param {import('./state.js').PageState} after - The state now.
+ */
+export function moveFocus(refs, before, after) {
+  if (before.phase === after.phase) {
+    return;
+  }
+  if (isBusy(after)) {
+    if (!isBusy(before) && document.activeElement !== refs.question) {
+      refs.stop.focus();
+    }
+    return;
+  }
+  if (after.phase === 'error') {
+    refs.retry.focus();
+  } else if (after.phase === 'done' && after.answer?.result.status !== 'clarify') {
+    refs.banner.focus();
+  } else if (after.phase !== 'idle') {
+    refs.question.focus();
+  }
+}
