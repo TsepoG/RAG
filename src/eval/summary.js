@@ -70,15 +70,13 @@ export function formatFailures(failures) {
 }
 
 /**
- * Writes the automatic results of a run as markdown.
- * @param {object} input - What to write.
- * @param {import('./results.js').RunHeader} input.run - The run.
- * @param {import('./summarise.js').Summary} input.summary - What the scores add up to.
- * @returns {string} The summary, ending with a line break.
+ * Writes every automatic measure as a table.
+ * @param {import('./summarise.js').Summary} summary - What the scores add up to.
+ * @returns {string} A markdown table.
  */
-export function formatSummary({ run, summary }) {
-  const { confidence, latencyMs } = summary;
-  const metrics = table(
+export function formatMetrics(summary) {
+  const { latencyMs } = summary;
+  return table(
     ['Measure', 'Result'],
     [
       ['Cases that passed every check that applies', ratioText(summary.passed)],
@@ -109,6 +107,18 @@ export function formatSummary({ run, summary }) {
       ],
     ],
   );
+}
+
+/**
+ * Writes the automatic results of a run as markdown.
+ * @param {object} input - What to write.
+ * @param {import('./results.js').RunHeader} input.run - The run.
+ * @param {import('./summarise.js').Summary} input.summary - What the scores add up to.
+ * @returns {string} The summary, ending with a line break.
+ */
+export function formatSummary({ run, summary }) {
+  const { confidence } = summary;
+  const metrics = formatMetrics(summary);
   const sections = [
     '# Eval summary',
     formatRunInfo(run),

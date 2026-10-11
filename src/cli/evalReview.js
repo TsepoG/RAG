@@ -1,28 +1,18 @@
 // @ts-check
 import { access, readFile, writeFile } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { join } from 'node:path';
 import { AppError } from '../errors/index.js';
 import {
   buildReviewRows,
   parseResults,
+  resolveRunFolder,
   RESULTS_FILE,
   REVIEW_FILE,
   toReviewCsv,
 } from '../eval/index.js';
 import { describeError, EXIT_FAILURE } from './shared.js';
 
-const RESULTS_DIRECTORY = 'eval/results';
 const USAGE = 'Usage: npm run eval:review -- <run folder name or path>';
-
-/**
- * Finds a run's folder from the name that was given: a bare name is looked for under
- * `eval/results`, and anything with a path in it is used as it is.
- * @param {string} name - What was typed.
- * @returns {string} The folder.
- */
-function runFolder(name) {
-  return isAbsolute(name) || /[\\/]/.test(name) ? name : join(RESULTS_DIRECTORY, name);
-}
 
 /**
  * Whether a file exists.
@@ -49,7 +39,7 @@ async function main() {
     if (name === undefined || extra.length > 0) {
       throw new AppError(USAGE);
     }
-    const folder = runFolder(name);
+    const folder = resolveRunFolder(name);
     const target = join(folder, REVIEW_FILE);
     if (await exists(target)) {
       throw new AppError(`${target} already exists. Move or delete it to write a fresh sheet.`);

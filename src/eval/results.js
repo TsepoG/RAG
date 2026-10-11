@@ -1,9 +1,24 @@
 // @ts-check
+import { isAbsolute, join } from 'node:path';
 import { z } from 'zod';
 import { EvalError } from '../errors/index.js';
 
 /** The name of the file a run's cases are written to. */
 export const RESULTS_FILE = 'results.jsonl';
+
+/** Where runs are written, relative to the working directory. */
+export const RESULTS_DIRECTORY = 'eval/results';
+
+/**
+ * Finds a run's folder from what was typed: a bare name is looked for under `eval/results`, and
+ * anything with a path in it is used as it is.
+ * @param {string} name - A folder name or path.
+ * @returns {string} The folder.
+ */
+export function resolveRunFolder(name) {
+  const hasPath = isAbsolute(name) || name.includes('/') || name.includes('\\');
+  return hasPath ? name : join(RESULTS_DIRECTORY, name);
+}
 
 /** The name of the file a run's summary is written to. */
 export const SUMMARY_FILE = 'summary.md';

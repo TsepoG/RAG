@@ -13,8 +13,15 @@ export { ERROR_STATUS, scoreCase, scoreFailure } from './score.js';
 export { percentile, summarise } from './summarise.js';
 export { createRequestGuard, estimateRequests } from './budget.js';
 export { EVAL_USAGE, parseEvalArguments } from './args.js';
-export { formatSummary } from './summary.js';
-export { formatResults, parseResults, RESULTS_FILE, SUMMARY_FILE } from './results.js';
+export { formatMetrics, formatSummary } from './summary.js';
+export {
+  formatResults,
+  parseResults,
+  RESULTS_DIRECTORY,
+  RESULTS_FILE,
+  resolveRunFolder,
+  SUMMARY_FILE,
+} from './results.js';
 export { collectRunInfo, runEval, runFolderName, sanitiseResult } from './run.js';
 export { parseCsv, toCsv } from './csv.js';
 export {
@@ -25,3 +32,7 @@ export {
   toReviewCsv,
   VERDICTS,
 } from './review.js';
+export { buildCalibration, LEVELS, MIN_SAMPLE } from './calibration.js';
+export { FEEDBACK_PATH, parseFeedbackLines, summariseFeedback } from './feedback.js';
+export { buildReport, diffRunInfo } from './report.js';
+export { evaluateTargets } from './targets.js';

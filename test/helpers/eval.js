@@ -73,3 +73,22 @@ export function makeScore(changes = {}) {
     ...changes,
   };
 }
+
+/**
+ * What a run was tied to, and what it used.
+ * @param {Partial<import('../../src/eval/results.js').RunHeader>} [changes] - Fields to replace.
+ * @returns {import('../../src/eval/results.js').RunHeader} The header.
+ */
+export function makeHeader(changes = {}) {
+  return {
+    startedAt: '2026-10-11T18:00:00.000Z',
+    commit: 'abc123def456',
+    dirty: false,
+    model: 'gpt-x',
+    roles: { developer: 2, qa: 3 },
+    basePromptHash: '0123456789ab',
+    requests: { used: 14, casesRun: 8, stoppedEarly: false },
+    interrupted: false,
+    ...changes,
+  };
+}

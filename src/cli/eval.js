@@ -17,6 +17,7 @@ import {
   formatSummary,
   loadCases,
   parseEvalArguments,
+  RESULTS_DIRECTORY,
   RESULTS_FILE,
   runEval,
   runFolderName,
@@ -27,7 +28,6 @@ import {
 import { loadRoles } from '../roles/index.js';
 import { describeError, EXIT_FAILURE, loadSettings, withCopilot } from './shared.js';
 
-const RESULTS_DIRECTORY = 'eval/results';
 const run = promisify(execFile);
 
 /**
