@@ -200,6 +200,8 @@ describe('buildRuntimeEnv', () => {
     'ASK_TIMEOUT_MS',
     'MAX_TOOL_CALLS',
     'MCP_TIMEOUT_MS',
+    'HOST',
+    'ALLOW_REMOTE',
   ];
 
   afterEach(() => {

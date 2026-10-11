@@ -62,6 +62,8 @@ Invalid values are reported by variable name, never by value.
 | `NODE_ENV`              | no       | `development` | `development`, `test` or `production`                                     |
 | `LOG_LEVEL`             | no       | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`              |
 | `PORT`                  | no       | `3000`        | Integer from 1 to 65535                                                   |
+| `HOST`                  | no       | `127.0.0.1`   | Address the web server listens on; non-loopback needs `ALLOW_REMOTE=true` |
+| `ALLOW_REMOTE`          | no       | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login     |
 | `GITHUB_TOKEN`          | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos |
 | `GITHUB_REPOS`          | yes      |               | Comma-separated `owner/repo` list, at least one                           |
 | `ATLASSIAN_SITE_URL`    | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed               |
