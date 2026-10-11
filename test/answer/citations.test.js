@@ -155,11 +155,14 @@ describe('askQuestion citations', () => {
     const { result } = await ask({ tools: [PAGE], answer: 'No citations here.' });
 
     expect(result).toMatchObject({
-      answer: 'No citations here.',
+      status: 'not_found',
+      confidence: null,
+      answer: "I couldn't find this in Confluence or the codebase.",
       sources: [],
       invalidKeys: [],
       uncitedSourceKeys: ['C1'],
     });
+    expect(result.alsoConsulted.map(({ key }) => key)).toEqual(['C1']);
   });
 
   it('numbers keys from one in every question, keeping questions apart', async () => {
@@ -271,6 +274,8 @@ describe('askQuestion keeps content from outside the allowed spaces from the mod
     );
     expect(result.sources).toEqual([]);
     expect(result.invalidKeys).toEqual(['C1']);
-    expect(result.answer).toBe('Salaries are public.');
+    expect(result.status).toBe('not_found');
+    expect(result.answer).toBe("I couldn't find this in Confluence or the codebase.");
+    expect(result.alsoConsulted).toEqual([]);
   });
 });

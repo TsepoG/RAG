@@ -15,6 +15,17 @@ const SHORT_SHA = COMMIT_SHA.slice(0, 7);
  */
 function result(overrides = {}) {
   return {
+    status: /** @type {const} */ ('answered'),
+    confidence: /** @type {const} */ ('high'),
+    confidenceReason: 'Stated in the page.',
+    capsApplied: [],
+    gaps: [],
+    conflicts: [],
+    uncitedSentences: [],
+    styleViolations: [],
+    rewritten: false,
+    rewriteRejected: false,
+    whoToAsk: [],
     answer: 'Refunds take 30 days [C1].\n',
     role: 'developer',
     sources: [],

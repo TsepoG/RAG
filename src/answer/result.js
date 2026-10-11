@@ -61,14 +61,15 @@ function buildAlsoConsulted(uncited, candidates, citedUrls) {
 /**
  * Turns the model's answer and what was fetched into the parts of the final result: checks the
  * citations, and works out which sources are cited and which were only consulted.
- * @param {{ answer: string, role: { id: string }, registry: import('../citations/index.js').CitationRegistry }} input
- *   The raw answer, the role it was written for, and the question's registry.
+ * @param {{ answer: string, role: { id: string }, registry: import('../citations/index.js').CitationRegistry, alsoCite?: ReadonlyArray<string> }} input
+ *   The raw answer, the role it was written for, the question's registry, and keys that are cited
+ *   outside the text (by a reported conflict) and so belong in the sources too.
  * @returns {AnswerParts} The checked answer and its sources.
  */
-export function assembleAnswer({ answer, role, registry }) {
+export function assembleAnswer({ answer, role, registry, alsoCite = [] }) {
   const checked = validateCitations(answer, registry);
   const all = registry.list();
-  const cited = new Set(checked.citedKeys);
+  const cited = new Set([...checked.citedKeys, ...alsoCite.filter((key) => registry.get(key))]);
   const sources = all
     .filter(({ key }) => cited.has(key))
     .map((source) => ({
@@ -88,7 +89,7 @@ export function assembleAnswer({ answer, role, registry }) {
       sources.map(({ url }) => url),
     ),
     invalidKeys: checked.invalidKeys,
-    uncitedSourceKeys: checked.uncitedSourceKeys,
+    uncitedSourceKeys: all.map(({ key }) => key).filter((key) => !cited.has(key)),
     inferredKeys: checked.inferredKeys,
   };
 }

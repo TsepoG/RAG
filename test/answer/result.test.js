@@ -65,6 +65,21 @@ describe('assembleAnswer sources', () => {
     expect(result.inferredKeys).toEqual([]);
   });
 
+  it('includes sources cited outside the text, such as by a reported conflict, once and only if real', () => {
+    const result = assembleAnswer({
+      answer: 'x [C1]',
+      role: ROLE,
+      registry: registry(),
+      alsoCite: ['G1', 'C1', 'G9'],
+    });
+
+    expect(result.sources.map(({ key, inferred }) => [key, inferred])).toEqual([
+      ['C1', false],
+      ['G1', false],
+    ]);
+    expect(result.uncitedSourceKeys).toEqual(['C2']);
+  });
+
   it('leaves out sources the answer does not cite', () => {
     const result = assembleAnswer({ answer: 'x [C2]', role: ROLE, registry: registry() });
 

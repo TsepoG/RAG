@@ -1,4 +1,7 @@
 // @ts-check
+
+/** @typedef {import('./toolGate.js').ToolGate} ToolGate */
+
 export {
   ALLOWLIST,
   isAllowedTool,
