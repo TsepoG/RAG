@@ -124,23 +124,25 @@ public/
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures, including `public/js`.
-- [ ] `npm start` serves the UI on `127.0.0.1`; refuses `0.0.0.0` without `ALLOW_REMOTE=true`.
-- [ ] A real question streams progress and draft text, then shows the final
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures, including `public/js`.
+- [x] `npm start` serves the UI on `127.0.0.1`; refuses `0.0.0.0` without `ALLOW_REMOTE=true`.
+- [x] A real question streams progress and draft text, then shows the final
       answer with banner, chips and Sources; links open the right pages.
-- [ ] The `answer-meta` block never appears in the UI (unit test + live).
-- [ ] Role choice survives a page reload.
-- [ ] "Show more detail" on a Product Owner answer returns a more technical
+- [x] The `answer-meta` block never appears in the UI (unit test + live).
+- [x] Role choice survives a page reload.
+- [x] "Show more detail" on a Product Owner answer returns a more technical
       answer for the same question.
-- [ ] Stop cancels a running question; the server log shows the session aborted.
+- [x] Stop cancels a running question; the server log shows the session aborted.
 - [ ] Not-found, clarify and out-of-scope results render correctly (live where
       possible, otherwise via a fake backend in tests).
-- [ ] Feedback writes to `data/feedback.jsonl` with no answer text or tokens.
-- [ ] `curl -X POST http://127.0.0.1:3000/api/ask -H "Origin: https://evil.example" -H "Content-Type: application/json" -d '{}'` → 403.
+      _Not met yet: not-found was seen live; clarify and out-of-scope are covered by unit tests with a fake backend but the live model never produced them (Phase 6 measures this)._
+- [x] Feedback writes to `data/feedback.jsonl` with no answer text or tokens.
+- [x] `curl -X POST http://127.0.0.1:3000/api/ask -H "Origin: https://evil.example" -H "Content-Type: application/json" -d '{}'` → 403.
 - [ ] Keyboard-only walkthrough works (pick role, ask, stop, open a source).
-- [ ] CI green; SonarQube quality gate passes with zero new issues (watch
+      _Not met yet: everything works except the skip link, which does not show on the first Tab (fixed in Phase 6)._
+- [x] CI green; SonarQube quality gate passes with zero new issues (watch
       for security hotspots on the server and HTML rendering).
-- [ ] README: `npm start`, `npm run dev`, the local-only security model,
+- [x] README: `npm start`, `npm run dev`, the local-only security model,
       `HOST`/`ALLOW_REMOTE`, feedback file, screenshots of the UI.
 
 ## Git rules for this phase
