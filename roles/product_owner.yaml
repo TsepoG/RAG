@@ -31,4 +31,10 @@ examples:
       A customer can get a refund within 30 days of ordering, once per order [C1]. Large refunds
       need a manager's sign-off [C1][G1]. This matches the agreed refund policy, and nothing
       extra is in progress.
-version: 1
+phrases:
+  high: 'Confirmed — see the sources below.'
+  medium: 'Mostly confirmed, but part of this is my best reading and is marked below.'
+  low: "I'm not sure. Here's what I found and what's still unclear."
+  notFound: "I couldn't find anything about this in our documentation or the product."
+  outOfScope: "I don't have that information. I can only answer from the team's documentation and the product as built."
+version: 2

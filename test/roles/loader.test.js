@@ -74,6 +74,42 @@ describe('loadRoles with the real role files', () => {
     expect(role.version).toBeGreaterThanOrEqual(1);
   });
 
+  it('words the banners for the roles that need their own, and leaves the rest to the defaults', async () => {
+    const roles = await loadRoles({ dir: ROLES_DIRECTORY });
+
+    expect(Object.keys(getRole(roles, 'product_owner').phrases ?? {}).sort()).toEqual([
+      'high',
+      'low',
+      'medium',
+      'notFound',
+      'outOfScope',
+    ]);
+    expect(getRole(roles, 'project_manager').phrases).toEqual(
+      getRole(roles, 'product_owner').phrases,
+    );
+    expect(Object.keys(getRole(roles, 'developer').phrases ?? {}).sort()).toEqual([
+      'low',
+      'medium',
+      'notFound',
+    ]);
+    expect(getRole(roles, 'business_analyst').phrases).toBeUndefined();
+    expect(getRole(roles, 'qa').phrases).toBeUndefined();
+  });
+
+  it('raised the version of each role whose wording changed', async () => {
+    const roles = await loadRoles({ dir: ROLES_DIRECTORY });
+
+    expect(
+      ['developer', 'product_owner', 'project_manager'].map((id) => getRole(roles, id).version),
+    ).toEqual([2, 2, 2]);
+  });
+
+  it('freezes the phrases like the rest of the role', async () => {
+    const roles = await loadRoles({ dir: ROLES_DIRECTORY });
+
+    expect(Object.isFrozen(getRole(roles, 'product_owner').phrases)).toBe(true);
+  });
+
   it('bans technical terms for the two business-facing roles, and none for developers', async () => {
     const roles = await loadRoles({ dir: ROLES_DIRECTORY });
 
