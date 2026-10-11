@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 // @ts-check
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SECTION_TITLES } from '../../../src/honesty/index.js';
 import { findRefs } from '../../../public/js/refs.js';
@@ -97,5 +99,79 @@ describe('findRefs', () => {
     document.body.innerHTML = '<p>nothing here</p>';
 
     expect(() => findRefs()).toThrow('The page has no element with the id "ask-form".');
+  });
+});
+
+describe('the skip link', () => {
+  const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+  it('is the first thing the Tab key reaches', () => {
+    loadPage();
+
+    const [first] = [...document.querySelectorAll(FOCUSABLE)].filter(
+      (element) => !element.hasAttribute('disabled') && !element.closest('[hidden]'),
+    );
+
+    expect(first.classList.contains('skip')).toBe(true);
+  });
+
+  it('points to the question box, which exists and can take the focus', () => {
+    loadPage();
+    const link = document.querySelector('a.skip');
+    const target = document.querySelector(link?.getAttribute('href') ?? '#nothing');
+
+    expect(link?.getAttribute('href')).toBe('#question');
+    expect(target?.tagName).toBe('TEXTAREA');
+  });
+
+  it('can take the focus, and nothing in the page takes it back on load', () => {
+    loadPage();
+    const link = /** @type {HTMLElement} */ (document.querySelector('a.skip'));
+
+    link.focus();
+
+    expect(document.activeElement).toBe(link);
+  });
+
+  it('sits in a navigation landmark, so it is found by screen reader users too', () => {
+    loadPage();
+
+    expect(document.querySelector('nav.skip-nav a.skip')).not.toBeNull();
+  });
+
+  describe('in the stylesheet', () => {
+    const css = readFileSync(resolve('public/css/app.css'), 'utf8');
+    const ruleFor = (/** @type {string} */ selector) => {
+      const start = css.indexOf(`${selector} {`);
+      return start === -1 ? '' : css.slice(start, css.indexOf('}', start));
+    };
+
+    it('is always visible: nothing hides it, moves it off screen or clips it', () => {
+      const rule = ruleFor('.skip');
+
+      expect(rule).not.toBe('');
+      const found = [
+        'display: none',
+        'visibility: hidden',
+        '-9999px',
+        'clip',
+        'opacity: 0',
+        'translate',
+      ].filter((hiding) => rule.includes(hiding));
+
+      expect(found).toEqual([]);
+    });
+
+    it('is not hidden by a rule for when it does not have focus', () => {
+      expect(css).not.toContain('.skip:not(:focus)');
+    });
+
+    it('turns bright yellow with black text and a border when it has focus', () => {
+      const rule = ruleFor('.skip:focus');
+
+      expect(rule).toContain('background: #ffd400');
+      expect(rule).toContain('color: #000000');
+      expect(rule).toContain('border: 3px solid #000000');
+    });
   });
 });

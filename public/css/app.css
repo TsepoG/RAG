@@ -72,23 +72,23 @@ h3 {
   margin: 4px 0;
 }
 
-/* Hidden with the same technique as .visually-hidden until it has focus, then shown on top of the
-   page in bright yellow with black text and a thick border, so it cannot be missed in either theme. */
-.skip:not(:focus) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
+/* The skip link is always visible, small and quiet, at the top of the page, so it never depends on
+   the browser moving focus to something that cannot be seen. When it has focus it becomes bright
+   yellow with black text and a thick border, in either theme. */
+.skip-nav {
+  max-width: 760px;
+  margin: 8px auto 0;
+}
+
+.skip {
+  display: inline-block;
+  padding: 2px 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .skip:focus {
-  position: fixed;
-  top: 8px;
-  left: 16px;
-  z-index: 1000;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: #ffd400;
   color: #000000;
   font-weight: 700;
