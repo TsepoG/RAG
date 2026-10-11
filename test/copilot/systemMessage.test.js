@@ -155,6 +155,20 @@ describe('buildBaseMessage honesty rules', () => {
     expect(base).toContain('Report it as out of scope.');
   });
 
+  it('keeps a prediction or promise out of scope unless a source states that plan', () => {
+    expect(base).toContain(
+      'is out of scope unless a source states that exact plan. Do not answer it by describing how things usually work.',
+    );
+  });
+
+  it('asks for not found, not "there is no X", when a thing was simply not seen', () => {
+    expect(base).toContain('needs a source that says so.');
+    expect(base).toContain('report not_found instead of answering "there is no X"');
+    expect(base).toContain(
+      '"not_found": the sources you read do not contain what the question asks about',
+    );
+  });
+
   it('tells the model to leave gaps and conflicts to the block, and not to settle a conflict', () => {
     expect(base).toContain('Put them in the answer-meta block; the application shows them.');
     expect(base).toContain('Report both sides with their keys. Do not decide between them.');
