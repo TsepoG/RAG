@@ -4,6 +4,7 @@ import { SERVER_KEYS } from './servers.js';
 import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL, MAX_CODE_SEARCHES } from './hints.js';
 import { createPostToolHooks } from './postHooks.js';
 import { buildScope, checkToolScope } from './scope.js';
+import { createToolGate, TOOLS_LOCKED_REASON } from './toolGate.js';
 import { asRecord } from './scopeCommon.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
@@ -20,6 +21,8 @@ import { asRecord } from './scopeCommon.js';
  * @property {ReadonlyArray<string>} spaceKeys - Allowed Confluence space keys.
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
+ * @property {import('./toolGate.js').ToolGate} [gate] - When locked, every call is refused. A new
+ *   open gate is used when omitted.
  * @property {string} [cloudId] - The Atlassian cloudId. When set, it replaces the one the model
  *   passes to Confluence tools, whether missing, a placeholder or wrong.
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
@@ -98,6 +101,7 @@ function createPreToolHook({
   siteUrl,
   maxToolCalls,
   cloudId,
+  gate = createToolGate(),
   logger,
   timer,
   checkScope = checkToolScope,
@@ -127,6 +131,9 @@ function createPreToolHook({
    *   The decision, with the arguments to run the call with when they were changed.
    */
   function decide(toolName, toolArgs) {
+    if (gate.isLocked()) {
+      return refuse(toolName, 'tools-locked', TOOLS_LOCKED_REASON);
+    }
     // Every attempt counts, allowed or not, so a model stuck retrying a denied call still stops.
     attempts += 1;
     if (attempts > maxToolCalls) {
