@@ -125,3 +125,9 @@ function formatIssues(issues) {
   const lines = issues.map(({ path, message }) => `- ${path}: ${message}`);
   return [`${CONFIG_ERROR_HEADLINE}:`, ...lines].join('\n');
 }
+
+/**
+ * Thrown when the eval set cannot be loaded or used: a missing or invalid file, an unknown role,
+ * or cases that are still drafts.
+ */
+export class EvalError extends AppError {}
