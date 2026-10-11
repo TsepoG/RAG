@@ -4,9 +4,10 @@
 /** @typedef {import('./registry.js').Source} Source */
 /** @typedef {import('./registry.js').RegisteredSource} RegisteredSource */
 /** @typedef {import('./registry.js').Candidate} Candidate */
+/** @typedef {import('./validate.js').WrittenKey} WrittenKey */
 
 export { getExtractor, MAX_CANDIDATES, NO_RESULTS } from './extractors/index.js';
 export { friendlyLabel } from './labels.js';
 export { createCitationRegistry, isKeyShaped } from './registry.js';
-export { validateCitations } from './validate.js';
+export { parseCitationKeys, validateCitations } from './validate.js';
 export { removedNotice, wrapAsSource } from './wrap.js';

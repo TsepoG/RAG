@@ -11,6 +11,7 @@ describe('citations public entry point', () => {
       'friendlyLabel',
       'getExtractor',
       'isKeyShaped',
+      'parseCitationKeys',
       'removedNotice',
       'validateCitations',
       'wrapAsSource',

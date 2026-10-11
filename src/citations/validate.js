@@ -30,7 +30,7 @@ const INFERRED_MARK = '*';
  * @param {string} inside - The text between the brackets.
  * @returns {WrittenKey[] | undefined} The keys, or undefined when any part is not shaped like a key.
  */
-function parseKeys(inside) {
+export function parseCitationKeys(inside) {
   const written = inside.split(',').map((part) => {
     const text = part.trim();
     const inferred = text.endsWith(INFERRED_MARK);
@@ -80,7 +80,7 @@ export function validateCitations(answer, registry) {
   const stated = [];
 
   const cleaned = answer.replace(CITATION_BRACKET, (whole, space, inside) => {
-    const keys = parseKeys(inside);
+    const keys = parseCitationKeys(inside);
     if (keys === undefined) {
       return whole;
     }
