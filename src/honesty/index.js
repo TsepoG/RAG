@@ -15,3 +15,4 @@ export {
   sentencesCitingOnly,
 } from './sentences.js';
 export { applyConfidenceCaps, NO_META_REASON } from './caps.js';
+export { findCitationBrackets } from './prose.js';
