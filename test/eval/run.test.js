@@ -110,7 +110,12 @@ describe('runEval', () => {
 
     expect(entries[0].score).toMatchObject({ id: 'po', plainStyleViolations: 1, passed: false });
     expect(entries[0].result).toMatchObject({ answer: 'Thirty days.', status: 'answered' });
-    expect(entries[0]).toMatchObject({ id: 'po', role: 'product_owner', error: undefined });
+    expect(entries[0]).toMatchObject({
+      id: 'po',
+      role: 'product_owner',
+      reference: 'In window.js.',
+      error: undefined,
+    });
   });
 
   it('never keeps the summary of a tool call’s arguments', async () => {

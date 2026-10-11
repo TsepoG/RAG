@@ -31,6 +31,7 @@ const DATE_PREFIX_LENGTH = 15;
  * @property {string} role - The role id.
  * @property {string} question - What was asked.
  * @property {ReadonlyArray<string>} tags - The case's tags.
+ * @property {string} reference - The short expected answer, as it was when the case ran.
  * @property {import('./score.js').CaseScore} score - How it scored.
  * @property {Record<string, unknown> | undefined} result - The answer, without the arguments of tool calls.
  * @property {{ kind: string, message: string } | undefined} error - Why there is no answer.
@@ -168,10 +169,10 @@ export async function runEval({
 /**
  * The parts of a case a result line repeats.
  * @param {import('./schema.js').EvalCase} one - The case.
- * @returns {{ id: string, role: string, question: string, tags: ReadonlyArray<string> }} The parts.
+ * @returns {{ id: string, role: string, question: string, tags: ReadonlyArray<string>, reference: string }} The parts.
  */
-function caseParts({ id, role, question, tags }) {
-  return { id, role, question, tags };
+function caseParts({ id, role, question, tags, expect: expected }) {
+  return { id, role, question, tags, reference: expected.reference };
 }
 
 /**

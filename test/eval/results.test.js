@@ -36,6 +36,7 @@ function entry(id, answer = 'Thirty days.') {
     role: 'developer',
     question: 'How long?',
     tags: ['smoke'],
+    reference: 'Thirty days.',
     score: makeScore({ id }),
     result: { answer, status: 'answered' },
     error: undefined,
