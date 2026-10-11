@@ -5,6 +5,7 @@
 /** @typedef {import('./registry.js').RegisteredSource} RegisteredSource */
 /** @typedef {import('./registry.js').Candidate} Candidate */
 /** @typedef {import('./validate.js').WrittenKey} WrittenKey */
+/** @typedef {import('./validate.js').ValidationResult} ValidationResult */
 
 export { getExtractor, MAX_CANDIDATES, NO_RESULTS } from './extractors/index.js';
 export { friendlyLabel } from './labels.js';

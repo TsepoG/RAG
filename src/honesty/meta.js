@@ -2,10 +2,12 @@
 import { z } from 'zod';
 
 /** What the model may report as the outcome of a question. */
-export const ANSWER_STATUSES = Object.freeze(['answered', 'not_found', 'clarify', 'out_of_scope']);
+export const ANSWER_STATUSES = Object.freeze(
+  /** @type {const} */ (['answered', 'not_found', 'clarify', 'out_of_scope']),
+);
 
 /** How sure the model says it is, lowest last. */
-export const CONFIDENCE_LEVELS = Object.freeze(['high', 'medium', 'low']);
+export const CONFIDENCE_LEVELS = Object.freeze(/** @type {const} */ (['high', 'medium', 'low']));
 
 const BLOCK_INFO = 'answer-meta';
 const MIN_FENCE_LENGTH = 3;
