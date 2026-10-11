@@ -3,7 +3,7 @@ import { friendlyLabel, validateCitations } from '../citations/index.js';
 
 /**
  * A source the answer cites, with the label low-depth roles show instead of a file path.
- * @typedef {import('../citations/index.js').RegisteredSource & { friendlyLabel: string }} CitedSource
+ * @typedef {import('../citations/index.js').RegisteredSource & { friendlyLabel: string, inferred: boolean }} CitedSource
  */
 
 /**
@@ -20,11 +20,13 @@ import { friendlyLabel, validateCitations } from '../citations/index.js';
  * @typedef {object} AnswerParts
  * @property {string} answer - The answer, with invented citation keys removed.
  * @property {string} role - The id of the role it was written for.
- * @property {CitedSource[]} sources - The sources the answer cites, in key order.
+ * @property {CitedSource[]} sources - The sources the answer cites, in key order. A source is
+ *   `inferred` when every citation of it carries the asterisk.
  * @property {ConsultedItem[]} alsoConsulted - Fetched sources it did not cite, then search hits it
  *   did not fetch, without repeats, at most ten.
  * @property {string[]} invalidKeys - Keys the answer used that were never registered.
  * @property {string[]} uncitedSourceKeys - Keys of fetched sources the answer did not cite.
+ * @property {string[]} inferredKeys - Keys cited with an asterisk (the model's interpretation).
  */
 
 /** Most entries in the "also consulted" list. */
@@ -69,7 +71,12 @@ export function assembleAnswer({ answer, role, registry }) {
   const cited = new Set(checked.citedKeys);
   const sources = all
     .filter(({ key }) => cited.has(key))
-    .map((source) => ({ ...source, friendlyLabel: friendlyLabel(source) }));
+    .map((source) => ({
+      ...source,
+      friendlyLabel: friendlyLabel(source),
+      inferred:
+        checked.inferredKeys.includes(source.key) && !checked.statedKeys.includes(source.key),
+    }));
   const uncited = all.filter(({ key }) => !cited.has(key));
   return {
     answer: checked.answer,
@@ -82,5 +89,6 @@ export function assembleAnswer({ answer, role, registry }) {
     ),
     invalidKeys: checked.invalidKeys,
     uncitedSourceKeys: checked.uncitedSourceKeys,
+    inferredKeys: checked.inferredKeys,
   };
 }

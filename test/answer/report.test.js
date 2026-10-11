@@ -21,6 +21,7 @@ function result(overrides = {}) {
     alsoConsulted: [],
     invalidKeys: [],
     uncitedSourceKeys: [],
+    inferredKeys: [],
     toolCalls: [],
     model: 'gpt-x',
     durationMs: 18_240,
@@ -35,7 +36,7 @@ function result(overrides = {}) {
  * @returns {import('../../src/answer/result.js').CitedSource} The cited source.
  */
 function cited(source, key) {
-  return { ...source, key, friendlyLabel: friendlyLabel(source) };
+  return { ...source, key, friendlyLabel: friendlyLabel(source), inferred: false };
 }
 
 /**

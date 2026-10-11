@@ -37,6 +37,7 @@ import { assembleAnswer } from './result.js';
  *   then search hits that were not fetched; at most ten.
  * @property {string[]} invalidKeys - Keys the answer used that were never registered.
  * @property {string[]} uncitedSourceKeys - Keys of fetched sources the answer did not cite.
+ * @property {string[]} inferredKeys - Keys cited with an asterisk (the model's interpretation).
  * @property {import('./toolCalls.js').ToolCallRecord[]} toolCalls - The tool calls made, in order.
  * @property {string | undefined} model - The model that answered, when Copilot reported it.
  * @property {number} durationMs - How long the whole question took.

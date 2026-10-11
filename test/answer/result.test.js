@@ -43,6 +43,28 @@ describe('assembleAnswer sources', () => {
     });
   });
 
+  it('marks a source inferred only when every citation of it carries an asterisk', () => {
+    const result = assembleAnswer({
+      answer: 'Guess [C1*]. Guess [G1*]. Fact [G1]. Fact [C2].',
+      role: ROLE,
+      registry: registry(),
+    });
+
+    expect(result.sources.map(({ key, inferred }) => [key, inferred])).toEqual([
+      ['C1', true],
+      ['C2', false],
+      ['G1', false],
+    ]);
+    expect(result.inferredKeys).toEqual(['C1', 'G1']);
+  });
+
+  it('marks nothing inferred when there are no asterisks', () => {
+    const result = assembleAnswer({ answer: 'x [C1][G1]', role: ROLE, registry: registry() });
+
+    expect(result.sources.every(({ inferred }) => inferred === false)).toBe(true);
+    expect(result.inferredKeys).toEqual([]);
+  });
+
   it('leaves out sources the answer does not cite', () => {
     const result = assembleAnswer({ answer: 'x [C2]', role: ROLE, registry: registry() });
 

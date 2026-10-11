@@ -93,6 +93,7 @@ describe('askQuestion answer', () => {
       alsoConsulted: [],
       invalidKeys: [],
       uncitedSourceKeys: [],
+      inferredKeys: [],
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,
