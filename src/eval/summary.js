@@ -33,7 +33,8 @@ export function formatRunInfo(run) {
     [
       ['Started', run.startedAt],
       ['Commit', `${run.commit}${run.dirty ? ' (uncommitted changes)' : ''}`],
-      ['Model', run.model],
+      ['Model asked for', run.model],
+      ['Models that answered', run.models.length === 0 ? 'none recorded' : run.models.join(', ')],
       ['Role versions', versions],
       ['Base prompt hash', run.basePromptHash],
       ['Requests used', requestsText(run.requests)],

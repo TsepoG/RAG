@@ -20,6 +20,7 @@ const HEADER = {
   model: 'gpt-x',
   roles: { qa: 3, developer: 2 },
   basePromptHash: '0123456789ab',
+  models: ['gpt-x'],
   requests: { used: 14, casesRun: 8, stoppedEarly: false },
   interrupted: false,
 };
@@ -62,6 +63,15 @@ describe('formatResults and parseResults', () => {
 
     expect(text.trim().split('\n')).toHaveLength(2);
     expect(parseResults(text).entries[0].result?.answer).toBe(answer);
+  });
+
+  it('read a results file from before models were recorded, as having no models', () => {
+    const { models, ...old } = HEADER;
+    const text = `${JSON.stringify({ type: 'run', ...old })}
+`;
+
+    expect(models).toEqual(['gpt-x']);
+    expect(parseResults(text).header.models).toEqual([]);
   });
 
   it('read a run with no cases', () => {
@@ -147,6 +157,23 @@ describe('formatSummary', () => {
     expect(text).toContain('developer v2, qa v3');
     expect(text).toContain('0123456789ab');
     expect(text).toContain('14 for 8 cases');
+  });
+
+  it('shows the model asked for and the models that actually answered', () => {
+    const text = formatRunInfo({
+      ...HEADER,
+      model: 'default',
+      models: ['gpt-6-luna', 'mai-code-1.1-flash'],
+    });
+
+    expect(text).toContain('| Model asked for | default |');
+    expect(text).toContain('| Models that answered | gpt-6-luna, mai-code-1.1-flash |');
+  });
+
+  it('says so when no model was recorded', () => {
+    expect(formatRunInfo({ ...HEADER, models: [] })).toContain(
+      '| Models that answered | none recorded |',
+    );
   });
 
   it('says when the working tree had uncommitted changes, and the request limit', () => {

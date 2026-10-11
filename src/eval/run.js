@@ -63,6 +63,19 @@ export async function collectRunInfo({ git, roles, config }) {
 }
 
 /**
+ * Lists the models that actually answered. With no model set, Copilot picks one and can pick a
+ * different one from run to run, which would change results without anything in the code changing.
+ * @param {ReadonlyArray<import('./run.js').RunEntry>} entries - The cases, as they ran.
+ * @returns {string[]} The distinct model names Copilot reported, in alphabetical order.
+ */
+export function modelsSeen(entries) {
+  const names = entries.flatMap(({ result }) =>
+    typeof result?.model === 'string' ? [result.model] : [],
+  );
+  return [...new Set(names)].sort();
+}
+
+/**
  * The name of the folder a run is written to.
  * @param {Date} when - When the run started.
  * @returns {string} `YYYYMMDD-HHMMSS` in UTC, which sorts by time.

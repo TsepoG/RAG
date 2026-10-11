@@ -27,7 +27,8 @@ export function diffRunInfo(before, after) {
   };
   note('commit', before.commit, after.commit);
   note('working tree had uncommitted changes', before.dirty, after.dirty);
-  note('model', before.model, after.model);
+  note('model asked for', before.model, after.model);
+  note('models that answered', before.models.join(', '), after.models.join(', '));
   note('base prompt hash', before.basePromptHash, after.basePromptHash);
   const ids = [...new Set([...Object.keys(before.roles), ...Object.keys(after.roles)])].sort();
   for (const id of ids) {

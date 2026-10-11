@@ -340,11 +340,20 @@ describe('diffRunInfo', () => {
     expect(lines).toEqual([
       'commit: abc123def456 → def',
       'working tree had uncommitted changes: false → true',
-      'model: gpt-x → gpt-y',
+      'model asked for: gpt-x → gpt-y',
       'base prompt hash: 0123456789ab → ffffffffffff',
       'role developer version: 2 → 3',
       'role product_owner version: none → 1',
     ]);
+  });
+
+  it('flags a different set of models answering, since that changes results by itself', () => {
+    const lines = diffRunInfo(
+      makeHeader({ model: 'default', models: ['gpt-6-luna'] }),
+      makeHeader({ model: 'default', models: ['gpt-6-luna', 'mai-code-1.1-flash'] }),
+    );
+
+    expect(lines).toEqual(['models that answered: gpt-6-luna → gpt-6-luna, mai-code-1.1-flash']);
   });
 
   it('notes a role that is no longer there', () => {

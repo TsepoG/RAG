@@ -22,7 +22,7 @@ export {
   resolveRunFolder,
   SUMMARY_FILE,
 } from './results.js';
-export { collectRunInfo, runEval, runFolderName, sanitiseResult } from './run.js';
+export { collectRunInfo, modelsSeen, runEval, runFolderName, sanitiseResult } from './run.js';
 export { parseCsv, toCsv } from './csv.js';
 export {
   buildReviewRows,

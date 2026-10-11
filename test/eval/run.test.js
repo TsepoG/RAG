@@ -2,7 +2,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EvalError } from '../../src/errors/index.js';
 import { createRequestGuard } from '../../src/eval/budget.js';
-import { collectRunInfo, runEval, runFolderName, sanitiseResult } from '../../src/eval/run.js';
+import {
+  collectRunInfo,
+  modelsSeen,
+  runEval,
+  runFolderName,
+  sanitiseResult,
+} from '../../src/eval/run.js';
 import { loadConfig } from '../../src/config/index.js';
 import { makeCase } from '../helpers/eval.js';
 import { FAKE_GITHUB_TOKEN, validEnv } from '../helpers/env.js';
@@ -337,5 +343,30 @@ describe('collectRunInfo', () => {
 describe('runFolderName', () => {
   it('writes the time in UTC so the folders sort by time', () => {
     expect(runFolderName(new Date('2026-10-11T18:05:09.123Z'))).toBe('20261011-180509');
+  });
+});
+
+describe('modelsSeen', () => {
+  /**
+   * An entry with an answer from a model.
+   * @param {unknown} model - What the answer says about the model.
+   * @returns {import('../../src/eval/run.js').RunEntry} The entry.
+   */
+  function entryFrom(model) {
+    return /** @type {any} */ ({ id: 'a', result: model === undefined ? undefined : { model } });
+  }
+
+  it('lists each model once, in alphabetical order', () => {
+    const entries = ['mai-code-1.1-flash', 'gpt-6-luna', 'mai-code-1.1-flash'].map(entryFrom);
+
+    expect(modelsSeen(entries)).toEqual(['gpt-6-luna', 'mai-code-1.1-flash']);
+  });
+
+  it('leaves out a case that failed and so has no answer, and an answer that names no model', () => {
+    expect(modelsSeen([entryFrom(undefined), entryFrom(undefined), entryFrom(null)])).toEqual([]);
+  });
+
+  it('lists nothing for no cases', () => {
+    expect(modelsSeen([])).toEqual([]);
   });
 });

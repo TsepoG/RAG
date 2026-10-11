@@ -87,6 +87,7 @@ export function makeHeader(changes = {}) {
     model: 'gpt-x',
     roles: { developer: 2, qa: 3 },
     basePromptHash: '0123456789ab',
+    models: ['gpt-x'],
     requests: { used: 14, casesRun: 8, stoppedEarly: false },
     interrupted: false,
     ...changes,

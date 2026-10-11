@@ -31,6 +31,8 @@ const runLine = z.looseObject({
   model: z.string(),
   roles: z.record(z.string(), z.number()),
   basePromptHash: z.string(),
+  // Older results do not have it.
+  models: z.array(z.string()).default([]),
   requests: z.looseObject({ used: z.number(), casesRun: z.number(), stoppedEarly: z.boolean() }),
   interrupted: z.boolean(),
 });
@@ -47,6 +49,7 @@ const caseLine = z.looseObject({
  * The first line of a results file: what the run was tied to and what it used.
  * @typedef {import('./run.js').RunInfo & {
  *   startedAt: string,
+ *   models: string[],
  *   requests: { limit?: number, used: number, casesRun: number, stoppedEarly: boolean },
  *   interrupted: boolean,
  * }} RunHeader

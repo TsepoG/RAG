@@ -16,6 +16,7 @@ import {
   formatResults,
   formatSummary,
   loadCases,
+  modelsSeen,
   parseEvalArguments,
   RESULTS_DIRECTORY,
   RESULTS_FILE,
@@ -118,6 +119,7 @@ async function main() {
     });
     const header = {
       ...result.info,
+      models: modelsSeen(result.outcome.entries),
       startedAt: startedAt.toISOString(),
       requests: result.outcome.requests,
       interrupted: result.outcome.interrupted,
