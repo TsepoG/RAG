@@ -22,6 +22,7 @@
     "ask": "node src/cli/ask.js",
     "models": "node src/cli/models.js",
     "roles": "node src/cli/roles.js",
+    "eval": "node src/cli/eval.js",
     "mcp:tools": "node src/cli/mcpTools.js",
     "mcp:sample": "node src/cli/mcpSample.js",
     "fixtures:sanitise": "node src/cli/sanitiseFixtures.js",
