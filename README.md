@@ -30,25 +30,25 @@ Values already exported in your shell win over `.env`.
 
 ## Scripts
 
-| Script                                                     | What it does                                                                             |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `npm start`                                                | Run `src/index.js`                                                                       |
-| `npm run lint`                                             | ESLint with JSDoc and SonarJS rules; zero warnings allowed                               |
-| `npm run lint:fix`                                         | ESLint with auto-fix                                                                     |
-| `npm run format`                                           | Prettier, write                                                                          |
-| `npm run format:check`                                     | Prettier, check only                                                                     |
-| `npm run typecheck`                                        | `tsc --noEmit` over the JSDoc types (`jsconfig.json`)                                    |
-| `npm test`                                                 | Vitest, once                                                                             |
-| `npm run test:watch`                                       | Vitest in watch mode                                                                     |
-| `npm run test:coverage`                                    | Vitest with coverage; fails below 90% for lines, branches, functions and statements      |
-| `npm run ask -- [--role <id>] "<question>"`                | Ask a question as a role; prints the answer, its sources and the tools used              |
-| `npm run roles`                                            | List the role profiles in `roles/`                                                       |
-| `npm run models`                                           | List the models your Copilot account can use                                             |
-| `npm run mcp:tools`                                        | List both MCP servers' tools and write `docs/mcp-tools.md`                               |
-| `npm run mcp:sample -- <tool> '<json args>' [--as <name>]` | Call one allow-listed tool and save its raw result to `test/fixtures/raw/` (git-ignored) |
-| `npm run fixtures:sanitise`                                | Turn the raw samples into `test/fixtures/mcp/*.json` with no real names or content       |
-| `npm run test:live`                                        | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)        |
-| `npm run verify`                                           | lint, format check, typecheck and coverage in sequence; stops at the first failure       |
+| Script                                                     | What it does                                                                                                   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `npm start`                                                | Run `src/index.js`                                                                                             |
+| `npm run lint`                                             | ESLint with JSDoc and SonarJS rules; zero warnings allowed                                                     |
+| `npm run lint:fix`                                         | ESLint with auto-fix                                                                                           |
+| `npm run format`                                           | Prettier, write                                                                                                |
+| `npm run format:check`                                     | Prettier, check only                                                                                           |
+| `npm run typecheck`                                        | `tsc --noEmit` over the JSDoc types (`jsconfig.json`)                                                          |
+| `npm test`                                                 | Vitest, once                                                                                                   |
+| `npm run test:watch`                                       | Vitest in watch mode                                                                                           |
+| `npm run test:coverage`                                    | Vitest with coverage; fails below 90% for lines, branches, functions and statements                            |
+| `npm run ask -- [--role <id>] [--json] "<question>"`       | Ask a question as a role; prints the answer with its confidence, sources and tools used, or the result as JSON |
+| `npm run roles`                                            | List the role profiles in `roles/`                                                                             |
+| `npm run models`                                           | List the models your Copilot account can use                                                                   |
+| `npm run mcp:tools`                                        | List both MCP servers' tools and write `docs/mcp-tools.md`                                                     |
+| `npm run mcp:sample -- <tool> '<json args>' [--as <name>]` | Call one allow-listed tool and save its raw result to `test/fixtures/raw/` (git-ignored)                       |
+| `npm run fixtures:sanitise`                                | Turn the raw samples into `test/fixtures/mcp/*.json` with no real names or content                             |
+| `npm run test:live`                                        | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)                              |
+| `npm run verify`                                           | lint, format check, typecheck and coverage in sequence; stops at the first failure                             |
 
 Run `npm run verify` before every commit and PR.
 
@@ -119,10 +119,18 @@ npm run ask -- --role product_owner "What does the refund feature do?"
 ```
 
 `--role` picks who the answer is written for (default `developer`). The command prints a progress
-line, then the answer once it has been checked, a numbered **Sources** list, an **Also consulted**
-list, a "Tools used" list (server, tool, a short argument summary and duration; never secrets or
-page content) and the role, model and time taken. Logs go to stderr as JSON. Exit codes: `0`
-success; `1` for a missing question, an unknown role, bad config, no Copilot login or a Copilot
+line to stderr, then, once the answer has been checked: a banner with the confidence level (for
+example `[medium] Mostly confirmed…`), the answer, where the documentation and code disagree, **What
+I couldn't confirm**, a numbered **Sources** list, **Also consulted**, **Who might know**, a "Tools
+used" list (server, tool, a short argument summary and duration; never secrets or page content)
+and the role, model and time taken. See [Honesty and confidence](#honesty-and-confidence) for what
+each part means. Logs go to stderr as JSON.
+
+`--json` prints the whole result as JSON instead (status, confidence, `confidenceReason`,
+`capsApplied`, sources and the rest), which is what the later web UI and the evaluation work use.
+
+Exit codes: `0` for every status, because "not found" and "out of scope" are correct outcomes, not
+errors; `1` for a missing question, an unknown role, bad config, no Copilot login or a Copilot
 error (one line on stderr); `2` when the question exceeds `ASK_TIMEOUT_MS`.
 
 ### Roles
@@ -135,6 +143,20 @@ and examples. All roles are grounded the same way: the part of the system messag
 safety and citations is identical for every role, and only the role block changes how the answer
 is written. Depth 1 roles (product owner, project manager) get plain business language, with no
 code or file paths in the answer or the Sources list.
+
+A role can also reword the banners the application shows when it is unsure, under `phrases` in its
+YAML file. Any of `high`, `medium`, `low`, `notFound` and `outOfScope` can be set; one left out uses
+the default. Each is a single line of at most 200 characters, and an unknown name is refused.
+Raise the role's `version` by one when you change it.
+
+```yaml
+phrases:
+  low: "I'm not sure. Here's what I found and what's still unclear."
+  notFound: "I couldn't find anything about this in our documentation or the product."
+```
+
+Wording changes how uncertainty is said, never whether it is said: the banner, level and lists are
+added by the application, not written by the model.
 
 ### How citations work
 
@@ -164,6 +186,80 @@ code or file paths in the answer or the Sources list.
   a long page behind a file pointer the model cannot read. Instead each source is cut at 24,000
   characters and the model is told when that happens.
 - Set `ATLASSIAN_CLOUD_ID` to save the model two calls: it is then used for every Confluence call.
+
+### Honesty and confidence
+
+Every answer says how sure it is and why. The model reports a status and a level at the end of its
+reply, in a fenced block tagged `answer-meta`; the application checks the block, removes it (it is
+never shown) and has the final say, through caps the model cannot override. A reply with no valid
+block counts as low confidence ("The assistant did not report its confidence"). Text after the
+block is kept and a warning is logged.
+
+**Statuses.** Every result has one:
+
+| Status         | Meaning                              | What is shown                                                |
+| -------------- | ------------------------------------ | ------------------------------------------------------------ |
+| `answered`     | The sources answer the question      | Banner with level, answer, sources, and the lists below      |
+| `not_found`    | Nothing in the sources answers it    | The role's not-found text, the closest pages, who might know |
+| `clarify`      | The question fits two or more things | One short question, nothing else                             |
+| `out_of_scope` | The sources can never answer it      | The role's out-of-scope text, no sources                     |
+
+The model's own text is discarded for `not_found` and `out_of_scope`. An `answered` reply with no
+valid citation at all becomes `not_found`, whatever the model said.
+
+**Confidence levels and caps.** The model proposes `high`, `medium` or `low` with a reason. The
+application can only lower it, and each rule that holds adds a sentence to `confidenceReason` and an
+entry to `capsApplied` in the JSON:
+
+| Code                | When                                                      | Limit     |
+| ------------------- | --------------------------------------------------------- | --------- |
+| `no-citations`      | No citation in the answer is a real, fetched source       | not found |
+| `invalid-keys`      | The model used a citation key it was never given          | medium    |
+| `uncited-sentences` | A sentence makes a claim without a citation (a heuristic) | medium    |
+| `stale-page`        | A cited Confluence page was last updated over a year ago  | medium    |
+| `inferred`          | A citation carries an asterisk (see below)                | medium    |
+| `folder-only`       | A sentence rests only on a folder listing                 | medium    |
+| `gaps`              | The model listed things it could not confirm              | medium    |
+| `conflicts`         | The documentation and the code disagree                   | low       |
+| `no-meta`           | The model's report is missing or invalid                  | low       |
+
+**Stated and inferred.** A sentence that repeats a source gets a normal citation, `[C1]`. A sentence
+that is the model's interpretation, usually of code, starts "Based on the code, it looks like…" and
+marks its citation with an asterisk, `[G1*]`. The asterisk stays in the answer, the source gets
+`inferred: true` when every citation of it has one, and the sources list says "my reading of it". A
+folder listing shows what exists, not what the files do, so a sentence supported only by one gets
+the asterisk added by the application. This closes the gap where a claim about a file's contents
+could be cited to a directory listing.
+
+**Gaps and conflicts.** At medium and low confidence the answer ends with **What I couldn't
+confirm**. When the documentation and the code disagree, the application writes both sides itself
+("The documentation says X [C1]; the code does Y [G2]. The code reflects current behaviour."),
+so the model cannot soften or settle it. The keys in a conflict are checked like any other.
+
+**Who might know.** For `not_found` and for medium and low answers, the application suggests, with
+no extra model call: the owners of the files and folders the model read, from the repository's
+`CODEOWNERS` (`.github/CODEOWNERS`, `CODEOWNERS` or `docs/CODEOWNERS`, read once per repository,
+allowed repositories only), and whoever last saved a Confluence page when the page result names
+them. The Atlassian server used so far returns only an account id, so page editors rarely appear.
+Names are never logged.
+
+**Style check and one rewrite.** After the answer is checked, `checkStyle` compares it with the
+role: depth 1 allows no code blocks, inline code, file paths or banned words; depth 2 no code
+blocks or banned words; depth 3 only banned words. If it fails, the model is asked once, in the
+same session, to rewrite the answer, with every tool locked. The rewrite is used only if it still
+cites exactly the same sources, keeps every asterisk and is still an answer, and it can never make
+the answer more confident. Otherwise the first answer is kept and the result says why
+(`rewriteRejectedReason`: `citations`, `markers`, `status`, `timeout` or `error`). `ask` prints a
+short note on stderr when a rewrite happened or was refused.
+
+**Known limits.**
+
+- The status is the model's call. In live runs the model sometimes answers a question the sources
+  cannot (such as "What will the release date be next year?") instead of reporting `out_of_scope`;
+  the caps then limit it to medium and say why, but they cannot turn it into out of scope.
+- The uncited-sentence check is strict by design. A sentence whose citation sits on the next
+  sentence counts as uncited.
+- Confidence is not yet calibrated; Phase 6 measures it.
 
 ### Test fixtures
 
@@ -225,10 +321,12 @@ src/
   copilot/   Copilot client, session config and system message (shared base plus role block)
   errors/    AppError and its subclasses
   fixtures/  the fixture sanitiser and its leak check
-  github/    looks up a repository's head commit, to pin links
+  github/    read-only GitHub REST client; head-commit lookup to pin links; CODEOWNERS reader
+  honesty/   answer-meta parsing, confidence caps, uncited-sentence check, who to ask, final rendering
   logger/    pino logger factory with secret redaction
   mcp/       server config, tool allow-list, scope and post-tool hooks, permission handler, discovery
   roles/     role schema and loader (profiles are in the top-level roles/ folder)
+  style/     checks an answer against what its role allows
   index.js   entry point: loads .env, loads config, logs a startup line
 test/        mirrors src/; test/helpers holds shared test utilities; test/live runs on demand
 docs/        roadmap, system design, coding principles and one file per phase
