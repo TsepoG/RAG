@@ -40,6 +40,8 @@ export function buildApp({ config, roles, ask, answers, saveFeedback, staticFile
   const app = Fastify({
     logger: false,
     bodyLimit: BODY_LIMIT_BYTES,
+    // On shutdown, drop open streams (which stops their questions) instead of waiting for them.
+    forceCloseConnections: true,
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
   });
   const policy = createGuardPolicy({ ...config.server, port: config.port });

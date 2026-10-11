@@ -24,7 +24,8 @@ cp .env.example .env   # then fill in real values
 npm start
 ```
 
-`npm start` loads `.env` if it exists, validates the settings and logs one startup line with the
+`npm start` loads `.env` if it exists, validates the settings, starts Copilot and serves the web page on
+`http://127.0.0.1:3000` (`HOST`, `PORT`), logging one startup line with the
 secrets masked. If a variable is missing or invalid, it prints which one and exits with code 1.
 Values already exported in your shell win over `.env`.
 
@@ -32,7 +33,8 @@ Values already exported in your shell win over `.env`.
 
 | Script                                                     | What it does                                                                                                   |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `npm start`                                                | Run `src/index.js`                                                                                             |
+| `npm start`                                                | Start the web server (`src/server/index.js`)                                                                   |
+| `npm run dev`                                              | Same, restarting when a file under `src/` changes                                                              |
 | `npm run lint`                                             | ESLint with JSDoc and SonarJS rules; zero warnings allowed                                                     |
 | `npm run lint:fix`                                         | ESLint with auto-fix                                                                                           |
 | `npm run format`                                           | Prettier, write                                                                                                |
@@ -343,7 +345,7 @@ writing code here are in [docs/CODING_PRINCIPLES.md](docs/CODING_PRINCIPLES.md).
   TypeScript is on 6.x because the lint plugins depend on `@typescript-eslint`, whose peer range
   is `typescript <6.1.0`.
 - **Coverage:** Vitest enforces 90% for lines, branches, functions and statements. Files in `src/`
-  that no test imports count as uncovered. `src/index.js` and `src/cli/` are the only exclusions
+  that no test imports count as uncovered. `src/server/index.js`, `src/cli/` and `public/js/main.js` are the only exclusions
   (entry-point wiring). Live tests (`test/live/`) run only with `npm run test:live`, never in CI.
 - **Git hooks (Husky):** `pre-commit` runs ESLint `--fix` and Prettier on staged files;
   `pre-push` runs `npm run typecheck` and `npm test`. They install automatically with

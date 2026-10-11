@@ -13,12 +13,12 @@ export default defineConfig({
       provider: 'v8',
       // Listing src explicitly makes files that no test imports count as uncovered.
       include: ['src/**/*.js', 'public/js/**/*.js'],
-      // Entry-point wiring only: src/index.js and the src/cli commands load .env, call the tested
+      // Entry-point wiring only: src/server/index.js and the src/cli commands load .env, call the tested
       // units, do the network or disk I/O they cannot fake, and exit. Excluding them is the one
       // exception CODING_PRINCIPLES §6 allows; sonar.coverage.exclusions mirrors it.
       // public/js/main.js is the same kind of file: it wires the tested page modules to the DOM
       // events and the network, and is checked by hand and by the live test.
-      exclude: ['src/index.js', 'src/cli/**', 'public/js/main.js'],
+      exclude: ['src/server/index.js', 'src/cli/**', 'public/js/main.js'],
       // lcov feeds SonarQube; json-summary feeds the CI job summary.
       reporter: ['text', 'lcov', 'html', 'json-summary'],
       reportsDirectory: 'coverage',
