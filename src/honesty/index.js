@@ -8,6 +8,7 @@
 /** @typedef {import('./whoToAsk.js').WhoToAsk} WhoToAsk */
 /** @typedef {import('./render.js').RenderableResult} RenderableResult */
 /** @typedef {import('./render.js').RenderedAnswer} RenderedAnswer */
+/** @typedef {import('./render.js').RenderRole} RenderRole */
 
 export { ANSWER_STATUSES, answerMetaSchema, CONFIDENCE_LEVELS, parseAnswerMeta } from './meta.js';
 export {

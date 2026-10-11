@@ -22,6 +22,7 @@ describe('parseAskArguments', () => {
     expect(parseAskArguments(['How do refunds work?'])).toEqual({
       question: 'How do refunds work?',
       role: undefined,
+      json: false,
     });
   });
 
@@ -31,13 +32,18 @@ describe('parseAskArguments', () => {
     [['--role=product_owner', 'Is it built?']],
     [['-r', 'product_owner', 'Is it built?']],
   ])('reads the role and question from %j', (argv) => {
-    expect(parseAskArguments(argv)).toEqual({ question: 'Is it built?', role: 'product_owner' });
+    expect(parseAskArguments(argv)).toEqual({
+      question: 'Is it built?',
+      role: 'product_owner',
+      json: false,
+    });
   });
 
   it('joins the words of an unquoted question', () => {
     expect(parseAskArguments(['--role', 'qa', 'Is', 'it', 'built?'])).toEqual({
       question: 'Is it built?',
       role: 'qa',
+      json: false,
     });
   });
 
@@ -46,7 +52,20 @@ describe('parseAskArguments', () => {
     [['--role', 'qa'], 'qa'],
     [['   '], undefined],
   ])('gives an empty question for %j', (argv, role) => {
-    expect(parseAskArguments(argv)).toEqual({ question: '', role });
+    expect(parseAskArguments(argv)).toEqual({ question: '', role, json: false });
+  });
+
+  it.each([
+    [['--json', 'Is it built?']],
+    [['Is it built?', '--json']],
+    [['--role', 'qa', '--json', 'Is it built?']],
+  ])('reads --json from %j', (argv) => {
+    expect(parseAskArguments(argv).json).toBe(true);
+    expect(parseAskArguments(argv).question).toBe('Is it built?');
+  });
+
+  it('does not ask for JSON unless told to', () => {
+    expect(parseAskArguments(['Is it built?']).json).toBe(false);
   });
 
   it('trims the question', () => {
@@ -67,5 +86,6 @@ describe('parseAskArguments', () => {
   it('uses developer as the default role, and the usage mentions --role', () => {
     expect(DEFAULT_ROLE_ID).toBe('developer');
     expect(ASK_USAGE).toContain('--role');
+    expect(ASK_USAGE).toContain('--json');
   });
 });

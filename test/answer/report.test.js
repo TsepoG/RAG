@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { describeInvalidKeys, formatReport } from '../../src/answer/report.js';
+import { describeInvalidKeys, describeStyle, formatReport } from '../../src/answer/report.js';
 import { friendlyLabel } from '../../src/citations/index.js';
 import { COMMIT_SHA, confluenceSource, githubSource } from '../helpers/sources.js';
 
@@ -79,6 +79,8 @@ describe('formatReport sections', () => {
 
     expect(text).toBe(
       [
+        '[high] Confirmed by the sources below.',
+        '',
         'Refunds take 30 days [C1].',
         '',
         'Sources',
@@ -221,6 +223,250 @@ describe('formatReport sources for business-facing roles', () => {
     });
 
     expect(text).toContain('[G1] src/refunds/refund_policy.ts —');
+  });
+});
+
+describe('formatReport confidence', () => {
+  it('shows the level in brackets before the banner, and no reason for a confident answer', () => {
+    const text = report(result({ confidenceReason: 'Stated in the page.' }));
+
+    expect(text.startsWith('[high] Confirmed by the sources below.\n\n')).toBe(true);
+    expect(text).not.toContain('Why:');
+  });
+
+  it.each([
+    ['medium', 'Mostly confirmed.'],
+    ['low', "I'm not sure."],
+  ])('shows the banner and the reason for %s confidence', (confidence, start) => {
+    const text = report(
+      result({
+        confidence: /** @type {'medium'} */ (confidence),
+        confidenceReason: 'A cited page is old.',
+      }),
+    );
+
+    expect(text).toContain(`[${confidence}] ${start}`);
+    expect(text).toContain('\nWhy: A cited page is old.\n');
+  });
+
+  it("uses the role's own banner words", () => {
+    const role = { ...OWNER, phrases: { high: 'Confirmed — see the sources below.' } };
+
+    expect(report(result(), role).startsWith('[high] Confirmed — see the sources below.\n')).toBe(
+      true,
+    );
+  });
+
+  it('lists what could not be confirmed under its heading, for a medium or low answer', () => {
+    const text = report(
+      result({ confidence: 'medium', gaps: ['No page covers partial refunds', 'Limits unknown'] }),
+    );
+
+    expect(text).toContain(
+      "\n\nWhat I couldn't confirm\n  - No page covers partial refunds\n  - Limits unknown\n\nSources",
+    );
+  });
+
+  it('leaves out the gaps heading for a confident answer or when there are none', () => {
+    expect(report(result({ gaps: ['x'] }))).not.toContain("couldn't confirm");
+    expect(report(result({ confidence: 'low' }))).not.toContain("couldn't confirm");
+  });
+
+  it('writes each disagreement as the application worded it, before the sources', () => {
+    const text = report(
+      result({
+        confidence: 'low',
+        conflicts: [
+          {
+            topic: 'Window',
+            docSays: '30 days',
+            docKeys: ['C1'],
+            codeSays: '14 days',
+            codeKeys: ['G1'],
+          },
+        ],
+      }),
+    );
+
+    expect(text).toContain(
+      'Window: the documentation says 30 days [C1]; the code does 14 days [G1]. The code reflects current behaviour.\n\nSources',
+    );
+  });
+
+  it('suggests who might know, by name, for an unsure answer', () => {
+    const text = report(
+      result({ confidence: 'low', whoToAsk: [{ name: '@acme/payments', sourceKeys: ['G1'] }] }),
+    );
+
+    expect(text).toContain('\n\nWho might know\n  - @acme/payments\n\nTools used:');
+  });
+
+  it("marks a source that is the assistant's reading, and a folder listing with its commit", () => {
+    const text = report(
+      result({
+        sources: [
+          {
+            ...cited(githubSource({ kind: 'directory', path: 'src', title: 'src/' }), 'G1'),
+            inferred: true,
+          },
+        ],
+      }),
+    );
+
+    expect(text).toContain(`(folder listing, commit ${SHORT_SHA}, my reading of it)`);
+  });
+
+  it("marks a Confluence page that is the assistant's reading", () => {
+    const text = report(
+      result({ sources: [{ ...cited(confluenceSource(), 'C1'), inferred: true }] }),
+    );
+
+    expect(text).toContain('(v3, my reading of it)');
+  });
+
+  it('says a folder listing is not pinned when it is not', () => {
+    const text = report(
+      result({
+        sources: [
+          cited(
+            githubSource({ kind: 'directory', path: 'src', title: 'src/', pinned: false }),
+            'G1',
+          ),
+        ],
+      }),
+    );
+
+    expect(text).toContain('(folder listing)');
+  });
+});
+
+describe('formatReport when nothing was found', () => {
+  const notFound = () =>
+    result({
+      status: 'not_found',
+      confidence: null,
+      answer: "I couldn't find this in Confluence or the codebase.",
+      alsoConsulted: [
+        { key: 'C1', type: 'confluence', title: 'Refund Policy', url: 'https://x/policy' },
+        { type: 'confluence', title: 'Old page', url: 'https://x/old' },
+      ],
+      whoToAsk: [{ name: '@acme/payments', sourceKeys: ['G1'] }],
+    });
+
+  it('shows the banner, the closest pages and who to ask, in that order', () => {
+    expect(report(notFound())).toBe(
+      [
+        "I couldn't find this in Confluence or the codebase.",
+        '',
+        'Closest pages I checked',
+        '  - [C1] Refund Policy — https://x/policy',
+        '  - Old page — https://x/old',
+        '',
+        'Who might know',
+        '  - @acme/payments',
+        '',
+        'Tools used:',
+        '  (none)',
+        '',
+        'Role: Developer | Model: gpt-x | 18.2s',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  it('shows no sources section and no level', () => {
+    const text = report(notFound());
+
+    expect(text).not.toContain('Sources');
+    expect(text).not.toContain('[high]');
+    expect(text).not.toContain('Also consulted');
+  });
+
+  it("uses the role's words", () => {
+    const role = { ...OWNER, phrases: { notFound: 'Nothing about this in our documentation.' } };
+
+    expect(report(notFound(), role).startsWith('Nothing about this in our documentation.\n')).toBe(
+      true,
+    );
+  });
+});
+
+describe('formatReport other statuses', () => {
+  it('shows only the banner and the footer for an out-of-scope question', () => {
+    const text = report(
+      result({
+        status: 'out_of_scope',
+        confidence: null,
+        answer: "I don't have that information.",
+        alsoConsulted: [{ type: 'confluence', title: 'Page', url: 'https://x/p' }],
+      }),
+    );
+
+    expect(text).toContain(
+      "I can only answer from the team's Confluence pages and code.\n\nTools used:",
+    );
+    expect(text).not.toContain('Sources');
+    expect(text).not.toContain('Also consulted');
+    expect(text).not.toContain('Closest pages');
+  });
+
+  it('prints only the clarifying question, with no sources and no tools', () => {
+    const text = report(
+      result({
+        status: 'clarify',
+        confidence: null,
+        answer: 'Which refunds do you mean?',
+        clarifyingQuestion: 'Which refunds do you mean?',
+        toolCalls: [{ server: 's', tool: 't', summary: '', durationMs: 1, success: true }],
+      }),
+    );
+
+    expect(text).toBe(
+      ['Which refunds do you mean?', '', 'Role: Developer | Model: gpt-x | 18.2s', ''].join('\n'),
+    );
+  });
+});
+
+describe('describeStyle', () => {
+  it('says nothing when the answer already suited the role', () => {
+    expect(describeStyle(result(), OWNER)).toEqual([]);
+  });
+
+  it('says the answer was rewritten', () => {
+    expect(describeStyle(result({ rewritten: true }), OWNER)).toEqual([
+      'Rewrote the answer to suit a Product Owner.',
+    ]);
+  });
+
+  it('says a rewrite was not used, and why', () => {
+    expect(
+      describeStyle(
+        result({
+          rewriteRejected: true,
+          rewriteRejectedReason: 'citations',
+          styleViolations: ['it contains a code block'],
+        }),
+        OWNER,
+      ),
+    ).toEqual([
+      'Kept the first answer: the rewrite was not used (citations).',
+      'The answer still does not suit a Product Owner: it contains a code block.',
+    ]);
+  });
+
+  it('lists what still does not suit the role, when the rewrite did not fix it', () => {
+    expect(
+      describeStyle(
+        result({
+          rewritten: true,
+          styleViolations: ['it uses the word "endpoint"', 'it contains a code block'],
+        }),
+        OWNER,
+      ),
+    ).toEqual([
+      'Rewrote the answer to suit a Product Owner.',
+      'The answer still does not suit a Product Owner: it uses the word "endpoint"; it contains a code block.',
+    ]);
   });
 });
 
