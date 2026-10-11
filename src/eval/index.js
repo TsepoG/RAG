@@ -33,6 +33,12 @@ export {
   VERDICTS,
 } from './review.js';
 export { buildCalibration, LEVELS, MIN_SAMPLE } from './calibration.js';
-export { FEEDBACK_PATH, parseFeedbackLines, summariseFeedback } from './feedback.js';
+export {
+  FEEDBACK_PATH,
+  feedbackToDraftCases,
+  formatDraftCases,
+  parseFeedbackLines,
+  summariseFeedback,
+} from './feedback.js';
 export { buildReport, diffRunInfo } from './report.js';
 export { evaluateTargets } from './targets.js';

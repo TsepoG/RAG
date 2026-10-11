@@ -1,4 +1,5 @@
 // @ts-check
+import { stringify } from 'yaml';
 import { z } from 'zod';
 
 /** Where the web page writes feedback, relative to the working directory. */
@@ -116,4 +117,127 @@ export function summariseFeedback(records) {
     ),
     comments: records.filter(({ comment }) => comment !== null && comment !== '').length,
   };
+}
+
+/** The longest slug taken from a question, so ids stay readable. */
+const SLUG_LENGTH = 40;
+
+/** A line at the top of the drafts file, saying what to do with it. */
+const DRAFT_HEADER = [
+  '# Drafts made from thumbs-down feedback. Nothing here has been checked.',
+  '# For each case: write the expected status, the sources it should cite and a short reference',
+  '# answer, then delete "draft: true" and copy it into eval/questions.yaml.',
+  '',
+].join('\n');
+
+/**
+ * Makes a short readable piece of an id from a question.
+ * @param {string} question - The question.
+ * @returns {string} Lower-case words joined by dashes, at most 40 characters; `question` when it has none.
+ */
+function slugOf(question) {
+  const words = question
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word !== '');
+  const slug = words.join('-').slice(0, SLUG_LENGTH).replace(/-$/, '');
+  return slug === '' ? 'question' : slug;
+}
+
+/**
+ * Adds a number to an id until it is one that is not taken.
+ * @param {string} base - The id to start from.
+ * @param {ReadonlySet<string>} taken - Ids already in use.
+ * @returns {string} `base`, or `base-2`, `base-3` and so on.
+ */
+function uniqueId(base, taken) {
+  let id = base;
+  let number = 1;
+  while (taken.has(id)) {
+    number += 1;
+    id = `${base}-${number}`;
+  }
+  return id;
+}
+
+/**
+ * The key two pieces of feedback share when they are about the same question for the same role.
+ * @param {{ role: string, question: string }} one - The role and the question.
+ * @returns {string} The key.
+ */
+function questionKey({ role, question }) {
+  return `${role}|${question.trim().split(/\s+/).join(' ').toLowerCase()}`;
+}
+
+/**
+ * Describes what the assistant did and what the person said, for the person writing the reference.
+ * @param {FeedbackRecord} one - The thumbs-down feedback.
+ * @returns {string} A reference that says plainly it still has to be written.
+ */
+function draftReference(one) {
+  const given =
+    one.confidence === null ? one.status : `${one.status}, ${one.confidence} confidence`;
+  const parts = [
+    'TO WRITE: what a correct answer says.',
+    `The assistant gave: ${given}; it cited ${one.citedKeys.length === 0 ? 'nothing' : one.citedKeys.join(', ')}.`,
+  ];
+  if (one.comment !== null && one.comment !== '') {
+    parts.push(`The person said: ${one.comment}`);
+  }
+  if (one.wrongSourceKey !== null) {
+    parts.push(`They marked ${one.wrongSourceKey} as a wrong source.`);
+  }
+  return parts.join(' ');
+}
+
+/**
+ * What turning feedback into drafts produced.
+ * @typedef {object} DraftResult
+ * @property {Array<Record<string, unknown>>} cases - The draft cases, each marked `draft: true`.
+ * @property {number} repeats - Thumbs-down on a question that already has a draft or is in the set.
+ */
+
+/**
+ * Turns each thumbs-down into a draft eval case for the owner to check. The expected status is a
+ * placeholder (`answered`), because the feedback says the answer was bad and not what it should
+ * have been. A question asked more than once, or already in the eval set, gets one case only.
+ * @param {ReadonlyArray<FeedbackRecord>} records - All the feedback.
+ * @param {ReadonlyArray<{ id: string, role: string, question: string }>} [existing] - Cases already
+ *   in the eval set, so the same question is not drafted again.
+ * @returns {DraftResult} The drafts, and how many repeats were skipped.
+ */
+export function feedbackToDraftCases(records, existing = []) {
+  const seen = new Set(existing.map(questionKey));
+  const ids = new Set(existing.map(({ id }) => id));
+  /** @type {Array<Record<string, unknown>>} */
+  const cases = [];
+  let repeats = 0;
+  for (const one of records.filter(({ rating }) => rating === 'down')) {
+    if (seen.has(questionKey(one))) {
+      repeats += 1;
+      continue;
+    }
+    seen.add(questionKey(one));
+    const base = `fb-${one.role.replaceAll('_', '-')}-${slugOf(one.question)}`;
+    const id = uniqueId(base, ids);
+    ids.add(id);
+    cases.push({
+      id,
+      role: one.role,
+      question: one.question,
+      tags: [],
+      draft: true,
+      expect: { status: 'answered', reference: draftReference(one) },
+    });
+  }
+  return { cases, repeats };
+}
+
+/**
+ * Writes draft cases as the YAML file the owner will edit.
+ * @param {ReadonlyArray<Record<string, unknown>>} cases - The drafts.
+ * @returns {string} The file's text, starting with a note on what to do with it.
+ */
+export function formatDraftCases(cases) {
+  return `${DRAFT_HEADER}${stringify({ cases }, { lineWidth: 0 })}`;
 }
