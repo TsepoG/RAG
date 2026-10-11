@@ -155,22 +155,22 @@ src/
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] Five role files exist, validate at startup, and `npm run roles` lists them.
-- [ ] The same real question asked with `--role developer` and
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+- [x] Five role files exist, validate at startup, and `npm run roles` lists them.
+- [x] The same real question asked with `--role developer` and
       `--role product_owner` gives answers that both draw on Confluence and
       GitHub, agree on the facts, and differ in depth and wording (code detail
       vs plain business language). Paste both in the PR.
-- [ ] Every key in a real answer resolves to a numbered source with a working
+- [x] Every key in a real answer resolves to a numbered source with a working
       link; GitHub file links contain a 40-character commit SHA.
-- [ ] A page from outside `CONFLUENCE_SPACE_KEYS` never appears in sources and
+- [x] A page from outside `CONFLUENCE_SPACE_KEYS` never appears in sources and
       its content never reaches the model (unit test; plus a live attempt if
       the owner has such a page).
-- [ ] Invented keys are stripped and reported (unit test).
-- [ ] Committed fixtures contain no real content from the owner's
+- [x] Invented keys are stripped and reported (unit test).
+- [x] Committed fixtures contain no real content from the owner's
       Confluence or code (owner confirms in the PR).
-- [ ] CI green; SonarQube quality gate passes with zero new issues.
-- [ ] README: roles, `--role`, how citations work, `roles`, `mcp:sample`,
+- [x] CI green; SonarQube quality gate passes with zero new issues.
+- [x] README: roles, `--role`, how citations work, `roles`, `mcp:sample`,
       `fixtures:sanitise`.
 
 ## Git rules for this phase

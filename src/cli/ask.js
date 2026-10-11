@@ -4,6 +4,7 @@ import {
   askQuestion,
   DEFAULT_ROLE_ID,
   describeInvalidKeys,
+  describeStyle,
   formatReport,
   parseAskArguments,
 } from '../answer/index.js';
@@ -13,12 +14,13 @@ import { describeError, EXIT_FAILURE, EXIT_TIMEOUT, loadSettings, withCopilot } 
 
 /**
  * Asks the question given on the command line, for the chosen role, and prints the checked
- * answer with its sources. The answer is printed once it has been checked, not as it streams,
- * so what is shown is exactly what was validated.
+ * answer with its confidence and sources, or with `--json` the whole result. The answer is printed
+ * once it has been checked, not as it streams, so what is shown is exactly what was validated. Every
+ * status, including "not found", is a correct outcome and exits with 0.
  */
 async function main() {
   try {
-    const { question, role: requestedRole } = parseAskArguments(process.argv.slice(2));
+    const { question, role: requestedRole, json } = parseAskArguments(process.argv.slice(2));
     if (question === '') {
       process.stderr.write(`${ASK_USAGE}\n`);
       process.exitCode = EXIT_FAILURE;
@@ -38,6 +40,11 @@ async function main() {
     if (removed !== undefined) {
       process.stderr.write(`${removed}\n`);
     }
+    if (json) {
+      process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+      return;
+    }
+    describeStyle(result, role).forEach((note) => process.stderr.write(`${note}\n`));
     process.stdout.write(formatReport({ result, role }));
   } catch (error) {
     if (!(error instanceof AppError)) {

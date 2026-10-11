@@ -9,6 +9,7 @@ describe('answer public entry point', () => {
       'DEFAULT_ROLE_ID',
       'askQuestion',
       'describeInvalidKeys',
+      'describeStyle',
       'formatReport',
       'parseAskArguments',
       'summarizeArguments',

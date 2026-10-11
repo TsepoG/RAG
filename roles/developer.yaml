@@ -24,4 +24,8 @@ examples:
       Eligibility is checked in the refund policy's isEligible function. It allows orders under 30
       days old that have not already been refunded, and flags amounts over 5000 for approval
       [G1]. This matches the rules on the Refund Policy page [C1].
-version: 1
+phrases:
+  medium: 'Mostly confirmed. Citations marked * are my reading of the code, or a source is stale or incomplete; details below.'
+  low: 'Low confidence: the sources are thin, partial or disagree. Gaps below.'
+  notFound: 'No matching documentation or implementation found in the configured spaces and repositories.'
+version: 2

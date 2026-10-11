@@ -135,6 +135,27 @@ describe('roleSchema', () => {
     expect(problems(role({ bannedTerm: ['x'] })).length).toBeGreaterThan(0);
   });
 
+  it('accepts a role with no phrases, with some, and with all five', () => {
+    const all = { high: 'a', medium: 'b', low: 'c', notFound: 'd', outOfScope: 'e' };
+
+    expect(problems(role())).toEqual([]);
+    expect(problems(role({ phrases: { low: 'Not sure.' } }))).toEqual([]);
+    expect(problems(role({ phrases: all }))).toEqual([]);
+  });
+
+  it.each([
+    ['an unknown phrase', { phrases: { loud: 'x' } }, 'phrases'],
+    ['a blank phrase', { phrases: { low: '  ' } }, 'phrases.low'],
+    ['a phrase that is not text', { phrases: { low: 3 } }, 'phrases.low'],
+    ['a phrase over several lines', { phrases: { low: 'a\nb' } }, 'phrases.low'],
+    ['a phrase that is too long', { phrases: { low: 'x'.repeat(201) } }, 'phrases.low'],
+    ['phrases that are a list', { phrases: ['x'] }, 'phrases'],
+  ])('rejects %s', (_name, changes, field) => {
+    const [first] = problems(role(changes));
+
+    expect(first.startsWith(`${field}: `)).toBe(true);
+  });
+
   it('reports a required field that is missing as required', () => {
     expect(problems(role({ displayName: undefined }))).toEqual(['displayName: is required']);
   });

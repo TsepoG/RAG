@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../../src/logger/index.js';
 import { createToolHooks } from '../../src/mcp/hooks.js';
+import { createToolGate } from '../../src/mcp/toolGate.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
 /** @typedef {import('../../src/mcp/hooks.js').ToolHooks} ToolHooks */
@@ -704,5 +705,109 @@ describe('onPreToolUse sets the cloudId on Confluence calls', () => {
     expect(lines().find((line) => line.msg === 'tool call completed')).toMatchObject({
       durationMs: 40,
     });
+  });
+});
+
+describe('onPreToolUse refuses every call while the gate is locked', () => {
+  /** @type {Array<[string, string, unknown]>} */
+  const calls = [
+    [
+      'an allow-listed GitHub tool',
+      'github_repos-get_file_contents',
+      { owner: 'acme', repo: 'app' },
+    ],
+    ['a Confluence search', 'atlassian-searchConfluence', { cql: 'space = ENG AND text ~ "x"' }],
+    ['a Confluence page', 'atlassian-getConfluenceContent', { content_url: PAGE_IN_ENG }],
+    ['a code search', 'github_repos-search_code', { query: 'repo:acme/app refund' }],
+    [
+      'a tool that is not allow-listed',
+      'github_repos-create_issue',
+      { owner: 'acme', repo: 'app' },
+    ],
+    [
+      'a call outside the allowed repositories',
+      'github_repos-get_file_contents',
+      { owner: 'evil', repo: 'x' },
+    ],
+    ['a call with no arguments', 'github_repos-list_commits', undefined],
+  ];
+
+  it.each(calls)('denies %s, with the reason and a code in the log', (_name, tool, args) => {
+    const gate = createToolGate();
+    const { hooks, lines } = setup({ gate });
+    gate.lock();
+
+    expect(pre(hooks, tool, args)).toEqual({
+      permissionDecision: 'deny',
+      permissionDecisionReason: 'Tools are not available while rewriting.',
+    });
+    expect(lines().at(-1)).toMatchObject({ reason: 'tools-locked', tool });
+  });
+
+  it('allows the same calls until the gate is locked, then refuses them', () => {
+    const gate = createToolGate();
+    const { hooks } = setup({ gate });
+    const call = /** @type {[string, unknown]} */ ([
+      'github_repos-get_file_contents',
+      { owner: 'acme', repo: 'app' },
+    ]);
+
+    const before = pre(hooks, ...call);
+    gate.lock();
+    const after = pre(hooks, ...call);
+
+    expect([before.permissionDecision, after.permissionDecision]).toEqual(['allow', 'deny']);
+  });
+
+  it('does not rewrite the arguments of a call it refuses', () => {
+    const gate = createToolGate();
+    const { hooks } = setup({ gate, cloudId: '82b58a78-f056-49aa-a740-c3c946f68f8b' });
+    gate.lock();
+
+    const decision = pre(hooks, 'atlassian-searchConfluence', {
+      cql: 'space = ENG AND text ~ "x"',
+    });
+
+    expect(decision).not.toHaveProperty('modifiedArgs');
+  });
+
+  it('refuses even when the call limit has not been reached, and does not count the refusal', () => {
+    const gate = createToolGate();
+    const { hooks } = setup({ gate, maxToolCalls: 1 });
+    gate.lock();
+
+    [1, 2, 3].forEach(() =>
+      pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' }),
+    );
+
+    expect(
+      pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' })
+        .permissionDecisionReason,
+    ).toBe('Tools are not available while rewriting.');
+  });
+
+  it('denies, rather than allows, when the gate itself fails', () => {
+    const broken = {
+      lock: () => undefined,
+      isLocked: () => {
+        throw new Error('gate broke');
+      },
+    };
+    const { hooks } = setup({ gate: broken });
+
+    expect(
+      pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' }),
+    ).toMatchObject({
+      permissionDecision: 'deny',
+    });
+  });
+
+  it('is open by default, and each set of hooks has its own gate', () => {
+    const { hooks } = setup();
+
+    expect(
+      pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' })
+        .permissionDecision,
+    ).toBe('allow');
   });
 });

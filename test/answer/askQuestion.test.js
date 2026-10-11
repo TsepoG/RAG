@@ -10,6 +10,24 @@ import { TEST_ROLE } from '../helpers/role.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
 const WORKING_DIRECTORY = 'sandbox/work';
+const FENCE = '```';
+
+/**
+ * Writes a reply that asks one clarifying question, with the report the model must end with. It is
+ * the simplest reply that needs no sources, so tests of the plumbing can read the answer back.
+ * @param {string} question - The question.
+ * @returns {string} The reply.
+ */
+function clarifyReply(question) {
+  const meta = {
+    status: 'clarify',
+    confidenceReason: 'Two things fit.',
+    gaps: [],
+    conflicts: [],
+    clarifyingQuestion: question,
+  };
+  return question + '\n\n' + FENCE + 'answer-meta\n' + JSON.stringify(meta) + '\n' + FENCE;
+}
 
 /**
  * A fake session that finishes at once, as a question that needs no tools would.
@@ -71,7 +89,7 @@ describe('askQuestion answer', () => {
     const session = createFakeSession({
       script(emit) {
         emit('assistant.usage', { model: 'gpt-x' });
-        emit('assistant.message', { content: 'The retry is in src/retry.js.' });
+        emit('assistant.message', { content: clarifyReply('Which service do you mean?') });
         emit('session.idle', {});
       },
     });
@@ -87,12 +105,25 @@ describe('askQuestion answer', () => {
 
     expect(session.sent).toEqual([{ prompt: 'Where is the retry logic?' }]);
     expect(result).toEqual({
-      answer: 'The retry is in src/retry.js.',
+      status: 'clarify',
+      confidence: null,
+      confidenceReason: 'Two things fit.',
+      capsApplied: [],
+      answer: 'Which service do you mean?',
+      clarifyingQuestion: 'Which service do you mean?',
       role: 'tester',
       sources: [],
       alsoConsulted: [],
       invalidKeys: [],
       uncitedSourceKeys: [],
+      inferredKeys: [],
+      gaps: [],
+      conflicts: [],
+      uncitedSentences: [],
+      styleViolations: [],
+      rewritten: false,
+      rewriteRejected: false,
+      whoToAsk: [],
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,
@@ -122,8 +153,9 @@ describe('askQuestion answer', () => {
   it('falls back to the streamed text when no full message arrives', async () => {
     const session = createFakeSession({
       script(emit) {
-        emit('assistant.message_delta', { deltaContent: 'Streamed ' });
-        emit('assistant.message_delta', { deltaContent: 'only' });
+        const reply = clarifyReply('Streamed only?');
+        emit('assistant.message_delta', { deltaContent: reply.slice(0, 10) });
+        emit('assistant.message_delta', { deltaContent: reply.slice(10) });
         emit('session.idle', {});
       },
     });
@@ -131,7 +163,7 @@ describe('askQuestion answer', () => {
 
     const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
-    expect(answer).toBe('Streamed only');
+    expect(answer).toBe('Streamed only?');
   });
 
   it('uses the last full message as the answer, not the text from earlier tool-calling turns', async () => {
@@ -140,7 +172,7 @@ describe('askQuestion answer', () => {
         emit('assistant.message_delta', { deltaContent: 'Let me search. ' });
         emit('assistant.message', { content: 'Let me search.' });
         emit('assistant.message_delta', { deltaContent: 'Found it.' });
-        emit('assistant.message', { content: 'Found it.' });
+        emit('assistant.message', { content: clarifyReply('Found it?') });
         emit('assistant.message', { content: '   ' });
         emit('session.idle', {});
       },
@@ -149,7 +181,7 @@ describe('askQuestion answer', () => {
 
     const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
-    expect(answer).toBe('Found it.');
+    expect(answer).toBe('Found it?');
   });
 
   it.each([
@@ -493,7 +525,7 @@ describe('askQuestion cleanup', () => {
   it('logs and carries on when disconnecting fails, so the answer is still returned', async () => {
     const session = createFakeSession({
       script: (emit) => {
-        emit('assistant.message', { content: 'answer' });
+        emit('assistant.message', { content: clarifyReply('answer?') });
         emit('session.idle', {});
       },
       disconnectError: new Error('already closed'),
@@ -502,7 +534,7 @@ describe('askQuestion cleanup', () => {
 
     const { answer } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
 
-    expect(answer).toBe('answer');
+    expect(answer).toBe('answer?');
     expect(lines()).toContainEqual(
       expect.objectContaining({ level: 'warn', msg: 'could not disconnect the session' }),
     );

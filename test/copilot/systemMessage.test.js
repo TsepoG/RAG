@@ -5,6 +5,7 @@ import {
   buildRoleBlock,
   buildSystemMessage,
 } from '../../src/copilot/systemMessage.js';
+import { answerMetaSchema } from '../../src/honesty/index.js';
 import { loadRoles } from '../../src/roles/index.js';
 import { makeRole, TEST_ROLE } from '../helpers/role.js';
 
@@ -14,6 +15,7 @@ const SCOPE = {
   siteUrl: 'https://acme.atlassian.net',
 };
 const SEPARATOR = '\n\n';
+const FENCE = '```';
 
 describe('buildBaseMessage', () => {
   const base = buildBaseMessage(SCOPE);
@@ -96,9 +98,9 @@ describe('buildBaseMessage', () => {
     expect(base).toContain(fragment);
   });
 
-  it('uses no markup other than the source tag it explains', () => {
+  it('uses no markup other than the source tag it explains and the one answer-meta example', () => {
     expect(base.replaceAll('<source key="...">', '')).not.toContain('<');
-    expect(base).not.toContain('```');
+    expect(base.split(FENCE)).toHaveLength(3);
   });
 
   it('is the same every time for the same scope', () => {
@@ -116,6 +118,103 @@ describe('buildBaseMessage', () => {
     expect(other).toContain('other/repo');
     expect(other).not.toContain('ENG');
     expect(other).not.toContain('acme/app');
+  });
+});
+
+describe('buildBaseMessage honesty rules', () => {
+  const base = buildBaseMessage(SCOPE);
+
+  it.each([
+    'Never sound more certain than your sources allow.',
+    'do not guess or fill gaps from general knowledge',
+    'Never invent file names, page titles, function names, numbers or dates.',
+    'Express uncertainty in the words of this audience, but never leave it out.',
+    'it must not drop the doubt to sound simpler',
+  ])('gives the honesty rule %j', (fragment) => {
+    expect(base).toContain(fragment);
+  });
+
+  it.each([
+    'starts with "Based on the code, it looks like"',
+    'marks its citation with an asterisk inside the brackets, such as [G1*]',
+    'Anything you conclude from a file or folder name alone is an interpretation: cite it with an asterisk.',
+  ])('gives the inferred-marker rule %j', (fragment) => {
+    expect(base).toContain(fragment);
+  });
+
+  it.each([
+    'Ask one short clarifying question instead of answering only when the question fits two or more different things',
+    'Do not ask when one reading is clearly meant. Never ask more than one question.',
+    'for example two services that both handle "refunds"',
+  ])('gives the clarify rule %j', (fragment) => {
+    expect(base).toContain(fragment);
+  });
+
+  it('gives the out-of-scope rule, with the examples that belong to it', () => {
+    expect(base).toContain('future dates, opinions, predictions');
+    expect(base).toContain('Report it as out of scope.');
+  });
+
+  it('keeps a prediction or promise out of scope unless a source states that plan', () => {
+    expect(base).toContain(
+      'is out of scope unless a source states that exact plan. Do not answer it by describing how things usually work.',
+    );
+  });
+
+  it('asks for not found, not "there is no X", when a thing was simply not seen', () => {
+    expect(base).toContain('needs a source that says so.');
+    expect(base).toContain('report not_found instead of answering "there is no X"');
+    expect(base).toContain(
+      '"not_found": the sources you read do not contain what the question asks about',
+    );
+  });
+
+  it('tells the model to leave gaps and conflicts to the block, and not to settle a conflict', () => {
+    expect(base).toContain('Put them in the answer-meta block; the application shows them.');
+    expect(base).toContain('Report both sides with their keys. Do not decide between them.');
+  });
+
+  it('is part of the base, so it is the same for every role', async () => {
+    for (const role of (await loadRoles()).values()) {
+      expect(buildSystemMessage({ ...SCOPE, role })).toContain('Never sound more certain');
+    }
+  });
+});
+
+describe('buildBaseMessage answer-meta rules', () => {
+  const base = buildBaseMessage(SCOPE);
+
+  it('asks for exactly one block tagged answer-meta, at the end, never shown', () => {
+    expect(base).toContain(
+      'End every reply with exactly one fenced code block tagged answer-meta, with nothing after it:',
+    );
+    expect(base).toContain('The block is never shown to the user.');
+  });
+
+  it.each(['"answered"', '"not_found"', '"clarify"', '"out_of_scope"', '"clarifyingQuestion"'])(
+    'names the status field %s',
+    (fragment) => {
+      expect(base).toContain(fragment);
+    },
+  );
+
+  it.each([
+    '"high": every sentence is stated directly in a source you cite',
+    '"medium": part is your interpretation, rests on a single source, or a cited page may be out of date',
+    '"low": the sources are thin, partial or disagree',
+  ])('defines the confidence level %j', (fragment) => {
+    expect(base).toContain(fragment);
+  });
+
+  it('says the application may lower the confidence', () => {
+    expect(base).toContain('The application checks this block and may lower your confidence.');
+  });
+
+  it('shows an example block that the parser accepts', () => {
+    const [, example] = base.split(FENCE);
+    const body = example.replace('answer-meta', '').trim();
+
+    expect(answerMetaSchema.safeParse(JSON.parse(body)).success).toBe(true);
   });
 });
 

@@ -46,6 +46,8 @@ describe('validateCitations valid keys', () => {
       citedKeys: [],
       invalidKeys: [],
       uncitedSourceKeys: ['C1', 'C2', 'G1', 'G2'],
+      inferredKeys: [],
+      statedKeys: [],
     });
   });
 
@@ -132,6 +134,69 @@ describe('validateCitations combined brackets', () => {
   it('writes a repeated key inside one bracket once', () => {
     expect(validateCitations('Rule [C1, C1].', registry()).answer).toBe('Rule [C1].');
   });
+});
+
+describe('validateCitations inferred markers', () => {
+  it('keeps the asterisk in the answer and reports the key as inferred', () => {
+    const answer = 'Based on the code, it looks like refunds are capped [G1*].';
+
+    expect(validateCitations(answer, registry())).toMatchObject({
+      answer,
+      citedKeys: ['G1'],
+      inferredKeys: ['G1'],
+      statedKeys: [],
+      invalidKeys: [],
+    });
+  });
+
+  it('writes a combined bracket with an asterisk as separate brackets', () => {
+    const result = validateCitations('Rule [G1*, C2] and [C1,G2*].', registry());
+
+    expect(result.answer).toBe('Rule [G1*][C2] and [C1][G2*].');
+    expect(result.inferredKeys).toEqual(['G1', 'G2']);
+    expect(result.statedKeys).toEqual(['C2', 'C1']);
+  });
+
+  it('strips an invented key with an asterisk and reports it without the asterisk', () => {
+    const result = validateCitations('Maybe [G9*] and [G1*, G9*].', registry());
+
+    expect(result).toMatchObject({
+      answer: 'Maybe and [G1*].',
+      invalidKeys: ['G9'],
+      inferredKeys: ['G1'],
+    });
+  });
+
+  it('reports a key used both with and without an asterisk as both', () => {
+    const result = validateCitations('Said [G1]. Read as [G1*].', registry());
+
+    expect(result).toMatchObject({ citedKeys: ['G1'], inferredKeys: ['G1'], statedKeys: ['G1'] });
+  });
+
+  it('counts a key cited with an asterisk as cited, not as uncited', () => {
+    expect(validateCitations('x [C1*]', registry()).uncitedSourceKeys).toEqual(['C2', 'G1', 'G2']);
+  });
+
+  it('writes a repeated asterisk key inside one bracket once, and keeps both forms', () => {
+    expect(validateCitations('A [C1*, C1*]. B [C1, C1*].', registry()).answer).toBe(
+      'A [C1*]. B [C1][C1*].',
+    );
+  });
+
+  it('allows a space before the asterisk', () => {
+    expect(validateCitations('A [C1 *].', registry()).answer).toBe('A [C1*].');
+  });
+
+  it.each(['A lone [*] star.', 'Two stars [C1**] stay.', 'Star first [*C1] stays.'])(
+    'leaves %j alone',
+    (answer) => {
+      expect(validateCitations(answer, registry())).toMatchObject({
+        answer,
+        citedKeys: [],
+        invalidKeys: [],
+      });
+    },
+  );
 });
 
 describe('validateCitations other brackets', () => {

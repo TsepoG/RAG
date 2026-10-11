@@ -29,6 +29,22 @@ const example = z
   .object({ question: text, answer: text }, { error: 'must have a question and an answer' })
   .strict();
 
+/** The banners a role may word for itself; any it leaves out use the application's default. */
+export const PHRASE_KEYS = Object.freeze(
+  /** @type {const} */ (['high', 'medium', 'low', 'notFound', 'outOfScope']),
+);
+const MAX_PHRASE_LENGTH = 200;
+
+const phrase = text
+  .max(MAX_PHRASE_LENGTH, `must be at most ${MAX_PHRASE_LENGTH} characters`)
+  .refine((value) => !value.includes('\n'), 'must be a single line');
+
+const phrases = z
+  .object(Object.fromEntries(PHRASE_KEYS.map((key) => [key, phrase.optional()])), {
+    error: 'must be a set of phrases',
+  })
+  .strict();
+
 /**
  * Schema for one role file. Unknown fields are rejected so a misspelt field is caught instead of
  * silently ignored.
@@ -57,6 +73,7 @@ export const roleSchema = z
       .array(example, { error: 'must be a list of question and answer pairs' })
       .min(1, 'must have at least one example')
       .max(MAX_EXAMPLES, `must have at most ${MAX_EXAMPLES} examples`),
+    phrases: phrases.optional(),
     version: z
       .number({ error: 'must be a whole number from 1' })
       .int('must be a whole number from 1')

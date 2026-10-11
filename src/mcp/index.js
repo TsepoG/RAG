@@ -1,4 +1,7 @@
 // @ts-check
+
+/** @typedef {import('./toolGate.js').ToolGate} ToolGate */
+
 export {
   ALLOWLIST,
   isAllowedTool,
@@ -12,4 +15,5 @@ export { collectToolReport, listServerTools, renderToolsMarkdown } from './disco
 export { createToolHooks } from './hooks.js';
 export { createPermissionHandler } from './permissions.js';
 export { checkSample, parseSampleArgs, RAW_DIRECTORY, rawSamplePath } from './sample.js';
+export { createToolGate, TOOLS_LOCKED_REASON } from './toolGate.js';
 export { ATLASSIAN_MCP_URL, buildMcpServers, GITHUB_MCP_URL, SERVER_KEYS } from './servers.js';

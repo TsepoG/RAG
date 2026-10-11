@@ -31,4 +31,10 @@ examples:
       The refund rules are agreed and delivered in the latest release [C1][G1]. The payments team
       owns them [C1]. They depend on the manager approval service being available [C1]. The main
       risk is that approval times are not yet measured.
-version: 1
+phrases:
+  high: 'Confirmed — see the sources below.'
+  medium: 'Mostly confirmed, but part of this is my best reading and is marked below.'
+  low: "I'm not sure. Here's what I found and what's still unclear."
+  notFound: "I couldn't find anything about this in our documentation or the product."
+  outOfScope: "I don't have that information. I can only answer from the team's documentation and the product as built."
+version: 2

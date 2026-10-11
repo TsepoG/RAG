@@ -1,19 +1,24 @@
 // @ts-check
 import { createCitationRegistry } from '../citations/index.js';
 import { listSecrets } from '../config/index.js';
-import { buildSessionConfig, finishesWithin } from '../copilot/index.js';
+import { buildSessionConfig } from '../copilot/index.js';
 import { AppError, AskTimeoutError, CopilotError } from '../errors/index.js';
-import { createCommitResolver } from '../github/index.js';
-import { createPermissionHandler, createToolHooks } from '../mcp/index.js';
+import { createCodeownersLookup, createCommitResolver, createGithubApi } from '../github/index.js';
+import { buildWhoToAsk } from '../honesty/index.js';
+import { createPermissionHandler, createToolGate, createToolHooks } from '../mcp/index.js';
+import { analyseReply } from './analyse.js';
+import { composeResult, wantsWhoToAsk } from './compose.js';
+import { bestEffort, createDeadline } from './deadline.js';
 import { createEventRecorder } from './events.js';
-import { assembleAnswer } from './result.js';
+import { rewriteAnswer } from './rewrite.js';
 
 /**
  * What to ask, and where to send the answer as it streams.
  * @typedef {object} AskInput
  * @property {string} question - The question.
  * @property {import('../roles/index.js').Role} role - The role the answer is written for.
- * @property {(text: string) => void} [onDelta] - Receives each piece of the answer as it arrives.
+ * @property {(text: string) => void} [onDelta] - Receives each piece of the model's reply as it
+ *   arrives. The reply includes its answer-meta block, which is not part of the final answer.
  */
 
 /**
@@ -24,76 +29,50 @@ import { assembleAnswer } from './result.js';
  * @property {import('../config/index.js').AppConfig} config - Validated config.
  * @property {import('../logger/index.js').Logger} logger - Where hooks and cleanup log.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
- * @property {typeof fetch} [fetch] - Used to look up commits; defaults to the global fetch.
+ * @property {typeof fetch} [fetch] - Used to look up commits and CODEOWNERS; defaults to the global fetch.
  */
 
 /**
- * The outcome of a question, shaped like the final event the web UI will stream.
- * @typedef {object} AskResult
- * @property {string} answer - The answer, with invented citation keys removed.
- * @property {string} role - The id of the role it was written for.
- * @property {import('./result.js').CitedSource[]} sources - The sources the answer cites, in key order.
- * @property {import('./result.js').ConsultedItem[]} alsoConsulted - Sources fetched but not cited,
- *   then search hits that were not fetched; at most ten.
- * @property {string[]} invalidKeys - Keys the answer used that were never registered.
- * @property {string[]} uncitedSourceKeys - Keys of fetched sources the answer did not cite.
- * @property {import('./toolCalls.js').ToolCallRecord[]} toolCalls - The tool calls made, in order.
- * @property {string | undefined} model - The model that answered, when Copilot reported it.
- * @property {number} durationMs - How long the whole question took.
+ * The outcome of a question: the checked answer with its status, confidence and sources, and how it
+ * was reached.
+ * @typedef {import('./compose.js').ComposedResult & {
+ *   toolCalls: import('./toolCalls.js').ToolCallRecord[],
+ *   model: string | undefined,
+ *   durationMs: number,
+ * }} AskResult
  */
 
 /** The parts of a session this function uses. */
 /** @typedef {Pick<import('@github/copilot-sdk').CopilotSession, 'on' | 'send' | 'abort' | 'disconnect'>} AskSession */
 
-/** Longest the cleanup after a question may take, so a stuck runtime cannot hang the caller. */
-const SHUTDOWN_TIMEOUT_MS = 5000;
-
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
 
 /**
- * Starts the clock for a question. When it runs out, the returned promise rejects.
- * @param {number} limitMs - The time limit in milliseconds.
- * @returns {{ promise: Promise<never>, cancel: () => void }} The deadline and a way to stop it.
+ * Logs why the model's report could not be used, or that text followed it. Only the kind of
+ * problem is logged, never the reply.
+ * @param {import('./analyse.js').Analysis} analysis - What was found in the reply.
+ * @param {Pick<import('../logger/index.js').Logger, 'warn'>} logger - Where to log.
  */
-function createDeadline(limitMs) {
-  /** @type {NodeJS.Timeout | undefined} */
-  let timer;
-  const promise = /** @type {Promise<never>} */ (
-    new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new AskTimeoutError(limitMs)), limitMs);
-      // A pending deadline must not keep the process alive at exit.
-      timer.unref();
-    })
-  );
-  return { promise, cancel: () => clearTimeout(timer) };
-}
-
-/**
- * Runs a cleanup step without letting it fail or hang the question. Cleanup trouble is logged: the
- * answer, or the error that is already on its way, matters more than a tidy shutdown.
- * @param {string} what - What is being done, for the log.
- * @param {() => Promise<unknown>} step - The step.
- * @param {Pick<import('../logger/index.js').Logger, 'warn'>} logger - Where problems are logged.
- * @returns {Promise<void>} Resolves when the step is done, failed or out of time.
- */
-async function bestEffort(what, step, logger) {
-  const attempt = step().catch((error) => {
-    logger.warn({ err: error }, `could not ${what}`);
-  });
-  if (!(await finishesWithin(attempt, SHUTDOWN_TIMEOUT_MS))) {
-    logger.warn({}, `gave up waiting to ${what}`);
+function logReportProblems({ metaError, warning }, logger) {
+  if (metaError !== undefined) {
+    logger.warn({ reason: metaError }, 'the answer-meta block was missing or invalid');
+  }
+  if (warning !== undefined) {
+    logger.warn({ reason: warning }, 'text followed the answer-meta block');
   }
 }
 
 /**
- * Sends a question to Copilot and returns the answer, the tools it used and the model. A new
- * session, with its own hooks and call limit, is used for each question and always disconnected.
+ * Sends a question to Copilot and returns the checked answer, its status and confidence, the tools
+ * used and the model. A new session, with its own hooks, call limit and sources, is used for each
+ * question and always disconnected. If the answer does not suit the role, it is rewritten once,
+ * with tools locked.
  * @param {AskInput} input - The question and an optional receiver for streamed text.
  * @param {AskDeps} deps - Client, config, logger and optional clock.
  * @returns {Promise<AskResult>} The answer and how it was reached.
  * @throws {AppError} When the question is blank.
- * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS.
+ * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS before it has an answer.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  */
 export async function askQuestion({ question, role, onDelta }, deps) {
@@ -104,14 +83,17 @@ export async function askQuestion({ question, role, onDelta }, deps) {
   const startedAt = clock.now();
   const events = createEventRecorder({ clock, onDelta });
   const deadline = createDeadline(config.copilot.askTimeoutMs);
-  // Per question, so one question's sources, keys and commit lookups never leak into another's.
+  // Per question, so one question's sources, keys and lookups never leak into another's.
   const registry = createCitationRegistry();
+  const gate = createToolGate();
+  const api = createGithubApi({ token: config.github.token, fetch });
   const commits = createCommitResolver({
     token: config.github.token,
     repos: config.github.repos,
-    fetch,
+    api,
     logger,
   });
+  const owners = createCodeownersLookup({ api, repos: config.github.repos, logger });
   // Held in an object because the session is created inside the closure below.
   const open = /** @type {{ session?: AskSession }} */ ({});
 
@@ -125,6 +107,7 @@ export async function askQuestion({ question, role, onDelta }, deps) {
       secrets: listSecrets(config),
       registry,
       resolveHead: commits.resolveHead,
+      gate,
       logger,
       clock,
     });
@@ -142,13 +125,37 @@ export async function askQuestion({ question, role, onDelta }, deps) {
     if (!outcome.ok) {
       throw outcome.error;
     }
-    const { answer, toolCalls, model } = events.result();
-    return {
-      ...assembleAnswer({ answer, role, registry }),
-      toolCalls,
-      model,
-      durationMs: clock.now() - startedAt,
-    };
+    const { answer: reply, toolCalls, model } = events.result();
+    const first = analyseReply({ reply, role, registry });
+    logReportProblems(first, logger);
+    const needsRewrite = first.caps.status === 'answered' && first.violations.length > 0;
+    const rewrite =
+      needsRewrite && open.session !== undefined
+        ? await rewriteAnswer({
+            session: open.session,
+            original: first,
+            role,
+            registry,
+            gate,
+            clock,
+            deadline,
+            logger,
+          })
+        : { analysis: first, rewritten: false, rewriteRejected: false };
+    const { analysis } = rewrite;
+    const whoToAsk = wantsWhoToAsk(analysis.caps)
+      ? await buildWhoToAsk({ sources: registry.list(), lookup: owners })
+      : [];
+    const composed = composeResult({
+      analysis,
+      role,
+      whoToAsk,
+      style: {
+        ...rewrite,
+        violations: analysis.caps.status === 'answered' ? analysis.violations : [],
+      },
+    });
+    return { ...composed, toolCalls, model, durationMs: clock.now() - startedAt };
   } catch (error) {
     if (error instanceof AskTimeoutError && open.session !== undefined) {
       const { session } = open;

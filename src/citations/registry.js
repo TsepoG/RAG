@@ -9,6 +9,8 @@
  * @property {string} spaceKey - Space the page is in.
  * @property {number} version - Page version at the time it was fetched.
  * @property {string} [lastUpdated] - When that version was saved, as an ISO date.
+ * @property {string} [lastEditor] - Display name of whoever saved that version, when the result
+ *   names one. Only ever shown to the user as someone to ask; never logged.
  * @property {string} url - Link to the page.
  * @property {boolean} [stale] - True when the page was last updated over 12 months ago.
  */
