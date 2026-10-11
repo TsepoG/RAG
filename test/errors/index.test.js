@@ -6,9 +6,26 @@ import {
   ConfigError,
   CopilotError,
   McpError,
+  QuestionCancelledError,
   RoleNotFoundError,
   ToolNotAllowedError,
 } from '../../src/errors/index.js';
+
+describe('QuestionCancelledError', () => {
+  it('is an app error with a plain message', () => {
+    const error = new QuestionCancelledError();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.message).toBe('The question was cancelled');
+    expect(error.name).toBe('QuestionCancelledError');
+  });
+
+  it('keeps the cause it is given', () => {
+    const cause = new Error('abort');
+
+    expect(new QuestionCancelledError({ cause }).cause).toBe(cause);
+  });
+});
 
 describe('AppError', () => {
   it('is an Error carrying its message', () => {
