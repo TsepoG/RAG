@@ -9,6 +9,8 @@ import globals from 'globals';
 
 const SRC_FILES = ['src/**/*.js'];
 const TEST_FILES = ['test/**/*.js'];
+// The page's scripts run in the browser, not in Node.
+const PAGE_FILES = ['public/**/*.js'];
 
 // Only src/config may read process.env (CODING_PRINCIPLES §3); everything else receives config.
 const PROCESS_ENV_RULE = [
@@ -31,9 +33,12 @@ export default [
       globals: globals.node,
     },
   },
-  { ...jsdoc.configs['flat/recommended-typescript-flavor-error'], files: SRC_FILES },
   {
-    files: SRC_FILES,
+    ...jsdoc.configs['flat/recommended-typescript-flavor-error'],
+    files: [...SRC_FILES, ...PAGE_FILES],
+  },
+  {
+    files: [...SRC_FILES, ...PAGE_FILES],
     rules: {
       'jsdoc/require-jsdoc': [
         'error',
@@ -54,6 +59,14 @@ export default [
   },
   sonarjs.configs.recommended,
   n.configs['flat/recommended-module'],
+  {
+    // The n plugin checks Node APIs and package imports; the browser has its own, so it is off here.
+    files: PAGE_FILES,
+    languageOptions: { globals: globals.browser },
+    rules: {
+      ...Object.fromEntries(Object.keys(n.rules ?? {}).map((name) => [`n/${name}`, 'off'])),
+    },
+  },
   { ...vitest.configs.recommended, files: TEST_FILES },
   {
     ignores: ['src/config/**'],

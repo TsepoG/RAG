@@ -4,5 +4,7 @@ coverage/
 .env.local
 .scannerwork/
 reports/
+# Feedback written by the web UI (ratings and comments, never answer text).
+data/
 # Raw MCP results captured by mcp:sample hold real page and code content.
 test/fixtures/raw/
