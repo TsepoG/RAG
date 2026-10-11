@@ -62,6 +62,9 @@ export async function extractConfluenceContent({ args, text }, { siteUrl, spaceK
     return blocked('space-not-allowed');
   }
   const lastUpdated = asString(version.createdAt) || undefined;
+  // The server used so far gives only an account id (`metadata.authorId`), which is no use to a
+  // reader, so a name is kept only when the version carries one in the usual `by.displayName`.
+  const lastEditor = asString(asObject(version.by).displayName) || undefined;
   return {
     sources: [
       {
@@ -71,6 +74,7 @@ export async function extractConfluenceContent({ args, text }, { siteUrl, spaceK
         spaceKey: space.spaceKey,
         version: version.number,
         ...(lastUpdated === undefined ? {} : { lastUpdated }),
+        ...(lastEditor === undefined ? {} : { lastEditor }),
         url: `${siteUrl}/wiki/spaces/${space.spaceKey}/pages/${id}`,
         stale: isOlderThanAYear(lastUpdated, now()),
       },

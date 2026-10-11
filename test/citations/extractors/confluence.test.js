@@ -85,6 +85,37 @@ describe('extractConfluenceContent', () => {
     expect(sources[0]).toMatchObject({ stale: false });
   });
 
+  it('keeps the display name of whoever saved the version, when the result has one', async () => {
+    const text = pageText({
+      metadata: { version: { number: 3, by: { displayName: 'Dana Reyes', accountId: 'a-1' } } },
+    });
+
+    const { sources } = await extractConfluenceContent({ args, text }, makeContext());
+
+    expect(sources[0]).toMatchObject({ lastEditor: 'Dana Reyes' });
+    expect(JSON.stringify(sources)).not.toContain('a-1');
+  });
+
+  it('leaves the editor out when the result has only an account id, as the real one does', async () => {
+    const { sources } = await extractConfluenceContent(
+      fixtureInput('getConfluenceContent'),
+      makeContext(),
+    );
+
+    expect(sources[0]).not.toHaveProperty('lastEditor');
+  });
+
+  it.each([{ by: {} }, { by: { displayName: '' } }, { by: { displayName: 5 } }, { by: 'Dana' }])(
+    'leaves the editor out for %j',
+    async (by) => {
+      const text = pageText({ metadata: { version: { number: 3, ...by } } });
+
+      const { sources } = await extractConfluenceContent({ args, text }, makeContext());
+
+      expect(sources[0]).not.toHaveProperty('lastEditor');
+    },
+  );
+
   it('takes the space from the validated URL, ignoring the case of the key', async () => {
     const lower = { content_url: 'https://acme.atlassian.net/wiki/spaces/eng/pages/262439' };
 
