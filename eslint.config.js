@@ -69,6 +69,11 @@ export default [
   },
   { ...vitest.configs.recommended, files: TEST_FILES },
   {
+    // These tests run in a simulated browser (happy-dom) and use its globals.
+    files: ['test/public/**/*.js', 'test/helpers/page.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     ignores: ['src/config/**'],
     rules: { 'no-restricted-properties': PROCESS_ENV_RULE },
   },
