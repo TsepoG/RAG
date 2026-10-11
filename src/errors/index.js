@@ -85,6 +85,19 @@ export class AskTimeoutError extends AppError {
 }
 
 /**
+ * Thrown when the person asking stops a question before it has an answer.
+ */
+export class QuestionCancelledError extends AppError {
+  /**
+   * Creates the error.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(options) {
+    super('The question was cancelled', options);
+  }
+}
+
+/**
  * Thrown when a role id is not one of the loaded roles.
  */
 export class RoleNotFoundError extends AppError {

@@ -30,13 +30,14 @@ function describeSessionError({ errorType, message, statusCode }) {
 /**
  * Collects what a question produces from the session's events: streamed text, the final message,
  * tool calls and the model. It also reports when the session goes idle (done) or errors.
- * @param {{ clock: { now: () => number }, onDelta?: (text: string) => void }} options - A time
- *   source for tool call durations, and an optional receiver for streamed text.
+ * @param {{ clock: { now: () => number }, onDelta?: (text: string) => void, onToolStart?: (tool: { server: string, tool: string }) => void }} options
+ *   A time source for tool call durations, an optional receiver for streamed text, and an optional
+ *   receiver told which tool each call is as it starts.
  * @returns {{ attach: (source: EventSource) => void, detach: () => void, settled: Promise<Outcome>, result: () => Collected }}
  *   `attach` starts listening; `detach` stops; `settled` resolves when the question ends;
  *   `result` returns what has been collected so far.
  */
-export function createEventRecorder({ clock, onDelta }) {
+export function createEventRecorder({ clock, onDelta, onToolStart }) {
   const toolCalls = createToolCallLog(clock);
   /** @type {Array<() => void>} */
   const unsubscribers = [];
@@ -80,7 +81,7 @@ export function createEventRecorder({ clock, onDelta }) {
         source.on('assistant.usage', ({ data }) => {
           model = data.model;
         }),
-        source.on('tool.execution_start', ({ data }) => toolCalls.start(data)),
+        source.on('tool.execution_start', ({ data }) => onToolStart?.(toolCalls.start(data))),
         source.on('tool.execution_complete', ({ data }) => toolCalls.complete(data)),
         source.on('session.error', ({ data }) =>
           settle({ ok: false, error: new CopilotError(describeSessionError(data)) }),

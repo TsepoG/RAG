@@ -124,6 +124,7 @@ describe('askQuestion answer', () => {
       rewritten: false,
       rewriteRejected: false,
       whoToAsk: [],
+      detailLevel: 'default',
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,
@@ -622,7 +623,7 @@ describe('askQuestion timeout', () => {
     expect(failure).toBeInstanceOf(AskTimeoutError);
     expect(session.disconnect).toHaveBeenCalledOnce();
     expect(lines()).toContainEqual(
-      expect.objectContaining({ level: 'warn', msg: 'could not abort the timed-out question' }),
+      expect.objectContaining({ level: 'warn', msg: 'could not abort the interrupted question' }),
     );
   });
 

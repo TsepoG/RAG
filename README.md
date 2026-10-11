@@ -7,8 +7,10 @@ used and states how confident it is.
 
 The project is built in phases (see [docs/ROADMAP.md](docs/ROADMAP.md)). **Phase 1** set up the
 quality gates, CI, and the shared config loader, error classes and logger. **Phase 2** connects
-GitHub Copilot to the Confluence and GitHub MCP servers, read-only, and answers a question from the
-command line. Roles, citations with confidence levels and a UI come in later phases.
+GitHub Copilot to the Confluence and GitHub MCP servers, read-only. **Phases 3 and 4** add roles,
+citations, confidence levels and the honesty checks. **Phase 5** adds a local web page for asking
+questions: `npm start` and open it (see [Using the web page](#using-the-web-page)). The command
+line (`npm run ask`) still works.
 
 ## Requirements
 
@@ -24,7 +26,8 @@ cp .env.example .env   # then fill in real values
 npm start
 ```
 
-`npm start` loads `.env` if it exists, validates the settings and logs one startup line with the
+`npm start` loads `.env` if it exists, validates the settings, starts Copilot and serves the web page on
+`http://127.0.0.1:3000` (`HOST`, `PORT`), logging one startup line with the
 secrets masked. If a variable is missing or invalid, it prints which one and exits with code 1.
 Values already exported in your shell win over `.env`.
 
@@ -32,7 +35,8 @@ Values already exported in your shell win over `.env`.
 
 | Script                                                     | What it does                                                                                                   |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `npm start`                                                | Run `src/index.js`                                                                                             |
+| `npm start`                                                | Start the web server (`src/server/index.js`)                                                                   |
+| `npm run dev`                                              | Same, restarting when a file under `src/` changes                                                              |
 | `npm run lint`                                             | ESLint with JSDoc and SonarJS rules; zero warnings allowed                                                     |
 | `npm run lint:fix`                                         | ESLint with auto-fix                                                                                           |
 | `npm run format`                                           | Prettier, write                                                                                                |
@@ -62,6 +66,8 @@ Invalid values are reported by variable name, never by value.
 | `NODE_ENV`              | no       | `development` | `development`, `test` or `production`                                     |
 | `LOG_LEVEL`             | no       | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`              |
 | `PORT`                  | no       | `3000`        | Integer from 1 to 65535                                                   |
+| `HOST`                  | no       | `127.0.0.1`   | Address the web server listens on; non-loopback needs `ALLOW_REMOTE=true` |
+| `ALLOW_REMOTE`          | no       | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login     |
 | `GITHUB_TOKEN`          | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos |
 | `GITHUB_REPOS`          | yes      |               | Comma-separated `owner/repo` list, at least one                           |
 | `ATLASSIAN_SITE_URL`    | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed               |
@@ -110,6 +116,94 @@ because the runtime runs against a throwaway data directory; use one of the thre
 
 `npm run models` is a quick check that you are signed in. Some plans, such as Copilot Free, report
 no models; leave `COPILOT_MODEL` unset to use the default.
+
+### Using the web page
+
+```bash
+npm start      # serves the page on http://127.0.0.1:3000 (change it with PORT)
+npm run dev    # the same, restarting when a file under src/ changes
+```
+
+Open `http://127.0.0.1:3000`. `npm start` loads `.env`, starts Copilot, checks you are signed in
+and then listens; a bad setting or a missing Copilot login prints one message and exits with
+code 1. Ctrl+C stops the server, any question that is running, and Copilot.
+
+On the page you pick a role (your choice is remembered in the browser) and type a question. Enter
+sends, Shift+Enter adds a line and Esc stops. While it works you see progress lines such as
+"Searching Confluence…" and the draft answer as plain grey text; the draft is not checked yet. When
+the answer has been checked it replaces the draft with:
+
+- a **banner** with the confidence level in words ("Medium confidence") and why;
+- the answer, with **citation chips** (`C1`, `G2*`). Click a chip to jump to its source in the
+  Sources list; a chip with `*` is the assistant's own reading of the code;
+- where the documentation and the code disagree, **What I couldn't confirm**, and **Who might
+  know**;
+- a **Sources** list with links (Confluence pages, files pinned to a commit), tags such as "may be
+  out of date", and a collapsed **Also consulted** list;
+- **Show more detail**, which asks the same question again one step more technically (not offered
+  to the Developer role, or when the answer was not found);
+- **Yes / No** feedback. A No opens a box for a comment and the source that was wrong.
+
+![The answer page in dark mode: role picker, question, a medium-confidence banner and the answer with citation chips](docs/screenshots/answer-dark.png)
+
+![The Sources list with commit tags, the feedback buttons and the collapsed Also consulted list](docs/screenshots/sources-dark.png)
+
+Clicking a chip highlights its source:
+
+![A source highlighted in the Sources list after its chip was clicked](docs/screenshots/source-highlight.png)
+
+The page follows the browser's light or dark setting and works on a narrow screen. When nothing is
+found, the role's own wording is shown instead of an answer:
+
+![The answer page in light mode](docs/screenshots/answer-light.png)
+
+![A not-found answer: one line, with no sources](docs/screenshots/not-found.png)
+
+![The page on a 375 pixel wide screen](docs/screenshots/mobile.png)
+
+**Stop** cancels the question: the server aborts the Copilot session, and the log shows
+`the question was cancelled; aborting the session`. One question is answered at a time; a second
+one gets a "please wait" message.
+
+Feedback is appended, one JSON line each, to `data/feedback.jsonl` (git-ignored, created on first
+use): the time, question, role, detail level, status, confidence, cited keys, rating, comment,
+wrong-source key and model. It never holds the answer text or a token.
+
+#### Security model of the web server
+
+The page has no login, so it is built to be reachable only from the machine it runs on.
+
+- **Loopback only.** The server listens on `127.0.0.1` (`HOST`). A `HOST` that is not a loopback
+  address makes it refuse to start unless `ALLOW_REMOTE=true`. **Do not set `ALLOW_REMOTE`**
+  unless the network is one you trust completely: anyone who can reach the port can ask questions
+  with your Copilot, Confluence and GitHub access.
+- **Every `/api/*` request is checked.** The `Host` must be `127.0.0.1:<port>` or
+  `localhost:<port>` (against DNS rebinding); a request that changes something must send
+  `Content-Type: application/json`; an `Origin` header, when there is one, must be the server's
+  own; and a `Sec-Fetch-Site: cross-site` request is refused. A refusal is a 403 with a short JSON
+  message, logged at warn with only the reason. No CORS headers are sent, so other sites cannot
+  read the responses.
+- **Headers.** `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src
+'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'`, `X-Content-Type-Options:
+nosniff`, `Referrer-Policy: no-referrer`; API responses are `no-store`. The page has no inline
+  script or style.
+- **Model text is data.** The server turns the answer's markdown into HTML with `marked`, shows raw
+  HTML in it as text, and sanitises the result with `sanitize-html`. A link in an answer is kept
+  only if it is `https` and points to your Atlassian site or `github.com`; any other link is shown
+  as text. The page puts only that HTML in the document and writes streamed text, source titles
+  and everything else as text.
+- **Small surface.** The request body is limited to 16 KB; only the files in `public/` are served,
+  by an allow-list built at start; feedback is accepted only for an answer id the server handed
+  out.
+
+#### API
+
+| Route                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`    | `{ "status": "ok" }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/roles`     | `[{ id, displayName, description, depth }]`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `POST /api/ask`      | Body `{ question, role, detailLevel }` (`detailLevel` is `default` or `more`). Answers with a `text/event-stream` of `progress` `{ kind, message }`, `token` `{ text }` (the `answer-meta` block is never in it), then exactly one `done` or `error`. `done` holds `{ answerId, result, rendered, html: { answer, conflicts } }`; `error` holds `{ kind, message }` with kind `timeout`, `cancelled`, `copilot` or `internal`. 429 while another question runs. |
+| `POST /api/feedback` | Body `{ answerId, rating: "up" or "down", comment?, wrongSourceKey? }`; 404 for an unknown id, 400 for a source the answer did not cite.                                                                                                                                                                                                                                                                                                                        |
 
 ### Asking a question
 
@@ -327,8 +421,10 @@ src/
   mcp/       server config, tool allow-list, scope and post-tool hooks, permission handler, discovery
   roles/     role schema and loader (profiles are in the top-level roles/ folder)
   style/     checks an answer against what its role allows
-  index.js   entry point: loads .env, loads config, logs a startup line
-test/        mirrors src/; test/helpers holds shared test utilities; test/live runs on demand
+  server/    the web server: Fastify app, guards, security headers, SSE, feedback; index.js starts it
+  render/    answer markdown to safe HTML with citation chips; removes answer-meta from the stream
+public/      the web page: index.html, css/ and vanilla JavaScript modules in js/ (no build step)
+test/        mirrors src/ and public/js/; test/helpers holds shared test utilities; test/live runs on demand
 docs/        roadmap, system design, coding principles and one file per phase
 ```
 
@@ -341,7 +437,7 @@ writing code here are in [docs/CODING_PRINCIPLES.md](docs/CODING_PRINCIPLES.md).
   TypeScript is on 6.x because the lint plugins depend on `@typescript-eslint`, whose peer range
   is `typescript <6.1.0`.
 - **Coverage:** Vitest enforces 90% for lines, branches, functions and statements. Files in `src/`
-  that no test imports count as uncovered. `src/index.js` and `src/cli/` are the only exclusions
+  that no test imports count as uncovered. `src/server/index.js`, `src/cli/` and `public/js/main.js` are the only exclusions
   (entry-point wiring). Live tests (`test/live/`) run only with `npm run test:live`, never in CI.
 - **Git hooks (Husky):** `pre-commit` runs ESLint `--fix` and Prettier on staged files;
   `pre-push` runs `npm run typecheck` and `npm test`. They install automatically with

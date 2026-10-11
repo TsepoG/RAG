@@ -1,5 +1,5 @@
 // @ts-check
-import { AskTimeoutError } from '../errors/index.js';
+import { AskTimeoutError, QuestionCancelledError } from '../errors/index.js';
 import { analyseReply } from './analyse.js';
 import { bestEffort } from './deadline.js';
 import { createEventRecorder } from './events.js';
@@ -93,8 +93,9 @@ function rejected(original, reason) {
 
 /**
  * Asks for the answer to be rewritten once, with tools locked, and keeps the rewrite only if it
- * passes `judgeRewrite`. It never throws: whatever goes wrong, the original answer is still good.
- * A timeout aborts the session and keeps the original.
+ * passes `judgeRewrite`. Whatever goes wrong, the original answer is still good, so it does not
+ * throw; a timeout aborts the session and keeps the original. The one exception is the person
+ * stopping the question, which is passed on.
  * @param {{
  *   session: Pick<import('@github/copilot-sdk').CopilotSession, 'on' | 'send' | 'abort'>,
  *   original: import('./analyse.js').Analysis,
@@ -137,6 +138,10 @@ export async function rewriteAnswer({
     }
     return { analysis: mergeRewrite(original, rewrite), rewritten: true, rewriteRejected: false };
   } catch (error) {
+    if (error instanceof QuestionCancelledError) {
+      // The person stopped the question: there is no answer to keep, so the caller handles it.
+      throw error;
+    }
     if (error instanceof AskTimeoutError) {
       await bestEffort('abort the timed-out rewrite', () => session.abort(), logger);
       return rejected(original, 'timeout');

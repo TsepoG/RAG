@@ -2,23 +2,37 @@
 import { createCitationRegistry } from '../citations/index.js';
 import { listSecrets } from '../config/index.js';
 import { buildSessionConfig } from '../copilot/index.js';
-import { AppError, AskTimeoutError, CopilotError } from '../errors/index.js';
+import {
+  AppError,
+  AskTimeoutError,
+  CopilotError,
+  QuestionCancelledError,
+} from '../errors/index.js';
 import { createCodeownersLookup, createCommitResolver, createGithubApi } from '../github/index.js';
-import { buildWhoToAsk } from '../honesty/index.js';
 import { createPermissionHandler, createToolGate, createToolHooks } from '../mcp/index.js';
-import { analyseReply } from './analyse.js';
-import { composeResult, wantsWhoToAsk } from './compose.js';
-import { bestEffort, createDeadline } from './deadline.js';
+import { withDetailLevel } from '../roles/index.js';
+import { bestEffort, createCancellation, createDeadline } from './deadline.js';
 import { createEventRecorder } from './events.js';
-import { rewriteAnswer } from './rewrite.js';
+import { finishAnswer } from './finish.js';
 
 /**
  * What to ask, and where to send the answer as it streams.
  * @typedef {object} AskInput
  * @property {string} question - The question.
  * @property {import('../roles/index.js').Role} role - The role the answer is written for.
+ * @property {import('../roles/index.js').DetailLevel} [detailLevel] - `more` answers one step more
+ *   technically than the role usually does; defaults to `default`.
+ * @property {AbortSignal} [signal] - Aborting it stops the question: the session is aborted and
+ *   disconnected, and the question throws a QuestionCancelledError.
+ * @property {(activity: Activity) => void} [onActivity] - Told what the question is doing, for a
+ *   progress display. Nothing in it comes from the content of a page or file.
  * @property {(text: string) => void} [onDelta] - Receives each piece of the model's reply as it
  *   arrives. The reply includes its answer-meta block, which is not part of the final answer.
+ */
+
+/**
+ * Something the question is doing, as it happens.
+ * @typedef {{ kind: 'tool', server: string, tool: string } | { kind: 'checking' } | { kind: 'rewriting' }} Activity
  */
 
 /**
@@ -36,6 +50,7 @@ import { rewriteAnswer } from './rewrite.js';
  * The outcome of a question: the checked answer with its status, confidence and sources, and how it
  * was reached.
  * @typedef {import('./compose.js').ComposedResult & {
+ *   detailLevel: import('../roles/index.js').DetailLevel,
  *   toolCalls: import('./toolCalls.js').ToolCallRecord[],
  *   model: string | undefined,
  *   durationMs: number,
@@ -49,21 +64,6 @@ import { rewriteAnswer } from './rewrite.js';
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
 
 /**
- * Logs why the model's report could not be used, or that text followed it. Only the kind of
- * problem is logged, never the reply.
- * @param {import('./analyse.js').Analysis} analysis - What was found in the reply.
- * @param {Pick<import('../logger/index.js').Logger, 'warn'>} logger - Where to log.
- */
-function logReportProblems({ metaError, warning }, logger) {
-  if (metaError !== undefined) {
-    logger.warn({ reason: metaError }, 'the answer-meta block was missing or invalid');
-  }
-  if (warning !== undefined) {
-    logger.warn({ reason: warning }, 'text followed the answer-meta block');
-  }
-}
-
-/**
  * Sends a question to Copilot and returns the checked answer, its status and confidence, the tools
  * used and the model. A new session, with its own hooks, call limit and sources, is used for each
  * question and always disconnected. If the answer does not suit the role, it is rewritten once,
@@ -73,16 +73,45 @@ function logReportProblems({ metaError, warning }, logger) {
  * @returns {Promise<AskResult>} The answer and how it was reached.
  * @throws {AppError} When the question is blank.
  * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS before it has an answer.
+ * @throws {QuestionCancelledError} When `signal` is aborted before the question is answered.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  */
-export async function askQuestion({ question, role, onDelta }, deps) {
+export async function askQuestion(
+  { question, role: usualRole, detailLevel = 'default', signal, onActivity, onDelta },
+  deps,
+) {
   const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK, fetch } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
   }
+  if (signal?.aborted) {
+    throw new QuestionCancelledError();
+  }
+  // Both the prompt and the style check use the role as it is for this level of detail, so a
+  // rewrite cannot undo the extra detail that was asked for.
+  const role = withDetailLevel(usualRole, detailLevel);
   const startedAt = clock.now();
-  const events = createEventRecorder({ clock, onDelta });
+  /**
+   * Tells the caller what is happening. A progress display failing must not fail the question.
+   * @param {Activity} activity - What the question is doing.
+   */
+  const notify = (activity) => {
+    try {
+      onActivity?.(activity);
+    } catch (error) {
+      logger.warn({ err: error }, 'could not report progress');
+    }
+  };
+  const events = createEventRecorder({
+    clock,
+    onDelta,
+    onToolStart: (tool) => notify({ kind: 'tool', ...tool }),
+  });
   const deadline = createDeadline(config.copilot.askTimeoutMs);
+  const cancellation = createCancellation(signal);
+  // Whichever comes first: the time limit or the person stopping the question.
+  const interrupt = Promise.race([deadline.promise, cancellation.promise]);
+  interrupt.catch(() => undefined);
   // Per question, so one question's sources, keys and lookups never leak into another's.
   const registry = createCitationRegistry();
   const gate = createToolGate();
@@ -121,51 +150,40 @@ export async function askQuestion({ question, role, onDelta }, deps) {
   };
 
   try {
-    const outcome = await Promise.race([run(), deadline.promise]);
+    const outcome = await Promise.race([run(), interrupt]);
     if (!outcome.ok) {
       throw outcome.error;
     }
     const { answer: reply, toolCalls, model } = events.result();
-    const first = analyseReply({ reply, role, registry });
-    logReportProblems(first, logger);
-    const needsRewrite = first.caps.status === 'answered' && first.violations.length > 0;
-    const rewrite =
-      needsRewrite && open.session !== undefined
-        ? await rewriteAnswer({
-            session: open.session,
-            original: first,
-            role,
-            registry,
-            gate,
-            clock,
-            deadline,
-            logger,
-          })
-        : { analysis: first, rewritten: false, rewriteRejected: false };
-    const { analysis } = rewrite;
-    const whoToAsk = wantsWhoToAsk(analysis.caps)
-      ? await buildWhoToAsk({ sources: registry.list(), lookup: owners })
-      : [];
-    const composed = composeResult({
-      analysis,
+    const composed = await finishAnswer({
+      reply,
       role,
-      whoToAsk,
-      style: {
-        ...rewrite,
-        violations: analysis.caps.status === 'answered' ? analysis.violations : [],
-      },
+      registry,
+      session: open.session,
+      gate,
+      clock,
+      interrupt,
+      cancellation: cancellation.promise,
+      owners,
+      logger,
+      notify,
     });
-    return { ...composed, toolCalls, model, durationMs: clock.now() - startedAt };
+    return { ...composed, detailLevel, toolCalls, model, durationMs: clock.now() - startedAt };
   } catch (error) {
-    if (error instanceof AskTimeoutError && open.session !== undefined) {
+    if (error instanceof QuestionCancelledError) {
+      logger.info({}, 'the question was cancelled; aborting the session');
+    }
+    const interrupted = error instanceof AskTimeoutError || error instanceof QuestionCancelledError;
+    if (interrupted && open.session !== undefined) {
       const { session } = open;
-      await bestEffort('abort the timed-out question', () => session.abort(), logger);
+      await bestEffort('abort the interrupted question', () => session.abort(), logger);
     }
     throw error instanceof AppError
       ? error
       : new CopilotError('Copilot could not answer the question', { cause: error });
   } finally {
     deadline.cancel();
+    cancellation.cancel();
     events.detach();
     const { session } = open;
     if (session !== undefined) {

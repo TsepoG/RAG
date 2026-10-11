@@ -57,25 +57,29 @@ export function summarizeArguments(args) {
 /**
  * Keeps the tool calls of one question, matching each end to its start by call id.
  * @param {{ now: () => number }} clock - Time source in milliseconds.
- * @returns {{ start: (data: ToolStart) => void, complete: (data: ToolEnd) => void, list: () => ToolCallRecord[] }}
- *   `start` and `complete` take the data of the matching SDK events; `list` returns a copy of the
- *   calls so far, in the order they started.
+ * @returns {{ start: (data: ToolStart) => { server: string, tool: string }, complete: (data: ToolEnd) => void, list: () => ToolCallRecord[] }}
+ *   `start` and `complete` take the data of the matching SDK events, and `start` returns the
+ *   server and tool it recorded; `list` returns a copy of the calls so far, in the order they
+ *   started.
  */
 export function createToolCallLog(clock) {
   /** @type {Map<string, { record: ToolCallRecord, startedAt: number }>} */
   const calls = new Map();
   return {
     start({ toolCallId, mcpServerName, mcpToolName, toolName, arguments: args }) {
+      const server = mcpServerName ?? UNKNOWN_SERVER;
+      const tool = mcpToolName ?? toolName;
       calls.set(toolCallId, {
         startedAt: clock.now(),
         record: {
-          server: mcpServerName ?? UNKNOWN_SERVER,
-          tool: mcpToolName ?? toolName,
+          server,
+          tool,
           summary: summarizeArguments(args),
           durationMs: undefined,
           success: undefined,
         },
       });
+      return { server, tool };
     },
     complete({ toolCallId, success }) {
       const call = calls.get(toolCallId);

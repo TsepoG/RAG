@@ -4,6 +4,8 @@ import { ConfigError } from '../errors/index.js';
 import { REDACTED_VALUE } from '../logger/index.js';
 import { configSchema, ENV_VARIABLE_NAMES } from './schema.js';
 
+export { isLoopbackHost } from './schema.js';
+
 /**
  * The validated application settings, grouped by system.
  * @typedef {import('zod').output<typeof configSchema>} AppConfig

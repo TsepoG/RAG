@@ -1,6 +1,6 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { configSchema, ENV_VARIABLE_NAMES } from '../../src/config/schema.js';
+import { configSchema, ENV_VARIABLE_NAMES, isLoopbackHost } from '../../src/config/schema.js';
 import { validEnv } from '../helpers/env.js';
 
 /**
@@ -45,6 +45,7 @@ describe('configSchema parsing', () => {
         askTimeoutMs: 60_000,
       },
       mcp: { maxToolCalls: 8, timeoutMs: 15_000 },
+      server: { host: '127.0.0.1', allowRemote: false },
     });
   });
 
@@ -149,6 +150,86 @@ describe('configSchema ATLASSIAN_SITE_URL', () => {
     );
 
     expect(atlassian.siteUrl).toBe('https://acme.atlassian.net');
+  });
+});
+
+describe('configSchema HOST and ALLOW_REMOTE', () => {
+  it('listens on this machine only, by default', () => {
+    expect(configSchema.parse(validEnv()).server).toEqual({
+      host: '127.0.0.1',
+      allowRemote: false,
+    });
+  });
+
+  it.each(['127.0.0.1', 'localhost', 'LOCALHOST', '::1', '[::1]', '127.1.2.3'])(
+    'accepts the loopback host %s without ALLOW_REMOTE',
+    (host) => {
+      expect(configSchema.parse(validEnv({ HOST: host })).server.host).toBe(host);
+    },
+  );
+
+  it.each([
+    '0.0.0.0',
+    ['192', '168', '1', '20'].join('.'),
+    ['10', '0', '0', '5'].join('.'),
+    '::',
+    'my-laptop.local',
+    '127.0.0.1.evil.example',
+  ])('refuses the host %s unless remote access is switched on', (host) => {
+    expect(failures(validEnv({ HOST: host }))).toEqual([
+      'HOST: must be a loopback address (127.0.0.1, localhost or ::1) unless ALLOW_REMOTE is true',
+    ]);
+  });
+
+  it.each(['true', 'TRUE', ' true '])('accepts a remote host when ALLOW_REMOTE is %j', (value) => {
+    const { server } = configSchema.parse(validEnv({ HOST: '0.0.0.0', ALLOW_REMOTE: value }));
+
+    expect(server).toEqual({ host: '0.0.0.0', allowRemote: true });
+  });
+
+  it('still refuses a remote host when ALLOW_REMOTE is false', () => {
+    expect(failures(validEnv({ HOST: '0.0.0.0', ALLOW_REMOTE: 'false' }))).toHaveLength(1);
+  });
+
+  it.each(['yes', '1', ''])('rejects ALLOW_REMOTE=%j without echoing it', (value) => {
+    expect(failures(validEnv({ ALLOW_REMOTE: value }))).toEqual([
+      'ALLOW_REMOTE: must be true or false',
+    ]);
+  });
+
+  it.each(['', '  ', 'a b', 'a/b', `${'http'}://x`])('rejects the HOST value %j', (host) => {
+    expect(
+      failures(validEnv({ HOST: host })).every((message) => message.startsWith('HOST: ')),
+    ).toBe(true);
+    expect(failures(validEnv({ HOST: host })).length).toBeGreaterThan(0);
+  });
+
+  it('reports a remote host and a bad ALLOW_REMOTE together with other problems', () => {
+    expect(failures(validEnv({ HOST: '0.0.0.0', PORT: 'x' })).sort()).toEqual([
+      'HOST: must be a loopback address (127.0.0.1, localhost or ::1) unless ALLOW_REMOTE is true',
+      'PORT: must be an integer between 1 and 65535',
+    ]);
+  });
+});
+
+describe('isLoopbackHost', () => {
+  it.each(['127.0.0.1', '127.255.255.254', 'localhost', 'Localhost', '::1', '[::1]'])(
+    'accepts %s',
+    (host) => {
+      expect(isLoopbackHost(host)).toBe(true);
+    },
+  );
+
+  it.each([
+    '0.0.0.0',
+    ['128', '0', '0', '1'].join('.'),
+    '1127.0.0.1',
+    '127.0.0',
+    '127.0.0.1.evil.example',
+    'local',
+    '',
+  ])('refuses %j', (host) => {
+    expect(isLoopbackHost(host)).toBe(false);
   });
 });
 

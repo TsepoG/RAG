@@ -74,6 +74,11 @@ async function toolReturns(client, toolName, fixture, args) {
  *   What the model says each turn.
  * @param {Array<[string, string, Record<string, unknown>?]>} [options.tools] - Tool results to deliver first.
  * @param {import('../../src/roles/index.js').Role} [options.role] - The role.
+ * @param {import('../../src/roles/index.js').DetailLevel} [options.detailLevel] - How much detail to ask for.
+ * @param {AbortSignal} [options.signal] - Stops the question when aborted.
+ * @param {(activity: any) => void} [options.onActivity] - Told what the question is doing.
+ * @param {{ session?: any, client?: any, lines?: () => Array<Record<string, unknown>> }} [options.capture]
+ *   Filled with the fakes before the question starts, so a test can look at them when it throws.
  * @param {Record<string, string | undefined>} [options.env] - Environment overrides.
  * @param {typeof fetch} [options.fetchFunction] - The fake fetch.
  * @param {() => number} [options.now] - The clock.
@@ -84,6 +89,10 @@ export async function ask({
   replies,
   tools = [],
   role = TEST_ROLE,
+  detailLevel,
+  signal,
+  onActivity,
+  capture = {},
   env = {},
   fetchFunction = /** @type {typeof fetch} */ (
     vi.fn(async () => new Response('', { status: 404 }))
@@ -112,8 +121,9 @@ export async function ask({
     },
   });
   client = createFakeClient(session);
+  Object.assign(capture, { session, client, lines });
   const result = await askQuestion(
-    { role, question: 'How do refunds work?' },
+    { role, detailLevel, signal, onActivity, question: 'How do refunds work?' },
     {
       client,
       workingDirectory: 'sandbox/work',

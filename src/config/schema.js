@@ -17,7 +17,22 @@ const LIST_SEPARATOR = ',';
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
 const ATLASSIAN_SITE_PATTERN = /^https:\/\/[a-z\d-]+\.atlassian\.net\/?$/i;
 const INTEGER_PATTERN = /^\d+$/;
+const DEFAULT_HOST = '127.0.0.1';
+const HOST_PATTERN = /^[\w.:[\]-]+$/;
+const LOOPBACK_NAMES = new Set(['localhost', '::1', '[::1]']);
+const LOOPBACK_IPV4 = /^127(?:\.\d{1,3}){3}$/;
 const CLOUD_ID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+/**
+ * Whether a host name or address is the machine itself: `localhost`, `::1` or any `127.x.x.x`.
+ * The web server may listen only on these unless remote access is switched on.
+ * @param {string} host - A host name or IP address.
+ * @returns {boolean} True for a loopback host.
+ */
+export function isLoopbackHost(host) {
+  const name = host.toLowerCase();
+  return LOOPBACK_NAMES.has(name) || LOOPBACK_IPV4.test(name);
+}
 
 const requiredString = z
   .string({ error: (issue) => (issue.input === undefined ? 'is required' : 'must be a string') })
@@ -108,6 +123,20 @@ const envSchema = z.object({
   ASK_TIMEOUT_MS: integerInRange(ASK_TIMEOUT_LIMITS),
   MAX_TOOL_CALLS: integerInRange(MAX_TOOL_CALLS_LIMITS),
   MCP_TIMEOUT_MS: integerInRange(MCP_TIMEOUT_LIMITS),
+  HOST: z
+    .string()
+    .trim()
+    .min(1, 'must not be empty')
+    .regex(HOST_PATTERN, 'must be a host name or IP address')
+    .default(DEFAULT_HOST),
+  // Anything but "true" keeps the server on this machine; see the rule below.
+  ALLOW_REMOTE: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .pipe(z.enum(['true', 'false'], { error: 'must be true or false' }))
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 // Checked on the whole object so a missing email is reported together with any other problems.
@@ -126,6 +155,19 @@ const envSchemaWithAuthRule = envSchema.superRefine(
       /** @type {Record<string, unknown>} */ (payload.value).ATLASSIAN_AUTH_MODE === 'basic',
   },
 );
+
+// The web server has no login, so it must not listen beyond this machine unless that is asked for
+// by name. Checked on the whole object so the host and the switch are reported together.
+const envSchemaWithHostRule = envSchemaWithAuthRule.superRefine((env, context) => {
+  if (!isLoopbackHost(env.HOST) && !env.ALLOW_REMOTE) {
+    context.addIssue({
+      code: 'custom',
+      path: ['HOST'],
+      message:
+        'must be a loopback address (127.0.0.1, localhost or ::1) unless ALLOW_REMOTE is true',
+    });
+  }
+});
 
 /**
  * Builds how to authenticate to Atlassian. A bearer key has no email, so the shape makes it
@@ -149,10 +191,11 @@ export const ENV_VARIABLE_NAMES = Object.freeze(Object.keys(envSchema.shape));
 /**
  * Schema for the process environment. Parsing yields the nested, typed config object.
  */
-export const configSchema = envSchemaWithAuthRule.transform((env) => ({
+export const configSchema = envSchemaWithHostRule.transform((env) => ({
   nodeEnv: env.NODE_ENV,
   logLevel: env.LOG_LEVEL,
   port: env.PORT,
+  server: { host: env.HOST, allowRemote: env.ALLOW_REMOTE },
   github: { token: env.GITHUB_TOKEN, repos: env.GITHUB_REPOS },
   atlassian: {
     siteUrl: env.ATLASSIAN_SITE_URL,

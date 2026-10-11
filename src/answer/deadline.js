@@ -1,6 +1,6 @@
 // @ts-check
 import { finishesWithin } from '../copilot/index.js';
-import { AskTimeoutError } from '../errors/index.js';
+import { AskTimeoutError, QuestionCancelledError } from '../errors/index.js';
 
 /** Longest the cleanup after a question may take, so a stuck runtime cannot hang the caller. */
 export const SHUTDOWN_TIMEOUT_MS = 5000;
@@ -21,6 +21,41 @@ export function createDeadline(limitMs) {
     })
   );
   return { promise, cancel: () => clearTimeout(timer) };
+}
+
+/**
+ * Watches for the person asking to stop the question. When the signal is aborted, the returned
+ * promise rejects; if it is already aborted, it is rejected at once. Without a signal it never
+ * settles.
+ * @param {AbortSignal | undefined} signal - The signal that stops the question, if any.
+ * @returns {{ promise: Promise<never>, cancel: () => void }} The watcher and a way to stop it.
+ */
+export function createCancellation(signal) {
+  /** @type {(() => void) | undefined} */
+  let onAbort;
+  const promise = /** @type {Promise<never>} */ (
+    new Promise((_, reject) => {
+      if (signal === undefined) {
+        return;
+      }
+      onAbort = () => reject(new QuestionCancelledError());
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+    })
+  );
+  // Raced by the callers; marked as handled so a stop that nobody is waiting for is not "unhandled".
+  promise.catch(() => undefined);
+  return {
+    promise,
+    cancel() {
+      if (signal !== undefined && onAbort !== undefined) {
+        signal.removeEventListener('abort', onAbort);
+      }
+    },
+  };
 }
 
 /**

@@ -77,6 +77,24 @@ describe('createToolCallLog', () => {
     arguments: { owner: 'acme', repo: 'app' },
   };
 
+  it('returns the server and tool it recorded, never the arguments', () => {
+    const { log } = setup();
+
+    expect(log.start({ ...start, arguments: { token: 'secret' } })).toEqual({
+      server: 'github_repos',
+      tool: 'get_file_contents',
+    });
+  });
+
+  it('returns an unknown server and the plain tool name when the runtime gave no MCP names', () => {
+    const { log } = setup();
+
+    expect(log.start({ toolCallId: 'c', toolName: 'view', arguments: {} })).toEqual({
+      server: 'unknown',
+      tool: 'view',
+    });
+  });
+
   it('records the server, bare tool name and argument summary when a call starts', () => {
     const { log } = setup();
 
