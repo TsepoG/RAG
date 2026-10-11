@@ -6,6 +6,7 @@ import { AppError, AskTimeoutError, CopilotError } from '../errors/index.js';
 import { createCodeownersLookup, createCommitResolver, createGithubApi } from '../github/index.js';
 import { buildWhoToAsk } from '../honesty/index.js';
 import { createPermissionHandler, createToolGate, createToolHooks } from '../mcp/index.js';
+import { withDetailLevel } from '../roles/index.js';
 import { analyseReply } from './analyse.js';
 import { composeResult, wantsWhoToAsk } from './compose.js';
 import { bestEffort, createDeadline } from './deadline.js';
@@ -17,6 +18,8 @@ import { rewriteAnswer } from './rewrite.js';
  * @typedef {object} AskInput
  * @property {string} question - The question.
  * @property {import('../roles/index.js').Role} role - The role the answer is written for.
+ * @property {import('../roles/index.js').DetailLevel} [detailLevel] - `more` answers one step more
+ *   technically than the role usually does; defaults to `default`.
  * @property {(text: string) => void} [onDelta] - Receives each piece of the model's reply as it
  *   arrives. The reply includes its answer-meta block, which is not part of the final answer.
  */
@@ -36,6 +39,7 @@ import { rewriteAnswer } from './rewrite.js';
  * The outcome of a question: the checked answer with its status, confidence and sources, and how it
  * was reached.
  * @typedef {import('./compose.js').ComposedResult & {
+ *   detailLevel: import('../roles/index.js').DetailLevel,
  *   toolCalls: import('./toolCalls.js').ToolCallRecord[],
  *   model: string | undefined,
  *   durationMs: number,
@@ -75,11 +79,17 @@ function logReportProblems({ metaError, warning }, logger) {
  * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS before it has an answer.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  */
-export async function askQuestion({ question, role, onDelta }, deps) {
+export async function askQuestion(
+  { question, role: usualRole, detailLevel = 'default', onDelta },
+  deps,
+) {
   const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK, fetch } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
   }
+  // Both the prompt and the style check use the role as it is for this level of detail, so a
+  // rewrite cannot undo the extra detail that was asked for.
+  const role = withDetailLevel(usualRole, detailLevel);
   const startedAt = clock.now();
   const events = createEventRecorder({ clock, onDelta });
   const deadline = createDeadline(config.copilot.askTimeoutMs);
@@ -155,7 +165,7 @@ export async function askQuestion({ question, role, onDelta }, deps) {
         violations: analysis.caps.status === 'answered' ? analysis.violations : [],
       },
     });
-    return { ...composed, toolCalls, model, durationMs: clock.now() - startedAt };
+    return { ...composed, detailLevel, toolCalls, model, durationMs: clock.now() - startedAt };
   } catch (error) {
     if (error instanceof AskTimeoutError && open.session !== undefined) {
       const { session } = open;

@@ -124,6 +124,7 @@ describe('askQuestion answer', () => {
       rewritten: false,
       rewriteRejected: false,
       whoToAsk: [],
+      detailLevel: 'default',
       toolCalls: [],
       model: 'gpt-x',
       durationMs: 750,

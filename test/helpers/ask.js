@@ -74,6 +74,7 @@ async function toolReturns(client, toolName, fixture, args) {
  *   What the model says each turn.
  * @param {Array<[string, string, Record<string, unknown>?]>} [options.tools] - Tool results to deliver first.
  * @param {import('../../src/roles/index.js').Role} [options.role] - The role.
+ * @param {import('../../src/roles/index.js').DetailLevel} [options.detailLevel] - How much detail to ask for.
  * @param {Record<string, string | undefined>} [options.env] - Environment overrides.
  * @param {typeof fetch} [options.fetchFunction] - The fake fetch.
  * @param {() => number} [options.now] - The clock.
@@ -84,6 +85,7 @@ export async function ask({
   replies,
   tools = [],
   role = TEST_ROLE,
+  detailLevel,
   env = {},
   fetchFunction = /** @type {typeof fetch} */ (
     vi.fn(async () => new Response('', { status: 404 }))
@@ -113,7 +115,7 @@ export async function ask({
   });
   client = createFakeClient(session);
   const result = await askQuestion(
-    { role, question: 'How do refunds work?' },
+    { role, detailLevel, question: 'How do refunds work?' },
     {
       client,
       workingDirectory: 'sandbox/work',

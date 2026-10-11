@@ -5,10 +5,12 @@ import * as roles from '../../src/roles/index.js';
 describe('roles public entry point', () => {
   it('exports the loader, the lookup, the directory name and the schema', () => {
     expect(Object.keys(roles).sort()).toEqual([
+      'DETAIL_LEVELS',
       'ROLES_DIRECTORY',
       'getRole',
       'loadRoles',
       'roleSchema',
+      'withDetailLevel',
     ]);
   });
 });

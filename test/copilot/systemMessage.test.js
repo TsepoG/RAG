@@ -6,7 +6,7 @@ import {
   buildSystemMessage,
 } from '../../src/copilot/systemMessage.js';
 import { answerMetaSchema } from '../../src/honesty/index.js';
-import { loadRoles } from '../../src/roles/index.js';
+import { loadRoles, withDetailLevel } from '../../src/roles/index.js';
 import { makeRole, TEST_ROLE } from '../helpers/role.js';
 
 const SCOPE = {
@@ -300,6 +300,43 @@ describe('buildRoleBlock', () => {
     expect(buildRoleBlock(makeRole({ depth: 1 }))).toContain(
       'The code files are still listed in the sources',
     );
+  });
+});
+
+describe('buildRoleBlock more detail', () => {
+  const usual = makeRole({ depth: 1 });
+  const more = withDetailLevel(usual, 'more');
+
+  it('uses the guidance for the higher depth and says it wins over the style notes', () => {
+    const block = buildRoleBlock(more);
+
+    expect(block).toContain('Describe the logic and rules in plain terms.');
+    expect(block).toContain(
+      'The reader asked for more detail than usual: explain how it works, not only what it does. Where the style notes below say to keep technical detail out, the guidance above wins.',
+    );
+  });
+
+  it('puts the note right after the depth guidance, before the style notes', () => {
+    const block = buildRoleBlock(more);
+
+    expect(block.indexOf('Describe the logic')).toBeLessThan(block.indexOf('The reader asked'));
+    expect(block.indexOf('The reader asked')).toBeLessThan(block.indexOf('Style:'));
+  });
+
+  it('leaves the note out at the usual level', () => {
+    expect(buildRoleBlock(usual)).not.toContain('The reader asked for more detail');
+  });
+
+  it('leaves the shared base the same for every level and role', () => {
+    const scope = {
+      spaceKeys: ['ENG'],
+      repos: ['acme/app'],
+      siteUrl: 'https://acme.atlassian.net',
+    };
+    const base = buildBaseMessage(scope);
+
+    expect(buildSystemMessage({ ...scope, role: more }).startsWith(base)).toBe(true);
+    expect(buildSystemMessage({ ...scope, role: usual }).startsWith(base)).toBe(true);
   });
 });
 

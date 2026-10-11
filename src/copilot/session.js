@@ -8,7 +8,7 @@ import { buildSystemMessage } from './systemMessage.js';
  * Everything a session needs that is built elsewhere.
  * @typedef {object} SessionParts
  * @property {import('../config/index.js').AppConfig} config - Validated config.
- * @property {import('../roles/index.js').Role} role - The role the answer is written for.
+ * @property {import('../roles/index.js').DetailedRole} role - The role the answer is written for.
  * @property {string} workingDirectory - An empty directory the session runs in.
  * @property {import('@github/copilot-sdk').SessionHooks} hooks - The tool hooks for this question.
  * @property {import('@github/copilot-sdk').PermissionHandler} onPermissionRequest - Answers

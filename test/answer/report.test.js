@@ -33,6 +33,7 @@ function result(overrides = {}) {
     invalidKeys: [],
     uncitedSourceKeys: [],
     inferredKeys: [],
+    detailLevel: /** @type {const} */ ('default'),
     toolCalls: [],
     model: 'gpt-x',
     durationMs: 18_240,

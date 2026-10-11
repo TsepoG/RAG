@@ -12,7 +12,7 @@
 
 /**
  * The scope plus the role the answer is written for.
- * @typedef {SystemMessageScope & { role: import('../roles/index.js').Role }} SystemMessageInput
+ * @typedef {SystemMessageScope & { role: import('../roles/index.js').DetailedRole }} SystemMessageInput
  */
 
 /** Separates the shared base from the role block. */
@@ -90,6 +90,13 @@ function cloudIdRule(cloudId) {
 }
 
 /**
+ * Added to the role block when the reader asked for more detail. The role's own style notes were
+ * written for its usual depth and may say to keep technical detail out, so this says which wins.
+ */
+const MORE_DETAIL_NOTE =
+  'The reader asked for more detail than usual: explain how it works, not only what it does. Where the style notes below say to keep technical detail out, the guidance above wins.';
+
+/**
  * Builds the part of the system message that is the same for every role: grounding, safety,
  * search scoping and citation rules. Keeping it identical means a role changes how an answer is
  * written, never how carefully it is grounded. The hooks enforce the scoping rules, so a model
@@ -134,7 +141,7 @@ export function buildBaseMessage({ spaceKeys, repos, siteUrl, cloudId }) {
 /**
  * Builds the part of the system message that depends on the role: who the answer is for, how
  * technical it is, the words to use and avoid, where to search first and how to lay it out.
- * @param {import('../roles/index.js').Role} role - The role profile.
+ * @param {import('../roles/index.js').DetailedRole} role - The role profile.
  * @returns {string} The role block.
  */
 export function buildRoleBlock(role) {
@@ -151,6 +158,7 @@ export function buildRoleBlock(role) {
   return [
     `This answer is for a ${role.displayName}. Audience: ${role.audience}`,
     DEPTH_GUIDANCE[depth],
+    ...(role.detailLevel === 'more' ? [MORE_DETAIL_NOTE] : []),
     '',
     'Style:',
     ...role.vocabulary.map((rule) => `- ${rule}`),
