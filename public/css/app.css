@@ -72,17 +72,23 @@ h3 {
   margin: 4px 0;
 }
 
+/* Parked above the window, not off to the side, and moved into view on focus. It has its own colours
+   so it stands out from the page. */
 .skip {
-  position: absolute;
-  left: -9999px;
+  position: fixed;
+  top: 8px;
+  left: 16px;
+  z-index: 10;
+  padding: 8px 12px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  border-radius: 6px;
+  transform: translateY(-200%);
 }
 
 .skip:focus {
-  left: 16px;
-  top: 8px;
-  background: var(--bg);
-  padding: 8px;
-  z-index: 1;
+  transform: translateY(0);
 }
 
 .visually-hidden {
