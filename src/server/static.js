@@ -1,6 +1,7 @@
 // @ts-check
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, sep } from 'node:path';
+import { AppError } from '../errors/index.js';
 
 /** What the browser is told for each kind of file served. Any other kind is never served. */
 const CONTENT_TYPES = new Map([
@@ -31,9 +32,12 @@ const NOT_FOUND = 404;
  * Only this list is ever served, so a request cannot reach anything else.
  * @param {string} root - The folder, for example `public`.
  * @returns {Promise<ReadonlyMap<string, StaticFile>>} URL path to file and type.
+ * @throws {AppError} When the folder cannot be read.
  */
 export async function listStaticFiles(root) {
-  const entries = await readdir(root, { recursive: true, withFileTypes: true });
+  const entries = await readdir(root, { recursive: true, withFileTypes: true }).catch((error) => {
+    throw new AppError(`Cannot read the page's files in ${root}`, { cause: error });
+  });
   /** @type {Map<string, StaticFile>} */
   const files = new Map();
   for (const entry of entries) {

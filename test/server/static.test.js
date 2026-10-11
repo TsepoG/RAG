@@ -53,6 +53,13 @@ describe('listStaticFiles', () => {
     expect(files.get('/index.html')?.type).toBe('text/html; charset=utf-8');
   });
 
+  it('says so, with the cause, when the folder does not exist', async () => {
+    const failure = await listStaticFiles(join(base, 'missing')).catch((error) => error);
+
+    expect(failure.message).toContain("Cannot read the page's files");
+    expect(failure.cause.code).toBe('ENOENT');
+  });
+
   it('leaves out a kind of file it has no type for', async () => {
     const files = await listStaticFiles(root);
 
