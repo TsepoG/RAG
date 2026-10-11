@@ -126,26 +126,30 @@ src/
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] Every live answer shows a banner and a confidence level; `--json` shows
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+- [x] Every live answer shows a banner and a confidence level; `--json` shows
       `confidenceReason` and `capsApplied`.
-- [ ] An unanswerable question about the configured project (e.g. "What is the
+- [x] An unanswerable question about the configured project (e.g. "What is the
       SLA for the payments API?" if no such page exists) returns `not_found`
       with closest pages, not a guess. Paste the output in the PR.
 - [ ] An out-of-scope question ("What will the release date be next year?")
       returns the out-of-scope text.
-- [ ] An ambiguous question (if the sources allow one) returns a single
+      Not met live: the model answered at medium; unit-tested; Phase 6 measures it.
+- [x] An ambiguous question (if the sources allow one) returns a single
       clarifying question; otherwise the unit tests cover it and the PR says so.
-- [ ] A PO answer containing code or paths is rewritten once; the result has
+      Unit-tested only: no ambiguous question in the sources.
+- [x] A PO answer containing code or paths is rewritten once; the result has
       `rewritten: true` and no violations (live if it happens naturally,
       otherwise unit-tested).
-- [ ] An answer citing a stale page is capped at `medium` with the reason shown.
-- [ ] The Phase 3 gap is closed mechanically: a sentence supported only by a
+      Unit-tested only: no rewrite happened in the live runs.
+- [x] An answer citing a stale page is capped at `medium` with the reason shown.
+      Unit-tested only: the pages in the sources are recent.
+- [x] The Phase 3 gap is closed mechanically: a sentence supported only by a
       directory listing is treated as inferred and caps confidence (unit test).
-- [ ] The same uncertain question asked as `developer` and `product_owner`
+- [x] The same uncertain question asked as `developer` and `product_owner`
       gives the same confidence level, worded for each role. Paste both.
-- [ ] CI green; SonarQube quality gate passes with zero new issues.
-- [ ] README: statuses, confidence levels and caps, inferred markers, gaps,
+- [x] CI green; SonarQube quality gate passes with zero new issues.
+- [x] README: statuses, confidence levels and caps, inferred markers, gaps,
       conflicts, the rewrite, `--json`, and how to edit role `phrases`.
 
 ## Git rules for this phase
