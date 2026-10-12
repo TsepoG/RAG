@@ -186,7 +186,7 @@ describe('buildBaseMessage answer-meta rules', () => {
 
   it('asks for exactly one block tagged answer-meta, at the end, never shown', () => {
     expect(base).toContain(
-      'End every reply with exactly one fenced code block tagged answer-meta, with nothing after it:',
+      'End every reply with exactly one fenced code block tagged answer-meta, with nothing after it',
     );
     expect(base).toContain('The block is never shown to the user.');
   });
@@ -386,5 +386,32 @@ describe('buildSystemMessage', () => {
 
     expect(developer).toContain('Be technical.');
     expect(buildSystemMessage({ ...SCOPE, role: owner })).toContain(owner.bannedTerms.join(', '));
+  });
+});
+
+describe('buildBaseMessage replies that do not answer', () => {
+  const base = buildBaseMessage(SCOPE);
+
+  it('asks for the answer-meta block on a decline, a not-found reply and a clarifying question too', () => {
+    expect(base).toContain('This holds for every reply without exception');
+    expect(base).toContain(
+      'a reply that declines, says you cannot find something, says the question is out of scope or asks a clarifying question ends with the block too',
+    );
+    expect(base).toContain('the matching status ("not_found", "out_of_scope" or "clarify")');
+  });
+
+  it('puts a question that is not about the project out of scope, not not_found', () => {
+    expect(base).toContain(
+      'is not about the project at all (general programming or world knowledge, the weather, how some other tool works) is out of scope',
+    );
+    expect(base).toContain(
+      'not_found is for a question about this project that the sources you read do not answer.',
+    );
+    expect(base).toContain('is out of scope, not not_found');
+  });
+
+  it('forbids answering from something only similar to what was asked', () => {
+    expect(base).toContain('Never answer from something that is only similar to what was asked.');
+    expect(base).toContain('that is not the answer: report not_found');
   });
 });

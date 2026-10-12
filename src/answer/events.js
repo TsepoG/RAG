@@ -1,5 +1,6 @@
 // @ts-check
 import { AppError, CopilotError } from '../errors/index.js';
+import { describeModelCall, markFinalCall } from './modelCalls.js';
 import { createToolCallLog } from './toolCalls.js';
 
 /**
@@ -14,6 +15,8 @@ import { createToolCallLog } from './toolCalls.js';
  * @property {import('./toolCalls.js').ToolCallRecord[]} toolCalls - The tool calls made.
  * @property {string | undefined} model - The model that answered, if the events said.
  * @property {ModelChange[]} modelChanges - Each time the session changed model, in order.
+ * @property {import('./modelCalls.js').ModelCall[]} modelCalls - Every model call, in order, with
+ *   the one that wrote the answer marked.
  */
 
 /**
@@ -61,6 +64,10 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
   let model;
   /** @type {ModelChange[]} */
   const modelChanges = [];
+  /** @type {import('./modelCalls.js').ModelCall[]} */
+  const modelCalls = [];
+  /** @type {string | undefined} */
+  let finalApiCallId;
   /** @type {(outcome: Outcome) => void} */
   let settle;
   // Resolves, never rejects, so a failure that arrives before anyone awaits it is not "unhandled".
@@ -91,11 +98,13 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
         source.on('assistant.message', ({ data }) => {
           if (data.content.trim() !== '') {
             finalMessage = data.content;
+            finalApiCallId = data.apiCallId;
           }
           model = data.model ?? model;
         }),
         source.on('assistant.usage', ({ data }) => {
           model = data.model;
+          modelCalls.push(describeModelCall(data, modelCalls.length));
         }),
         source.on('session.model_change', ({ data }) =>
           modelChanges.push({
@@ -124,6 +133,7 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
         toolCalls: toolCalls.list(),
         model,
         modelChanges: [...modelChanges],
+        modelCalls: markFinalCall(modelCalls, finalApiCallId),
       };
     },
   };

@@ -81,19 +81,24 @@ flags correct sentences whose citation sits at the end of the paragraph.
 
 ### Two things that affect how to read the results
 
-1. **The pinned model did not answer every case.** 13 of 38 full-run answers came from
-   `mai-code-1.1-flash`, though `gpt-6-luna` was asked for. The same three smoke cases
-   (`dev-rate-limit-clarify`, `pm-release-history`, `oos-pm-next-year-releases`) were answered by
-   `mai-code-1.1-flash` in all three runs, so which cases switch looks stable. By model:
+1. **The model reported on the answer was not always the one asked for.** For 13 of 38
+   full-run answers the last model the runtime reported was `mai-code-1.1-flash`, though
+   `gpt-6-luna` was pinned. Those 13 are not a random sample: 5 expected a decline or a clarifying question (12 of all
+   38 cases do), and 8 were product owner or project manager cases (14 of 38 are), so the split by
+   model below is confounded by case type and role. It does not show that the second model is
+   weaker, and it is not used to explain any result.
+   **Cause: under investigation.** A smoke rerun (`20261012-154802`) recorded no
+   `session.model_change` event in any case, so this is not a session-level switch. Two of its 8
+   cases still ended on `mai-code-1.1-flash`, and `pm-release-history`, which did in all three
+   baseline runs, did not. Every model call is now recorded per case (model, class of call,
+   routing details, and which call wrote the answer); the round 1 rerun will show whether another
+   model makes some calls inside a question.
 
-   | Model | Cases | Status as expected | Correctness | Answers with no confidence report |
+   | Last model reported | Cases | Status as expected | Correctness | Answers with no confidence report |
    | --- | --- | --- | --- | --- |
    | gpt-6-luna | 25 | 88% | 88% | 2 |
    | mai-code-1.1-flash | 13 | 54% | 68% | 3 |
 
-   The SDK can switch a session's model on its own, either for rate-limit recovery or when a model
-   declines a request (`session.model_change` with reason `rate_limit_auto_switch` or
-   `refusal_fallback`). The eval does not record these events yet, so the reason is unknown.
 2. **The review verdicts were drafted by Claude Code at the owner's request**, after checking each
    answer against the pages and files (the code claims in the jump, coverage and split answers were
    checked against the repository). They are not an independent judgement. At 21 correct, 8 partial

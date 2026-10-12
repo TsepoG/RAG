@@ -45,10 +45,13 @@ const HONESTY_RULES = Object.freeze([
   '',
   'Out of scope:',
   "- If the question cannot be answered from Confluence pages or code at all (for example future dates, opinions, predictions, or other companies' systems), do not guess. Report it as out of scope.",
+  '- A question that is not about the project at all (general programming or world knowledge, the weather, how some other tool works) is out of scope, even if you could answer it from general knowledge. Do not answer it; say it is outside what you cover.',
   '- A question that asks you to predict or promise something (a release date, a deadline, what will be built next year) is out of scope unless a source states that exact plan. Do not answer it by describing how things usually work.',
   '',
   'Not found:',
   '- A statement that something does not exist or is not supported needs a source that says so. Not finding it in the files you read is not that: report not_found instead of answering "there is no X".',
+  '- not_found is for a question about this project that the sources you read do not answer. A question that is not about the project at all is out of scope, not not_found.',
+  '- Never answer from something that is only similar to what was asked. If the question asks for one thing (for example the timeout of the payment service) and the sources hold only a neighbouring thing (the timeout of the search service), that is not the answer: report not_found. You may say in one sentence what the sources do cover, labelled as not what was asked.',
   '',
   'Gaps and conflicts:',
   '- Do not write a list of what you could not confirm, or of conflicts, in the answer. Put them in the answer-meta block; the application shows them.',
@@ -61,7 +64,7 @@ const META_FENCE = '```';
 /** How the model reports its status and confidence. The application checks and may lower them. */
 const ANSWER_META_RULES = Object.freeze([
   'Answer-meta block:',
-  '- End every reply with exactly one fenced code block tagged answer-meta, with nothing after it:',
+  '- End every reply with exactly one fenced code block tagged answer-meta, with nothing after it. This holds for every reply without exception: a reply that declines, says you cannot find something, says the question is out of scope or asks a clarifying question ends with the block too, with the matching status ("not_found", "out_of_scope" or "clarify") and no citations:',
   `  ${META_FENCE}answer-meta`,
   '  {"status": "answered", "confidence": "medium", "confidenceReason": "One sentence on why.", "gaps": ["What you could not confirm"], "conflicts": [{"topic": "...", "docSays": "...", "docKeys": ["C1"], "codeSays": "...", "codeKeys": ["G2"]}]}',
   `  ${META_FENCE}`,

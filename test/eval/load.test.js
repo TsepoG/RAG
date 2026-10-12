@@ -276,3 +276,38 @@ describe('loadCases with the roles as a map', () => {
     expect(failure.message).toContain('Valid roles: developer');
   });
 });
+
+describe('selectCases with a list of ids', () => {
+  /** @returns {Promise<ReadonlyArray<import('../../src/eval/schema.js').EvalCase>>} The sample cases. */
+  const sample = () => load(VALID);
+
+  it('keeps only the listed cases, in file order', async () => {
+    const chosen = selectCases(await sample(), { ids: ['qa-three', 'po-two'] });
+
+    expect(chosen.map(({ id }) => id)).toEqual(['po-two', 'qa-three']);
+  });
+
+  it('keeps the listed cases and the smoke cases together, each once', async () => {
+    const chosen = selectCases(await sample(), { ids: ['po-two', 'dev-one'], subset: 'smoke' });
+
+    expect(chosen.map(({ id }) => id)).toEqual(['dev-one', 'po-two', 'qa-three']);
+  });
+
+  it('keeps every case when the full subset is added', async () => {
+    expect(selectCases(await sample(), { ids: ['po-two'], subset: 'full' })).toHaveLength(3);
+  });
+
+  it('names every id that is not a case', async () => {
+    const cases = await sample();
+
+    expect(() => selectCases(cases, { ids: ['po-two', 'nope', 'nada'] })).toThrow(
+      'There is no case with the id "nope", "nada".',
+    );
+  });
+
+  it('still applies the role filter', async () => {
+    const cases = await sample();
+
+    expect(selectCases(cases, { ids: ['po-two', 'qa-three'], role: 'qa' })).toHaveLength(1);
+  });
+});

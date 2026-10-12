@@ -86,7 +86,12 @@ async function main() {
     const { config, logger } = settings;
     const roles = await loadRoles();
     const all = await loadCases({ roles });
-    const cases = selectCases(all, { subset: args.subset, caseId: args.caseId, role: args.role });
+    const cases = selectCases(all, {
+      subset: args.subset,
+      ids: args.ids,
+      caseId: args.caseId,
+      role: args.role,
+    });
     assertRunnable(cases);
     const estimate = estimateRequests(cases, roles);
     process.stderr.write(

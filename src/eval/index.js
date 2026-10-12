@@ -14,7 +14,7 @@ export { percentile, summarise } from './summarise.js';
 export { createRequestGuard, estimateRequests } from './budget.js';
 export { EVAL_USAGE, parseEvalArguments } from './args.js';
 export { formatMetrics, formatSummary } from './summary.js';
-export { casesByModel, formatModelSwitches, groupModelSwitches } from './switches.js';
+export { callsByCase, casesByModel, formatModelSwitches, groupModelSwitches } from './switches.js';
 export {
   formatResults,
   parseResults,

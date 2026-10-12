@@ -24,7 +24,9 @@ const SMOKE_TAG = 'smoke';
 /**
  * Which cases to run.
  * @typedef {object} Selection
- * @property {'smoke' | 'full'} [subset] - `smoke` is the cases tagged smoke; `full` (the default) is all.
+ * @property {'smoke' | 'full'} [subset] - `smoke` is the cases tagged smoke; `full` is all. Left
+ *   out, it is all, unless `ids` is given.
+ * @property {ReadonlyArray<string>} [ids] - These cases; together with a subset, both.
  * @property {string} [caseId] - Only the case with this id.
  * @property {string} [role] - Only the cases for this role.
  */
@@ -143,19 +145,39 @@ export async function loadCases({ file = EVAL_FILE, readFile = readTextFile, rol
 }
 
 /**
+ * Whether a case belongs to the chosen subset or list of ids. With ids and no subset, only the
+ * listed cases; with both, the listed cases and the subset together.
+ * @param {import('./schema.js').EvalCase} one - The case.
+ * @param {Selection} selection - What to keep.
+ * @returns {boolean} Whether it is in.
+ */
+function isSelected(one, { subset, ids }) {
+  const inSubset = subset === 'full' || (subset === 'smoke' && one.tags.includes(SMOKE_TAG));
+  if (ids === undefined) {
+    return subset === undefined || inSubset;
+  }
+  return ids.includes(one.id) || inSubset;
+}
+
+/**
  * Picks the cases to run.
  * @param {ReadonlyArray<import('./schema.js').EvalCase>} cases - All the cases.
  * @param {Selection} [selection] - What to keep.
  * @returns {import('./schema.js').EvalCase[]} The chosen cases, in file order.
- * @throws {EvalError} When nothing is chosen, or `caseId` names no case.
+ * @throws {EvalError} When nothing is chosen, or `caseId` or one of `ids` names no case.
  */
-export function selectCases(cases, { subset = 'full', caseId, role } = {}) {
-  if (caseId !== undefined && !cases.some(({ id }) => id === caseId)) {
-    throw new EvalError(`There is no case with the id "${caseId}".`);
+export function selectCases(cases, selection = {}) {
+  const { caseId, role, ids } = selection;
+  const unknown = [...(caseId === undefined ? [] : [caseId]), ...(ids ?? [])].filter(
+    (wanted) => !cases.some(({ id }) => id === wanted),
+  );
+  if (unknown.length > 0) {
+    const quoted = unknown.map((id) => '"' + id + '"').join(', ');
+    throw new EvalError(`There is no case with the id ${quoted}.`);
   }
   const chosen = cases.filter(
     (one) =>
-      (subset === 'full' || one.tags.includes(SMOKE_TAG)) &&
+      isSelected(one, selection) &&
       (caseId === undefined || one.id === caseId) &&
       (role === undefined || one.role === role),
   );

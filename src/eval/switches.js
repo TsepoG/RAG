@@ -81,6 +81,51 @@ export function casesByModel(entries) {
 }
 
 /**
+ * Names a model call for a reader: the model, and the concrete model behind it when a router chose.
+ * @param {{ model: string, fusion?: { sourceModel?: string } }} call - The call.
+ * @returns {string} For example `gpt-6-luna` or `gpt-6-luna via some-model`.
+ */
+function callLabel({ model, fusion }) {
+  const behind = fusion?.sourceModel;
+  return behind === undefined || behind === model ? model : `${model} via ${behind}`;
+}
+
+/**
+ * Reads the model calls recorded in an answer, ignoring anything not shaped like one.
+ * @param {Record<string, unknown> | undefined} result - A stored answer.
+ * @returns {Array<{ model: string, fusion?: { sourceModel?: string }, producedFinal: boolean, interactionType?: string }>} The calls.
+ */
+function callsOf(result) {
+  const recorded = result?.modelCalls;
+  if (!Array.isArray(recorded)) {
+    return [];
+  }
+  return recorded.flatMap((call) =>
+    typeof call === 'object' && call !== null && typeof call.model === 'string'
+      ? [{ ...call, producedFinal: call.producedFinal === true }]
+      : [],
+  );
+}
+
+/**
+ * For each case, the models its calls used and the one that wrote the answer.
+ * @param {ReadonlyArray<import('./run.js').RunEntry>} entries - The cases, as they ran.
+ * @returns {Array<{ id: string, calls: number, models: string[], wrote: string }>} One row per case.
+ */
+export function callsByCase(entries) {
+  return entries.map(({ id, result }) => {
+    const calls = callsOf(result);
+    const final = calls.find((call) => call.producedFinal);
+    return {
+      id,
+      calls: calls.length,
+      models: [...new Set(calls.map(callLabel))],
+      wrote: final === undefined ? UNKNOWN : callLabel(final),
+    };
+  });
+}
+
+/**
  * Writes which models answered and every time the runtime changed the model, with the reason it
  * gave. Without this a change in results cannot be told apart from a change of model.
  * @param {ReadonlyArray<import('./run.js').RunEntry>} entries - The cases, as they ran.
@@ -88,16 +133,25 @@ export function casesByModel(entries) {
  */
 export function formatModelSwitches(entries) {
   const answered = table(
-    ['Answered by', 'Cases', 'Which'],
+    ['Last model reported', 'Cases', 'Which'],
     casesByModel(entries).map(({ model, cases }) => [
       model,
       String(cases.length),
       cases.join(', '),
     ]),
   );
+  const perCase = table(
+    ['Case', 'Model calls', 'Models used', 'Wrote the answer'],
+    callsByCase(entries).map(({ id, calls, models, wrote }) => [
+      id,
+      String(calls),
+      models.join(', ') || UNKNOWN,
+      wrote,
+    ]),
+  );
   const groups = groupModelSwitches(entries);
   if (groups.length === 0) {
-    return `${answered}\n\nThe runtime did not change the model in any case.`;
+    return `${answered}\n\n${perCase}\n\nThe runtime did not change the model in any case.`;
   }
   const changes = table(
     ['Reason', 'Source', 'From', 'To', 'Cases', 'Which'],
@@ -110,5 +164,5 @@ export function formatModelSwitches(entries) {
       cases.join(', '),
     ]),
   );
-  return `${answered}\n\n${changes}`;
+  return `${answered}\n\n${perCase}\n\n${changes}`;
 }

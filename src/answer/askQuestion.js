@@ -54,6 +54,7 @@ import { finishAnswer } from './finish.js';
  *   toolCalls: import('./toolCalls.js').ToolCallRecord[],
  *   model: string | undefined,
  *   modelChanges: import('./events.js').ModelChange[],
+ *   modelCalls: import('./modelCalls.js').ModelCall[],
  *   durationMs: number,
  * }} AskResult
  */
@@ -155,7 +156,7 @@ export async function askQuestion(
     if (!outcome.ok) {
       throw outcome.error;
     }
-    const { answer: reply, toolCalls, model, modelChanges } = events.result();
+    const { answer: reply, toolCalls, model, modelChanges, modelCalls } = events.result();
     const composed = await finishAnswer({
       reply,
       role,
@@ -175,6 +176,7 @@ export async function askQuestion(
       toolCalls,
       model,
       modelChanges,
+      modelCalls,
       durationMs: clock.now() - startedAt,
     };
   } catch (error) {

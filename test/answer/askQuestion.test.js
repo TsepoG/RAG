@@ -128,6 +128,17 @@ describe('askQuestion answer', () => {
       toolCalls: [],
       model: 'gpt-x',
       modelChanges: [],
+      modelCalls: [
+        {
+          index: 0,
+          model: 'gpt-x',
+          apiCallId: undefined,
+          interactionType: undefined,
+          initiator: undefined,
+          fusion: undefined,
+          producedFinal: false,
+        },
+      ],
       durationMs: 750,
     });
   });
@@ -695,5 +706,51 @@ describe('askQuestion model changes', () => {
       },
       { from: undefined, to: 'other', reason: 'unspecified', source: undefined },
     ]);
+  });
+});
+
+describe('askQuestion model calls', () => {
+  it('records every model call and marks the one that wrote the answer', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a1' });
+        emit('assistant.message', { content: 'first', apiCallId: 'a1' });
+        emit('assistant.usage', {
+          model: 'gpt-x',
+          apiCallId: 'a2',
+          fusion: { sourceModel: 'small-z' },
+        });
+        emit('assistant.message', { content: 'last', apiCallId: 'a2' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelCalls } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(
+      modelCalls.map(({ index, apiCallId, producedFinal }) => [index, apiCallId, producedFinal]),
+    ).toEqual([
+      [0, 'a1', false],
+      [1, 'a2', true],
+    ]);
+    expect(modelCalls[1].fusion?.sourceModel).toBe('small-z');
+  });
+
+  it('does not move the mark for a message with no text', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a1' });
+        emit('assistant.message', { content: 'answer', apiCallId: 'a1' });
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a2' });
+        emit('assistant.message', { content: '  ', apiCallId: 'a2' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelCalls } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(modelCalls.map(({ producedFinal }) => producedFinal)).toEqual([true, false]);
   });
 });

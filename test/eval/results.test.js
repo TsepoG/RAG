@@ -268,8 +268,23 @@ describe('parseEvalArguments', () => {
     ).toEqual({ subset: 'smoke', caseId: 'dev-one', role: 'qa', maxRequests: 12, yes: true });
   });
 
+  it('reads a list of ids, trimmed and without repeats, and then runs only those', () => {
+    const args = parseEvalArguments(['--ids', 'a, b,,a']);
+
+    expect(args.ids).toEqual(['a', 'b']);
+    expect(args.subset).toBeUndefined();
+  });
+
+  it('adds the smoke cases to the listed ones when both are asked for', () => {
+    expect(parseEvalArguments(['--ids', 'a', '--subset', 'smoke'])).toMatchObject({
+      ids: ['a'],
+      subset: 'smoke',
+    });
+  });
+
   it.each([
     ['an unknown option', ['--fast']],
+    ['an empty list of ids', ['--ids', ' , ']],
     ['a word that is not an option', ['everything']],
     ['an option with no value', ['--role']],
     ['a subset that does not exist', ['--subset', 'half']],

@@ -1,6 +1,11 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { casesByModel, formatModelSwitches, groupModelSwitches } from '../../src/eval/switches.js';
+import {
+  callsByCase,
+  casesByModel,
+  formatModelSwitches,
+  groupModelSwitches,
+} from '../../src/eval/switches.js';
 import { formatSummary } from '../../src/eval/summary.js';
 import { summarise } from '../../src/eval/summarise.js';
 import { makeHeader, makeScore } from '../helpers/eval.js';
@@ -132,5 +137,74 @@ describe('formatSummary models section', () => {
 
   it('is left out when they are not', () => {
     expect(formatSummary({ run: makeHeader(), summary })).not.toContain('## Models');
+  });
+});
+
+describe('callsByCase', () => {
+  const call = (/** @type {Record<string, unknown>} */ changes) => ({
+    model: 'gpt-6-luna',
+    producedFinal: false,
+    ...changes,
+  });
+
+  it('lists the models a case used and the one that wrote the answer', () => {
+    const [row] = callsByCase([
+      entry('a', {
+        modelCalls: [
+          call({ fusion: { sourceModel: 'mai-code-1.1-flash' } }),
+          call({}),
+          call({ producedFinal: true }),
+        ],
+      }),
+    ]);
+
+    expect(row).toEqual({
+      id: 'a',
+      calls: 3,
+      models: ['gpt-6-luna via mai-code-1.1-flash', 'gpt-6-luna'],
+      wrote: 'gpt-6-luna',
+    });
+  });
+
+  it('names the concrete model behind a router that wrote the answer', () => {
+    const [row] = callsByCase([
+      entry('a', {
+        modelCalls: [call({ fusion: { sourceModel: 'other' }, producedFinal: true })],
+      }),
+    ]);
+
+    expect(row.wrote).toBe('gpt-6-luna via other');
+  });
+
+  it('does not repeat the model when the router and the concrete model are the same', () => {
+    const [row] = callsByCase([
+      entry('a', { modelCalls: [call({ fusion: { sourceModel: 'gpt-6-luna' } })] }),
+    ]);
+
+    expect(row.models).toEqual(['gpt-6-luna']);
+  });
+
+  it('says unknown when no call is marked, and copes with missing or malformed calls', () => {
+    const rows = callsByCase([
+      entry('a', { modelCalls: [call({})] }),
+      entry('b', undefined),
+      entry('c', { modelCalls: [null, { model: 3 }] }),
+    ]);
+
+    expect(rows.map(({ wrote, calls }) => [wrote, calls])).toEqual([
+      ['unknown', 1],
+      ['unknown', 0],
+      ['unknown', 0],
+    ]);
+  });
+
+  it('is shown per case in the summary', () => {
+    const text = formatModelSwitches([
+      entry('a', { model: 'm', modelCalls: [call({ producedFinal: true })] }),
+      entry('b', undefined),
+    ]);
+
+    expect(text).toContain('| a | 1 | gpt-6-luna | gpt-6-luna |');
+    expect(text).toContain('| b | 0 | unknown | unknown |');
   });
 });

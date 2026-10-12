@@ -37,6 +37,7 @@ function result(overrides = {}) {
     toolCalls: [],
     model: 'gpt-x',
     modelChanges: [],
+    modelCalls: [],
     durationMs: 18_240,
     ...overrides,
   };
