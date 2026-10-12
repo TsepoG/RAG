@@ -97,6 +97,7 @@ export function formatMetrics(summary) {
       ['Style problems left for a depth 1 role', ratioText(summary.plainStyleViolations)],
       ['Meta block missing', ratioText(summary.metaErrors)],
       ['Meta block got by asking again', ratioText(summary.metaRepaired)],
+      ['Meta block asked for again and not got', ratioText(summary.metaRepairRejected)],
       ['Invalid citation keys', ratioText(summary.invalidKeys)],
       ['Sentences without a citation', ratioText(summary.uncitedSentences)],
       ['Cited sources that are the assistant’s own reading', percent(summary.inferredShare)],

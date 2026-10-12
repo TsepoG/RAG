@@ -123,6 +123,12 @@ describe('summarise: citations and checks', () => {
     expect(summary.metaRepaired).toEqual({ count: 1, of: 2, rate: 0.5 });
   });
 
+  it('counts the reports that were asked for again and not got', () => {
+    const summary = summarise([makeScore({ metaRepairRejected: true }), makeScore({ id: 'b' })]);
+
+    expect(summary.metaRepairRejected).toEqual({ count: 1, of: 2, rate: 0.5 });
+  });
+
   it('counts meta errors, invalid keys and uncited sentences', () => {
     const summary = summarise([
       makeScore({ id: 'a', metaError: true, invalidKeys: 1, uncitedSentences: 3 }),

@@ -32,7 +32,7 @@ describe('askQuestion when the answer-meta block is missing', () => {
     const { result, session } = await ask({ tools: [PAGE], replies: [reply(ANSWER)] });
 
     expect(session.sent).toHaveLength(1);
-    expect(result.metaRepaired).toBe(false);
+    expect(result).toMatchObject({ metaRepaired: false, metaRepairRejected: false });
   });
 
   it('does not ask when there is no answer for a report to be about', async () => {
@@ -115,6 +115,27 @@ describe('askQuestion when the answer-meta block is missing', () => {
     expect(result).toMatchObject({ answer: ANSWER, metaRepaired: true });
   });
 
+  it.each([
+    [
+      'not valid JSON',
+      `${FENCE}answer-meta
+{oops
+${FENCE}`,
+      'invalid-json',
+    ],
+    [
+      'without the required fields',
+      `${FENCE}answer-meta
+{"status":"answered"}
+${FENCE}`,
+      'invalid-shape',
+    ],
+  ])('says why when the repair is %s', async (_name, second, reason) => {
+    const { result } = await ask({ tools: [PAGE], replies: [ANSWER, second] });
+
+    expect(result).toMatchObject({ metaRepaired: false, metaRepairRejectedReason: reason });
+  });
+
   it('uses only the block from the repair, never words around it', async () => {
     const { result } = await ask({
       tools: [PAGE],
@@ -132,7 +153,13 @@ describe('askQuestion when the answer-meta block is missing', () => {
     });
 
     expect(session.sent).toHaveLength(2);
-    expect(result).toMatchObject({ answer: ANSWER, metaRepaired: false, confidence: 'low' });
+    expect(result).toMatchObject({
+      answer: ANSWER,
+      metaRepaired: false,
+      metaRepairRejected: true,
+      metaRepairRejectedReason: 'missing',
+      confidence: 'low',
+    });
     expect(result.capsApplied.map(({ code }) => code)).toContain('no-meta');
   });
 
@@ -167,7 +194,13 @@ describe('askQuestion when the answer-meta block is missing', () => {
       ],
     });
 
-    expect(result).toMatchObject({ answer: ANSWER, metaRepaired: false, confidence: 'low' });
+    expect(result).toMatchObject({
+      answer: ANSWER,
+      metaRepaired: false,
+      metaRepairRejected: true,
+      metaRepairRejectedReason: 'error',
+      confidence: 'low',
+    });
     expect(lines()).toContainEqual(
       expect.objectContaining({ msg: 'the repair failed; keeping the first report' }),
     );
@@ -184,7 +217,12 @@ describe('askQuestion when the answer-meta block is missing', () => {
       ],
     });
 
-    expect(result).toMatchObject({ answer: ANSWER, metaRepaired: false });
+    expect(result).toMatchObject({
+      answer: ANSWER,
+      metaRepaired: false,
+      metaRepairRejected: true,
+      metaRepairRejectedReason: 'error',
+    });
   });
 
   it('keeps the first answer, and aborts the session, when the repair runs out of time', async () => {
@@ -197,7 +235,11 @@ describe('askQuestion when the answer-meta block is missing', () => {
     await vi.advanceTimersByTimeAsync(8000);
     const { result, session } = await outcome;
 
-    expect(result).toMatchObject({ answer: ANSWER, metaRepaired: false });
+    expect(result).toMatchObject({
+      answer: ANSWER,
+      metaRepaired: false,
+      metaRepairRejectedReason: 'timeout',
+    });
     expect(session.abort).toHaveBeenCalledOnce();
   });
 

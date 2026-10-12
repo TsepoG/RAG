@@ -11,7 +11,34 @@ import { createEventRecorder } from './events.js';
  * @property {import('./analyse.js').Analysis} analysis - What to show: the answer judged with the
  *   repaired report when there is one, otherwise the first analysis, unchanged.
  * @property {boolean} metaRepaired - True when a valid report was got and used.
+ * @property {boolean} metaRepairRejected - True when a request was sent and no valid report came
+ *   of it.
+ * @property {RepairRejectedReason} [metaRepairRejectedReason] - Why, when it was not used.
  */
+
+/**
+ * Why a repair did not give a report: what was wrong with the reply to it, or how the request
+ * ended.
+ * @typedef {'missing' | 'invalid-json' | 'invalid-shape' | 'error' | 'timeout'} RepairRejectedReason
+ */
+
+/** The outcome when nothing was asked. */
+const NOT_ASKED = Object.freeze({ metaRepaired: false, metaRepairRejected: false });
+
+/**
+ * Builds the outcome for a request that gave no usable report.
+ * @param {import('./analyse.js').Analysis} analysis - The first analysis, kept.
+ * @param {RepairRejectedReason} reason - Why.
+ * @returns {RepairOutcome} The outcome.
+ */
+function rejected(analysis, reason) {
+  return {
+    analysis,
+    metaRepaired: false,
+    metaRepairRejected: true,
+    metaRepairRejectedReason: reason,
+  };
+}
 
 /** The fence the report is written in. */
 const FENCE = '```';
@@ -77,7 +104,7 @@ export async function repairMeta({
   const { metaError } = original;
   // With no answer there is nothing for a report to be about.
   if (metaError === undefined || original.parts.answer.trim() === '') {
-    return { analysis: original, metaRepaired: false };
+    return { analysis: original, ...NOT_ASKED };
   }
   // Locked before the request, so even a model that ignores the instruction gets no tool.
   gate.lock();
@@ -89,17 +116,18 @@ export async function repairMeta({
     const outcome = await Promise.race([turn.settled, deadline.promise]);
     if (!outcome.ok) {
       logger.warn({ err: outcome.error }, 'the repair failed; keeping the first report');
-      return { analysis: original, metaRepaired: false };
+      return rejected(original, 'error');
     }
     const repaired = parseAnswerMeta(turn.result().answer);
     if (repaired.meta === undefined) {
       logger.warn({ reason: repaired.metaError }, 'the repaired answer-meta block was not usable');
-      return { analysis: original, metaRepaired: false };
+      return rejected(original, /** @type {'missing'} */ (repaired.metaError));
     }
     const { answer } = parseAnswerMeta(reply);
     return {
       analysis: analyseReply({ reply: withReport(answer, repaired.meta), role, registry }),
       metaRepaired: true,
+      metaRepairRejected: false,
     };
   } catch (error) {
     if (error instanceof QuestionCancelledError) {
@@ -108,10 +136,10 @@ export async function repairMeta({
     }
     if (error instanceof AskTimeoutError) {
       await bestEffort('abort the timed-out repair', () => session.abort(), logger);
-      return { analysis: original, metaRepaired: false };
+      return rejected(original, 'timeout');
     }
     logger.warn({ err: error }, 'the repair failed; keeping the first report');
-    return { analysis: original, metaRepaired: false };
+    return rejected(original, 'error');
   } finally {
     turn.detach();
   }

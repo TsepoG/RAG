@@ -35,6 +35,7 @@ const P95 = 0.95;
  *   problems left after the rewrite.
  * @property {Ratio} metaErrors - Cases where the assistant did not report its confidence, even when asked again.
  * @property {Ratio} metaRepaired - Cases where the first reply had no usable report and a second request got one.
+ * @property {Ratio} metaRepairRejected - Cases where a second request was sent and got no report.
  * @property {Ratio} invalidKeys - Cases with a citation key that was never given out.
  * @property {Ratio} uncitedSentences - Cases with a sentence that makes a claim without a citation.
  * @property {number | undefined} inferredShare - The mean share of cited sources that are the assistant's reading.
@@ -172,6 +173,7 @@ export function summarise(scores) {
     ),
     metaErrors: countWhere(scores, ({ metaError }) => metaError),
     metaRepaired: countWhere(scores, ({ metaRepaired }) => metaRepaired),
+    metaRepairRejected: countWhere(scores, ({ metaRepairRejected }) => metaRepairRejected),
     invalidKeys: countWhere(scores, ({ invalidKeys }) => invalidKeys > 0),
     uncitedSentences: countWhere(scores, ({ uncitedSentences }) => uncitedSentences > 0),
     inferredShare: mean(shares),

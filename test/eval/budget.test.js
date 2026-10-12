@@ -102,6 +102,14 @@ describe('createRequestGuard', () => {
     expect(guard.report().used).toBe(5);
   });
 
+  it('counts a request more when the report was asked for again and not got', () => {
+    const guard = createRequestGuard(10);
+
+    guard.record({ metaRepairRejected: true });
+
+    expect(guard.report().used).toBe(2);
+  });
+
   it('counts two requests for a rewrite that was tried and not used', () => {
     const guard = createRequestGuard(10);
 

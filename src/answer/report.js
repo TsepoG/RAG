@@ -159,6 +159,11 @@ export function describeStyle(result, role) {
   if (result.metaRepaired) {
     notes.push('The confidence report was missing, so it was asked for again.');
   }
+  if (result.metaRepairRejected) {
+    notes.push(
+      `The confidence report was asked for again and not got (${result.metaRepairRejectedReason}).`,
+    );
+  }
   if (result.rewritten) {
     notes.push(`Rewrote the answer to suit a ${role.displayName}.`);
   }

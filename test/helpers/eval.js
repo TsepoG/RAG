@@ -63,6 +63,7 @@ export function makeScore(changes = {}) {
     plainStyleViolations: 0,
     metaError: false,
     metaRepaired: false,
+    metaRepairRejected: false,
     invalidKeys: 0,
     uncitedSentences: 0,
     inferredShare: undefined,

@@ -129,6 +129,7 @@ describe('askQuestion answer', () => {
       model: 'gpt-x',
       modelChanges: [],
       metaRepaired: false,
+      metaRepairRejected: false,
       modelCalls: [
         {
           index: 0,

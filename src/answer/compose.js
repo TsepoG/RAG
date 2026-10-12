@@ -32,6 +32,8 @@ import { MAX_ALSO_CONSULTED } from './result.js';
  * @property {string} [rewriteRejectedReason] - Why it was not used.
  * @property {boolean} metaRepaired - True when the answer-meta block was missing or unusable and a
  *   valid one was got by asking again; the answer text is the first reply's.
+ * @property {boolean} metaRepairRejected - True when it was asked for again and no valid one came.
+ * @property {string} [metaRepairRejectedReason] - Why not.
  * @property {import('../honesty/index.js').WhoToAsk[]} whoToAsk - People worth asking.
  */
 
@@ -60,12 +62,18 @@ export function wantsWhoToAsk({ status, confidence }) {
  *   role: import('../roles/index.js').Role,
  *   whoToAsk: import('../honesty/index.js').WhoToAsk[],
  *   style: StyleOutcome,
- *   metaRepaired?: boolean,
+ *   repair?: Pick<import('./repairMeta.js').RepairOutcome, 'metaRepaired' | 'metaRepairRejected' | 'metaRepairRejectedReason'>,
  * }} input - The analysis of the final reply, the role, who to ask, what happened to the style, and
  *   whether the answer-meta block was got by asking again.
  * @returns {ComposedResult} The result.
  */
-export function composeResult({ analysis, role, whoToAsk, style, metaRepaired = false }) {
+export function composeResult({
+  analysis,
+  role,
+  whoToAsk,
+  style,
+  repair = { metaRepaired: false, metaRepairRejected: false },
+}) {
   const { caps, meta, parts } = analysis;
   const answered = caps.status === 'answered';
   // Nothing counts as cited when the question was not answered, so what was fetched is "consulted".
@@ -99,7 +107,11 @@ export function composeResult({ analysis, role, whoToAsk, style, metaRepaired = 
     ...(style.rewriteRejectedReason === undefined
       ? {}
       : { rewriteRejectedReason: style.rewriteRejectedReason }),
-    metaRepaired,
+    metaRepaired: repair.metaRepaired,
+    metaRepairRejected: repair.metaRepairRejected,
+    ...(repair.metaRepairRejectedReason === undefined
+      ? {}
+      : { metaRepairRejectedReason: repair.metaRepairRejectedReason }),
     whoToAsk,
   };
   const shown = renderFinalAnswer(composed, role);

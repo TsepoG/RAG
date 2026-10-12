@@ -75,7 +75,7 @@ export async function finishAnswer({
           deadline: { promise: interrupt },
           logger,
         })
-      : { analysis: first, metaRepaired: false };
+      : { analysis: first, metaRepaired: false, metaRepairRejected: false };
   const needsRewrite =
     repair.analysis.caps.status === 'answered' && repair.analysis.violations.length > 0;
   if (needsRewrite) {
@@ -105,7 +105,7 @@ export async function finishAnswer({
     analysis,
     role,
     whoToAsk,
-    metaRepaired: repair.metaRepaired,
+    repair,
     style: {
       ...rewrite,
       violations: analysis.caps.status === 'answered' ? analysis.violations : [],

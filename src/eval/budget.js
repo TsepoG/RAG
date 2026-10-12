@@ -50,6 +50,7 @@ export function estimateRequests(cases, roles) {
  * @property {boolean} [rewritten] - Whether the answer was rewritten.
  * @property {boolean} [rewriteRejected] - Whether a rewrite was tried and not used.
  * @property {boolean} [metaRepaired] - Whether the confidence report was asked for again and got.
+ * @property {boolean} [metaRepairRejected] - Whether it was asked for again and not got.
  */
 
 /**
@@ -83,8 +84,14 @@ export function createRequestGuard(limit) {
       }
       return !stoppedEarly;
     },
-    record({ rewritten = false, rewriteRejected = false, metaRepaired = false }) {
-      used += 1 + (rewritten || rewriteRejected ? 1 : 0) + (metaRepaired ? 1 : 0);
+    record({
+      rewritten = false,
+      rewriteRejected = false,
+      metaRepaired = false,
+      metaRepairRejected = false,
+    }) {
+      used +=
+        1 + (rewritten || rewriteRejected ? 1 : 0) + (metaRepaired || metaRepairRejected ? 1 : 0);
       casesRun += 1;
     },
     report() {

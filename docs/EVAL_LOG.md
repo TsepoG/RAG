@@ -278,3 +278,47 @@ for `low`, and `high` (89%) would sit just under the 90% target. The inversion c
 what each level holds: `low` answers are the ones that hedge, and are right; `medium` holds the
 partial and wrong answers. The live run will show the real effect, since the model's reported
 level will then be seen after the rule.
+
+### Round 2, first live run (`20261012-173807`)
+
+Commit `a435dfa7f359`, base prompt hash `81ddc08c88b9`, the same 20 cases as round 1, 22 requests
+counted for 20 cases. **This run cannot be used to judge round 2.** Four questions ran out of time
+(120 s) and the repair of the confidence report did not work and left no record of why.
+
+| | Baseline | Round 1 | Round 2, first run |
+| --- | --- | --- | --- |
+| Passed every check that applies | 11 of 20 | 10 of 20 | 11 of 20 |
+| Status exactly as expected | 11 of 20 | 10 of 20 | 11 of 20 |
+| Questions that failed | 0 | 0 | 4 |
+| Answers with an uncited sentence | 10 of 20 | 10 of 20 | 1 of 20 |
+| Meta block missing | 5 | 4 | 4 |
+| Meta block got by asking again | n/a | n/a | 0 |
+| Citation recall | 75% | 73% | 64% |
+| Median time to an answer | n/a | 48.8 s | 70.8 s |
+
+What the run does show:
+
+- **The paragraph rule works as an instrument.** Answers with an uncited sentence went from 10 of
+  20 to 1 of 20 (the offline re-score predicted 3 of 16 answered). `dev-alias-chain-order` is
+  reported `high`; no answer that was reported `high` was judged here, so calibration is not
+  re-measured.
+- **The release list works.** `pm-release-history` was `not_found` in all three earlier runs. It is
+  now `answered`, cites the release list (`G1`, pinned) and gives the three releases with their
+  dates. It was answered by `gpt-6-luna` this time, where it was `mai-code-1.1-flash` in every earlier
+  run, so which model answers a question is not fixed from run to run.
+- **`oos-po-weather` was answered `out_of_scope`** with a report, for the first time.
+
+What it does not allow a conclusion on:
+
+- **Four timeouts, all on questions the earlier runs gave to `mai-code-1.1-flash`**
+  (`ba-sector-membership-built`, `nf-ba-fx-rates`, `nf-qa-load-tests`, `oos-pm-next-year-releases`).
+  No question given to `gpt-6-luna` timed out, but those were slower too (median 65 s on 13
+  questions, against 48.8 s in round 1 for the whole set). Whether the service was slow or the
+  larger pages and the extra call are the cause is not known. Four of the 20 cases have no result.
+- **The repair did not produce a report in any of the four cases that still lack one**
+  (`nf-dev-grade-thresholds`, `oos-dev-bloomberg-scores`, `qa-backfill-clarify`,
+  `oos-qa-python-gc`). The result did not record whether the extra request was sent or how it
+  ended, and the request count only included repairs that worked, so the 22 requests understate
+  what was used. Both are fixed in the next commit: a repair that was tried and not used now
+  records why (`missing`, `invalid-json`, `invalid-shape`, `error` or `timeout`), counts as a
+  request, and has its own line in the summary.

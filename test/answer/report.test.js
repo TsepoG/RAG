@@ -39,6 +39,7 @@ function result(overrides = {}) {
     modelChanges: [],
     modelCalls: [],
     metaRepaired: false,
+    metaRepairRejected: false,
     durationMs: 18_240,
     ...overrides,
   };
@@ -461,6 +462,15 @@ describe('describeStyle', () => {
     expect(describeStyle(result({ metaRepaired: true }), OWNER)).toEqual([
       'The confidence report was missing, so it was asked for again.',
     ]);
+  });
+
+  it('says the confidence report was asked for again and not got, and why', () => {
+    expect(
+      describeStyle(
+        result({ metaRepairRejected: true, metaRepairRejectedReason: 'missing' }),
+        OWNER,
+      ),
+    ).toEqual(['The confidence report was asked for again and not got (missing).']);
   });
 
   it('says the answer was rewritten', () => {

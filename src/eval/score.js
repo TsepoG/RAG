@@ -27,6 +27,8 @@ export const ERROR_STATUS = 'error';
  * @property {boolean} rewriteRejected - Whether a rewrite was tried and not used.
  * @property {boolean} [metaRepaired] - Whether the confidence report was asked for again and got;
  *   left out of results from before it was recorded.
+ * @property {boolean} [metaRepairRejected] - Whether it was asked for again and not got; also left
+ *   out of older results.
  * @property {ReadonlyArray<unknown>} toolCalls - The tool calls made.
  * @property {number} durationMs - How long the question took.
  */
@@ -60,6 +62,7 @@ export const ERROR_STATUS = 'error';
  * @property {number} plainStyleViolations - The same, counted only for the most plain-spoken roles.
  * @property {boolean} metaError - Whether the assistant failed to report its confidence, even when asked again.
  * @property {boolean} metaRepaired - Whether the first reply had no usable report and a second request got one.
+ * @property {boolean} metaRepairRejected - Whether a second request was sent and got none.
  * @property {number} invalidKeys - Keys that were never given out.
  * @property {number} uncitedSentences - Sentences without a citation.
  * @property {number | undefined} inferredShare - The share of cited sources that are the assistant's reading.
@@ -150,6 +153,7 @@ export function scoreCase(one, result, { depth, maxToolCalls }) {
     plainStyleViolations: depth === PLAIN_DEPTH ? style : 0,
     metaError: result.capsApplied.some(({ code }) => code === 'no-meta'),
     metaRepaired: result.metaRepaired === true,
+    metaRepairRejected: result.metaRepairRejected === true,
     invalidKeys: result.invalidKeys.length,
     uncitedSentences: result.uncitedSentences.length,
     rewritten: result.rewritten,
@@ -187,6 +191,7 @@ export function scoreFailure(one, latencyMs) {
     plainStyleViolations: 0,
     metaError: false,
     metaRepaired: false,
+    metaRepairRejected: false,
     invalidKeys: 0,
     uncitedSentences: 0,
     inferredShare: undefined,

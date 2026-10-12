@@ -313,6 +313,16 @@ describe('scoreCase: the answer’s own checks', () => {
     expect(score).toMatchObject({ metaRepaired: true, metaError: false });
   });
 
+  it('notes a report that was asked for again and not got', () => {
+    const score = scoreCase(
+      makeCase(),
+      makeResult({ metaRepairRejected: true, capsApplied: [{ code: 'no-meta' }] }),
+      CONTEXT,
+    );
+
+    expect(score).toMatchObject({ metaRepairRejected: true, metaError: true });
+  });
+
   it('says a report was not asked for again when the result does not say, as in older results', () => {
     expect(scoreCase(makeCase(), makeResult(), CONTEXT).metaRepaired).toBe(false);
   });
