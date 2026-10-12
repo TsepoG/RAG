@@ -322,3 +322,14 @@ What it does not allow a conclusion on:
   what was used. Both are fixed in the next commit: a repair that was tried and not used now
   records why (`missing`, `invalid-json`, `invalid-shape`, `error` or `timeout`), counts as a
   request, and has its own line in the summary.
+
+### Round 2, why the repair fails (`20261012-181404`)
+
+The four cases that still lacked a report were run again (7 requests for 4 cases; one timed out at
+120 s again, `qa-backfill-clarify`). In the other three the extra request was sent and the model
+replied with a block, but it was rejected as the wrong shape: `nf-dev-grade-thresholds`,
+`oos-dev-bloomberg-scores` and `oos-qa-python-gc` all have `metaRepairRejectedReason`
+`invalid-shape`. So the model is not ignoring the instruction; the block it writes fails the
+schema, and probably did the first time too (a bad block is removed from the answer exactly like a
+missing one, so the earlier "missing" counts include these). The names of the wrong fields are now
+recorded (`metaRepairRejectedFields`, names only) so the next run says which ones.

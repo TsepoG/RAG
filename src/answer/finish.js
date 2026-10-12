@@ -28,9 +28,12 @@ import { rewriteAnswer } from './rewrite.js';
  * @param {import('./analyse.js').Analysis} analysis - What was found in the reply.
  * @param {Pick<import('../logger/index.js').Logger, 'warn'>} logger - Where to log.
  */
-function logReportProblems({ metaError, warning }, logger) {
+function logReportProblems({ metaError, metaFields, warning }, logger) {
   if (metaError !== undefined) {
-    logger.warn({ reason: metaError }, 'the answer-meta block was missing or invalid');
+    logger.warn(
+      { reason: metaError, fields: metaFields },
+      'the answer-meta block was missing or invalid',
+    );
   }
   if (warning !== undefined) {
     logger.warn({ reason: warning }, 'text followed the answer-meta block');

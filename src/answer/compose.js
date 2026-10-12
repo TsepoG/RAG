@@ -34,6 +34,7 @@ import { MAX_ALSO_CONSULTED } from './result.js';
  *   valid one was got by asking again; the answer text is the first reply's.
  * @property {boolean} metaRepairRejected - True when it was asked for again and no valid one came.
  * @property {string} [metaRepairRejectedReason] - Why not.
+ * @property {string[]} [metaRepairRejectedFields] - With an invalid report: which fields were wrong.
  * @property {import('../honesty/index.js').WhoToAsk[]} whoToAsk - People worth asking.
  */
 
@@ -62,7 +63,7 @@ export function wantsWhoToAsk({ status, confidence }) {
  *   role: import('../roles/index.js').Role,
  *   whoToAsk: import('../honesty/index.js').WhoToAsk[],
  *   style: StyleOutcome,
- *   repair?: Pick<import('./repairMeta.js').RepairOutcome, 'metaRepaired' | 'metaRepairRejected' | 'metaRepairRejectedReason'>,
+ *   repair?: Pick<import('./repairMeta.js').RepairOutcome, 'metaRepaired' | 'metaRepairRejected' | 'metaRepairRejectedReason' | 'metaRepairRejectedFields'>,
  * }} input - The analysis of the final reply, the role, who to ask, what happened to the style, and
  *   whether the answer-meta block was got by asking again.
  * @returns {ComposedResult} The result.
@@ -112,6 +113,9 @@ export function composeResult({
     ...(repair.metaRepairRejectedReason === undefined
       ? {}
       : { metaRepairRejectedReason: repair.metaRepairRejectedReason }),
+    ...(repair.metaRepairRejectedFields === undefined
+      ? {}
+      : { metaRepairRejectedFields: repair.metaRepairRejectedFields }),
     whoToAsk,
   };
   const shown = renderFinalAnswer(composed, role);

@@ -136,6 +136,22 @@ ${FENCE}`,
     expect(result).toMatchObject({ metaRepaired: false, metaRepairRejectedReason: reason });
   });
 
+  it('names the fields that were wrong in the repaired report, never what they held', async () => {
+    const second = `${FENCE}answer-meta
+{"status":"out_of_scope","confidence":null,"gaps":"SECRET"}
+${FENCE}`;
+
+    const { result } = await ask({ tools: [PAGE], replies: [ANSWER, second] });
+
+    expect(result.metaRepairRejectedFields).toEqual([
+      'confidence',
+      'confidenceReason',
+      'gaps',
+      'conflicts',
+    ]);
+    expect(JSON.stringify(result)).not.toContain('SECRET');
+  });
+
   it('uses only the block from the repair, never words around it', async () => {
     const { result } = await ask({
       tools: [PAGE],

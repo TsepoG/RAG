@@ -202,20 +202,36 @@ describe('parseAnswerMeta a missing or bad block', () => {
 
 describe('parseAnswerMeta a block of the wrong shape', () => {
   it.each([
-    ['an unknown status', { ...META, status: 'maybe' }],
-    ['an out-of-range confidence', { ...META, confidence: 'certain' }],
-    ['a numeric confidence', { ...META, confidence: 3 }],
-    ['an answer with no confidence', { ...META, confidence: undefined }],
-    ['a clarify with no question', { ...META, status: 'clarify', confidence: undefined }],
-    ['no reason', { ...META, confidenceReason: undefined }],
-    ['an empty reason', { ...META, confidenceReason: '  ' }],
-    ['a reason that is far too long', { ...META, confidenceReason: 'x'.repeat(301) }],
-    ['gaps that are not a list', { ...META, gaps: 'none' }],
-    ['no gaps field', { ...META, gaps: undefined }],
-    ['too many gaps', { ...META, gaps: Array.from({ length: 11 }, (_, i) => `gap ${i}`) }],
-    ['a gap that is not text', { ...META, gaps: [1] }],
-    ['conflicts that are not a list', { ...META, conflicts: {} }],
-    ['a conflict missing a side', { ...META, conflicts: [{ topic: 'x', docSays: 'y' }] }],
+    ['an unknown status', { ...META, status: 'maybe' }, ['status']],
+    ['an out-of-range confidence', { ...META, confidence: 'certain' }, ['confidence']],
+    ['a numeric confidence', { ...META, confidence: 3 }, ['confidence']],
+    ['an answer with no confidence', { ...META, confidence: undefined }, ['confidence']],
+    [
+      'a clarify with no question',
+      { ...META, status: 'clarify', confidence: undefined },
+      ['clarifyingQuestion'],
+    ],
+    ['no reason', { ...META, confidenceReason: undefined }, ['confidenceReason']],
+    ['an empty reason', { ...META, confidenceReason: '  ' }, ['confidenceReason']],
+    [
+      'a reason that is far too long',
+      { ...META, confidenceReason: 'x'.repeat(301) },
+      ['confidenceReason'],
+    ],
+    ['gaps that are not a list', { ...META, gaps: 'none' }, ['gaps']],
+    ['no gaps field', { ...META, gaps: undefined }, ['gaps']],
+    [
+      'too many gaps',
+      { ...META, gaps: Array.from({ length: 11 }, (_, i) => `gap ${i}`) },
+      ['gaps'],
+    ],
+    ['a gap that is not text', { ...META, gaps: [1] }, ['gaps.0']],
+    ['conflicts that are not a list', { ...META, conflicts: {} }, ['conflicts']],
+    [
+      'a conflict missing a side',
+      { ...META, conflicts: [{ topic: 'x', docSays: 'y' }] },
+      ['conflicts.0.docKeys', 'conflicts.0.codeSays', 'conflicts.0.codeKeys'],
+    ],
     [
       'too many conflicts',
       {
@@ -228,16 +244,21 @@ describe('parseAnswerMeta a block of the wrong shape', () => {
           codeKeys: [],
         })),
       },
+      ['conflicts'],
     ],
-    ['a JSON array', []],
-    ['a JSON string', 'text'],
-    ['null', null],
-  ])('reports %s as an invalid shape and removes the block', (_name, meta) => {
-    const body = JSON.stringify(meta ?? null);
+    ['a JSON array', [], ['(block)']],
+    ['a JSON string', 'text', ['(block)']],
+    ['null', null, ['(block)']],
+  ])(
+    'reports %s as an invalid shape, names the fields, and removes the block',
+    (_name, meta, fields) => {
+      const body = JSON.stringify(meta ?? null);
 
-    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toEqual({
-      answer: ANSWER,
-      metaError: 'invalid-shape',
-    });
-  });
+      expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toEqual({
+        answer: ANSWER,
+        metaError: 'invalid-shape',
+        metaFields: fields,
+      });
+    },
+  );
 });

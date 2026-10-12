@@ -16,6 +16,8 @@ const MAX_TEXT_LENGTH = 300;
 const MAX_GAPS = 10;
 const MAX_CONFLICTS = 5;
 const MAX_KEYS = 10;
+/** Named for an issue with the block as a whole rather than with one of its fields. */
+const ROOT_FIELD = '(block)';
 const NOT_AT_END = /** @type {const} */ ('not-at-end');
 
 const text = z.string().trim().min(1).max(MAX_TEXT_LENGTH);
@@ -63,6 +65,8 @@ export const answerMetaSchema = z
  * @property {AnswerMeta} [meta] - The checked block, when there is a valid one.
  * @property {'missing' | 'invalid-json' | 'invalid-shape'} [metaError] - Why there is no valid
  *   block. The answer treats all three as "the confidence was not reported".
+ * @property {string[]} [metaFields] - With `invalid-shape`: the names of the fields that were
+ *   wrong, such as `confidence` or `conflicts.0.docKeys`. Names only, never what they held.
  * @property {'not-at-end'} [warning] - Set when text followed the block. The block was still
  *   used, and that text was put back into the answer.
  */
@@ -115,7 +119,8 @@ function findLastBlock(lines) {
 /**
  * Checks the text inside a block.
  * @param {string} body - The text between the fences.
- * @returns {{ meta: AnswerMeta } | { metaError: 'invalid-json' | 'invalid-shape' }} The block, or why not.
+ * @returns {{ meta: AnswerMeta } | { metaError: 'invalid-json' } | { metaError: 'invalid-shape', metaFields: string[] }}
+ *   The block, or why not.
  */
 function readBody(body) {
   let value;
@@ -125,7 +130,11 @@ function readBody(body) {
     return { metaError: 'invalid-json' };
   }
   const checked = answerMetaSchema.safeParse(value);
-  return checked.success ? { meta: checked.data } : { metaError: 'invalid-shape' };
+  if (checked.success) {
+    return { meta: checked.data };
+  }
+  const fields = checked.error.issues.map(({ path }) => path.join('.') || ROOT_FIELD);
+  return { metaError: 'invalid-shape', metaFields: [...new Set(fields)] };
 }
 
 /**

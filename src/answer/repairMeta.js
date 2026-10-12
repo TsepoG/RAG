@@ -14,6 +14,8 @@ import { createEventRecorder } from './events.js';
  * @property {boolean} metaRepairRejected - True when a request was sent and no valid report came
  *   of it.
  * @property {RepairRejectedReason} [metaRepairRejectedReason] - Why, when it was not used.
+ * @property {string[]} [metaRepairRejectedFields] - With `invalid-shape`: the names of the fields
+ *   that were wrong in the repaired report. Names only.
  */
 
 /**
@@ -29,14 +31,16 @@ const NOT_ASKED = Object.freeze({ metaRepaired: false, metaRepairRejected: false
  * Builds the outcome for a request that gave no usable report.
  * @param {import('./analyse.js').Analysis} analysis - The first analysis, kept.
  * @param {RepairRejectedReason} reason - Why.
+ * @param {string[]} [fields] - The fields that were wrong, when that is the reason.
  * @returns {RepairOutcome} The outcome.
  */
-function rejected(analysis, reason) {
+function rejected(analysis, reason, fields) {
   return {
     analysis,
     metaRepaired: false,
     metaRepairRejected: true,
     metaRepairRejectedReason: reason,
+    ...(fields === undefined ? {} : { metaRepairRejectedFields: fields }),
   };
 }
 
@@ -120,8 +124,11 @@ export async function repairMeta({
     }
     const repaired = parseAnswerMeta(turn.result().answer);
     if (repaired.meta === undefined) {
-      logger.warn({ reason: repaired.metaError }, 'the repaired answer-meta block was not usable');
-      return rejected(original, /** @type {'missing'} */ (repaired.metaError));
+      logger.warn(
+        { reason: repaired.metaError, fields: repaired.metaFields },
+        'the repaired answer-meta block was not usable',
+      );
+      return rejected(original, /** @type {'missing'} */ (repaired.metaError), repaired.metaFields);
     }
     const { answer } = parseAnswerMeta(reply);
     return {
