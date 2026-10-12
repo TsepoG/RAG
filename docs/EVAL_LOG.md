@@ -351,3 +351,47 @@ found in the sources.", "The question is outside what the sources cover.", "The 
 clarifying first."), and a reason over 300 characters is cut to 300. Every other field is as
 strict as before, and the repair request stays as a safety net. This affects the first reply as
 well as the repair, so the missing-report rate in the next run is the thing to look at.
+
+### Round 2 result (`20261012-183901`)
+
+Commit `d51f8cd076f4`, the same 20 cases as rounds 1 and 2's first run, 24 requests counted for 20
+cases. Four questions ran out of time at 120 s and have no answer (`ba-sector-rule`,
+`ba-survivor-universe`, `pm-phase-status`, `pm-release-history`), so the comparison below is on
+the 16 that finished. Each of the four passed or was a known miss before, so leaving them out does
+not favour this run.
+
+| On the 16 cases that finished | Baseline | Round 1 | Round 2 |
+| --- | --- | --- | --- |
+| Passed every check | 8 | 7 | 12 |
+| Status exactly as expected | 8 | 7 | 12 |
+
+| On all 20 | Baseline | Round 1 | Round 2 |
+| --- | --- | --- | --- |
+| Meta block missing | 5 | 4 | **0** |
+| Meta block got by asking again | n/a | n/a | 3 |
+| Declined when it should (of 7) | 3 | 3 | 6 |
+| Answers with an uncited sentence | 10 | 10 | 3 |
+| Questions that failed | 0 | 0 | 4 |
+
+- **Gain beyond the baseline variation.** On the cases that finished, 12 passed against 7 in round
+  1 and 8 in the baseline, a gain of 4 to 5 cases, where the variation measured at baseline was 1
+  case of 8. The smoke set itself cannot be compared: 2 of its 8 cases are among the four that
+  timed out. The final full run has to confirm it.
+- **What produced it.** The answer-meta block is no longer missing in any case (0 of 20), so the
+  statuses of declines are now reported: `oos-dev-bloomberg-scores`, `oos-po-weather` and
+  `oos-qa-python-gc` are `out_of_scope`, and `nf-dev-grade-thresholds` and `nf-qa-load-tests` are
+  `not_found`. Three of the 20 reports (`oos-dev-bloomberg-scores`, `qa-backfill-clarify`,
+  `oos-qa-python-gc`) still needed the second request, so the first reply lacked a usable report
+  in 3 of 20 (15%), above the 10% bar; the repair covers it at the price of one request each.
+- **What it did not fix.** `nf-ba-fx-rates` is still answered at `medium` from the price provider
+  (the "nothing merely similar" rule has not changed it in three runs). The two clarify cases are
+  still answered: `dev-rate-limit-clarify` picks one reading, and `qa-backfill-clarify`, which does
+  ask a question, was reported `answered` by its repaired report. `oos-pm-next-year-releases` is
+  `not_found` where `out_of_scope` was expected.
+- **Timeouts.** The four that failed are not the same as last time (these include two
+  `gpt-6-luna` questions). The median time to an answer for the finished questions has risen from
+  44 s to 53, 65 and 76 s over the four runs of the day, while a question such as
+  `dev-alias-chain-order` took 42 to 64 s on the same sequence of tool calls. That points at the
+  service slowing during the day more than at the changes, but it is not proved. Citation recall
+  (55%) is lowered by the four timed-out cases, which score as having cited nothing.
+- **Latency.** Far above the design's 8 s target in every run.
