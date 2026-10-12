@@ -559,6 +559,7 @@ describe('resolveRunFolder', () => {
     'somewhere/else',
     '.',
     'eval/results',
+    'eval/results/a/b',
   ])('refuses %j, which is not a run folder under eval/results', (name) => {
     expect(() => resolveRunFolder(name)).toThrow(EvalError);
     expect(() => resolveRunFolder(name)).toThrow('is not a run folder under eval/results');
