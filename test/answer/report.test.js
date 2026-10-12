@@ -36,6 +36,7 @@ function result(overrides = {}) {
     detailLevel: /** @type {const} */ ('default'),
     toolCalls: [],
     model: 'gpt-x',
+    modelChanges: [],
     durationMs: 18_240,
     ...overrides,
   };

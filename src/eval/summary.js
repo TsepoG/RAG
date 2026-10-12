@@ -1,5 +1,6 @@
 // @ts-check
 import { percent, ratioText, seconds, table } from './format.js';
+import { formatModelSwitches } from './switches.js';
 
 /** A line break, and a blank line between paragraphs. */
 const LINE = '\n';
@@ -115,9 +116,11 @@ export function formatMetrics(summary) {
  * @param {object} input - What to write.
  * @param {import('./results.js').RunHeader} input.run - The run.
  * @param {import('./summarise.js').Summary} input.summary - What the scores add up to.
+ * @param {ReadonlyArray<import('./run.js').RunEntry>} [input.entries] - The cases, for the model
+ *   section; left out, the section is left out.
  * @returns {string} The summary, ending with a line break.
  */
-export function formatSummary({ run, summary }) {
+export function formatSummary({ run, summary, entries }) {
   const { confidence } = summary;
   const metrics = formatMetrics(summary);
   const sections = [
@@ -136,6 +139,7 @@ export function formatSummary({ run, summary }) {
     formatConfusion(summary.confusion),
     '## Failed checks',
     formatFailures(summary.failures),
+    ...(entries === undefined ? [] : ['## Models', formatModelSwitches(entries)]),
   ];
   return sections.join(PARAGRAPH) + LINE;
 }

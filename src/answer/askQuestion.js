@@ -53,6 +53,7 @@ import { finishAnswer } from './finish.js';
  *   detailLevel: import('../roles/index.js').DetailLevel,
  *   toolCalls: import('./toolCalls.js').ToolCallRecord[],
  *   model: string | undefined,
+ *   modelChanges: import('./events.js').ModelChange[],
  *   durationMs: number,
  * }} AskResult
  */
@@ -154,7 +155,7 @@ export async function askQuestion(
     if (!outcome.ok) {
       throw outcome.error;
     }
-    const { answer: reply, toolCalls, model } = events.result();
+    const { answer: reply, toolCalls, model, modelChanges } = events.result();
     const composed = await finishAnswer({
       reply,
       role,
@@ -168,7 +169,14 @@ export async function askQuestion(
       logger,
       notify,
     });
-    return { ...composed, detailLevel, toolCalls, model, durationMs: clock.now() - startedAt };
+    return {
+      ...composed,
+      detailLevel,
+      toolCalls,
+      model,
+      modelChanges,
+      durationMs: clock.now() - startedAt,
+    };
   } catch (error) {
     if (error instanceof QuestionCancelledError) {
       logger.info({}, 'the question was cancelled; aborting the session');

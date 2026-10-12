@@ -127,6 +127,7 @@ describe('askQuestion answer', () => {
       detailLevel: 'default',
       toolCalls: [],
       model: 'gpt-x',
+      modelChanges: [],
       durationMs: 750,
     });
   });
@@ -663,5 +664,36 @@ describe('askQuestion defaults', () => {
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.cause).toBe(cause);
+  });
+});
+
+describe('askQuestion model changes', () => {
+  it('records each change of model the runtime makes, with its reason', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('session.model_change', {
+          previousModel: 'gpt-x',
+          newModel: 'fallback-y',
+          cause: 'rate_limit_auto_switch',
+          source: 'automatic',
+        });
+        emit('session.model_change', { newModel: 'other' });
+        emit('assistant.message', { content: 'done' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelChanges } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(modelChanges).toEqual([
+      {
+        from: 'gpt-x',
+        to: 'fallback-y',
+        reason: 'rate_limit_auto_switch',
+        source: 'automatic',
+      },
+      { from: undefined, to: 'other', reason: 'unspecified', source: undefined },
+    ]);
   });
 });

@@ -129,6 +129,7 @@ async function main() {
     await writeFile(join(folder, RESULTS_FILE), formatResults(header, result.outcome.entries));
     const summary = formatSummary({
       run: header,
+      entries: result.outcome.entries,
       summary: summarise(result.outcome.entries.map(({ score }) => score)),
     });
     await writeFile(join(folder, SUMMARY_FILE), summary);
