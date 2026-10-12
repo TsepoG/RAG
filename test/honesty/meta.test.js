@@ -262,3 +262,75 @@ describe('parseAnswerMeta a block of the wrong shape', () => {
     },
   );
 });
+
+describe('parseAnswerMeta the reason of a reply that is not an answer', () => {
+  const DECLINE = { status: 'not_found', gaps: [], conflicts: [] };
+  const CLARIFY = { status: 'clarify', clarifyingQuestion: 'Which one?', gaps: [], conflicts: [] };
+
+  it.each([
+    ['not_found', DECLINE, 'Nothing relevant was found in the sources.'],
+    [
+      'out_of_scope',
+      { ...DECLINE, status: 'out_of_scope' },
+      'The question is outside what the sources cover.',
+    ],
+    ['clarify', CLARIFY, 'The question needs clarifying first.'],
+  ])('gives a %s reply a stock reason when it has none', (_status, meta, reason) => {
+    expect(
+      parseAnswerMeta(`${ANSWER}\n${block(JSON.stringify(meta))}`).meta?.confidenceReason,
+    ).toBe(reason);
+  });
+
+  it.each([
+    ['an empty reason', ''],
+    ['a blank reason', '   '],
+    ['a reason that is not text', 7],
+    ['a null reason', null],
+  ])('gives the stock reason for %s', (_name, confidenceReason) => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`).meta?.confidenceReason).toBe(
+      'Nothing relevant was found in the sources.',
+    );
+  });
+
+  it('keeps a reason it was given', () => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason: '  The pages are silent.  ' });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`).meta?.confidenceReason).toBe(
+      'The pages are silent.',
+    );
+  });
+
+  it('cuts a reason that is too long, instead of refusing the report', () => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason: 'x'.repeat(500) });
+
+    const parsed = parseAnswerMeta(`${ANSWER}\n${block(body)}`);
+
+    expect(parsed.metaError).toBeUndefined();
+    expect(parsed.meta?.confidenceReason).toBe('x'.repeat(300));
+  });
+
+  it.each([
+    ['no reason', undefined],
+    ['an empty reason', ''],
+    ['a reason that is too long', 'x'.repeat(301)],
+    ['a reason that is not text', 7],
+  ])('still refuses an answer with %s', (_name, confidenceReason) => {
+    const body = JSON.stringify({ ...META, confidenceReason });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toMatchObject({
+      metaError: 'invalid-shape',
+      metaFields: ['confidenceReason'],
+    });
+  });
+
+  it('still refuses a decline whose other fields are wrong', () => {
+    const body = JSON.stringify({ ...DECLINE, gaps: 'none' });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toMatchObject({
+      metaError: 'invalid-shape',
+      metaFields: ['gaps'],
+    });
+  });
+});

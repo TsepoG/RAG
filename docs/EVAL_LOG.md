@@ -333,3 +333,21 @@ replied with a block, but it was rejected as the wrong shape: `nf-dev-grade-thre
 schema, and probably did the first time too (a bad block is removed from the answer exactly like a
 missing one, so the earlier "missing" counts include these). The names of the wrong fields are now
 recorded (`metaRepairRejectedFields`, names only) so the next run says which ones.
+
+### Round 2, the field that fails, and the change (`20261012-182555`)
+
+The three cases were run again with the names of the wrong fields recorded (6 requests for 3
+cases). All three repairs were rejected as `invalid-shape`, and the only field named in each is
+`confidenceReason`: `nf-dev-grade-thresholds`, `oos-dev-bloomberg-scores` and `oos-qa-python-gc`.
+No other field is wrong. The model leaves the reason out, writes it empty, or writes it over 300
+characters when it declines; which of the three is not known, because values are not recorded.
+The prompt says the confidence is only for an answered reply, and the model seems to drop the
+reason with it.
+
+Change, approved by the owner: the report's `confidenceReason` is required, and checked as before,
+only when the status is `answered`. For `not_found`, `out_of_scope` and `clarify`, a missing,
+empty or non-text reason is replaced by a fixed sentence for that status ("Nothing relevant was
+found in the sources.", "The question is outside what the sources cover.", "The question needs
+clarifying first."), and a reason over 300 characters is cut to 300. Every other field is as
+strict as before, and the repair request stays as a safety net. This affects the first reply as
+well as the repair, so the missing-report rate in the next run is the thing to look at.

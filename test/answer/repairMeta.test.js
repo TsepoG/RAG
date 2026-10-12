@@ -143,12 +143,7 @@ ${FENCE}`;
 
     const { result } = await ask({ tools: [PAGE], replies: [ANSWER, second] });
 
-    expect(result.metaRepairRejectedFields).toEqual([
-      'confidence',
-      'confidenceReason',
-      'gaps',
-      'conflicts',
-    ]);
+    expect(result.metaRepairRejectedFields).toEqual(['confidence', 'gaps', 'conflicts']);
     expect(JSON.stringify(result)).not.toContain('SECRET');
   });
 
@@ -295,5 +290,24 @@ describe('buildRepairPrompt', () => {
     expect(prompt).toContain(words);
     expect(prompt).toContain('Reply with only the answer-meta block');
     expect(prompt).toContain('Do not repeat or change the answer. Do not call any tools.');
+  });
+});
+
+describe('askQuestion when a decline gives no reason', () => {
+  it('takes the status it reports without asking again', async () => {
+    const block = `${FENCE}answer-meta\n{"status":"out_of_scope","gaps":[],"conflicts":[]}\n${FENCE}`;
+
+    const { result, session } = await ask({
+      replies: [`I can only answer from the project's sources.\n\n${block}`],
+    });
+
+    expect(session.sent).toHaveLength(1);
+    expect(result).toMatchObject({
+      status: 'out_of_scope',
+      confidenceReason: 'The question is outside what the sources cover.',
+      metaRepaired: false,
+      metaRepairRejected: false,
+    });
+    expect(result.capsApplied).toEqual([]);
   });
 });
