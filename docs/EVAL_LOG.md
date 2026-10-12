@@ -395,3 +395,61 @@ not favour this run.
   service slowing during the day more than at the changes, but it is not proved. Citation recall
   (55%) is lowered by the four timed-out cases, which score as having cited nothing.
 - **Latency.** Far above the design's 8 s target in every run.
+
+## Closing summary (2026-10-12)
+
+**The final full run was not done.** It would have taken 45 to 55 requests and about 45 minutes,
+and the owner decided it would use up the Copilot allowance. The brief asks for a final full run
+reported against the MVP targets; this section reports the targets with what was measured, and
+says where it was not. The last measurements are the baseline over 38 cases and the second round
+over 20 of them (16 finished). The tuning changes were not confirmed on all 38.
+
+| Target | Should be | Baseline (38 cases) | Latest: round 2 (20-case subset) | Standing |
+| --- | --- | --- | --- | --- |
+| Status exactly as expected | at least 85% | 76% (29 of 38) | 60% (12 of 20); 75% (12 of 16) of those that finished | not met; not re-measured on the full set |
+| Citation recall | at least 70% | 75% | 86% over the 7 finished cases that expect sources (55% counting the 4 timeouts as zero) | met in both |
+| Answered cases that are correct | at least 80% | 81% (21 correct, 8 partial, 2 wrong of 31) | 7 verdicts only (round 1): 86% | borderline at baseline; verdicts are not independent |
+| `high` answers that are correct | at least 90% | 3 of 3, too few | no verdicts | not enough data |
+| Cases to decline handled honestly | at least 80% | 90% (9 of 10) | 86% (6 of 7) | met in both |
+| Style problems left for a depth 1 role | none | 0 | 0 | met |
+| Answers with no confidence report | at most 10% | 13% (5 of 38) | 0% (0 of 20) after asking again; 15% (3 of 20) without | met only with the repair request |
+
+**Each miss, and why**
+
+- **Status exactly as expected (76%).** Of the 9 wrong statuses at baseline, 5 were declines that
+  came back without the answer-meta block, so their status was guessed; round 2 fixed that
+  (three `out_of_scope` and two `not_found` cases now have their status). What remains is the
+  model's behaviour, which the changes did not move: `nf-ba-fx-rates` is answered from something
+  similar in three runs; the two clarify cases are answered rather than clarified; and
+  `oos-pm-next-year-releases` is `not_found` where `out_of_scope` was expected (it is a decline
+  either way, and it never made up a date). The 20-case subset is also heavy with these cases, so
+  60% understates the full set; the full-set figure after tuning was not measured.
+- **Correctness (81%).** Met at baseline by a margin of one case, with verdicts drafted by Claude
+  Code and not independent; two `partial` changed to `wrong` would put it at 78%. After tuning, the
+  seven long-page cases went from 57% to 86% correct (Claude's drafts both times), which is too few
+  cases to conclude from.
+- **`high` correctness.** Only 3 answers claimed `high` at baseline, so the target cannot be
+  judged. Calibration was inverted at baseline (`low` 94% correct, `medium` 73%), and the
+  uncited-sentence change does not fix it (offline, even at the ceiling `medium` stays at 68%):
+  `low` answers hedge and are right, and `medium` holds the partial and wrong ones.
+- **Missing report (13%).** 0 after the second request, but 3 of 20 first replies still lacked a
+  usable block (15%); the repair costs one request each.
+
+**The release-date question** (`oos-pm-next-year-releases`). Baseline: answered at `low`
+confidence with no usable report, saying there is no published schedule and citing the project
+version. Round 1 and round 2: `not_found`, "I couldn't find anything about this", with a report.
+It never gave a date in any run. It is treated as a decline, which is honest behaviour, but its
+status is `not_found` and not `out_of_scope`, and the changes to the prompt did not change that.
+
+**Other findings, not tuned**
+
+- **Latency.** The median time to an answer was 44 to 76 s across the day's runs, against the
+  design's 8 s target, and rose through the day; 4 of 20 questions exceeded the 120 s limit in each
+  of the last two runs. A question reads several sources through up to a dozen tool calls.
+- **Which model answers.** Every question was answered by one model, `gpt-6-luna` or
+  `mai-code-1.1-flash`, not mixed, with no model-change event and no routing details. Which model
+  a question gets changed between runs for at least one question, so results are not tied to one
+  model. The cause is unknown; Copilot decides.
+- **Clarifying questions.** The assistant almost never asks; a question that fits two things is
+  answered with one reading. This is the clearest remaining weakness.
+- **Request cost.** About 0.4 to 0.6 AI credits a question on the Free plan, measured at the start.

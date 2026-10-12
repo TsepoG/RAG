@@ -106,16 +106,25 @@ docs/EVAL_LOG.md, docs/DEMO.md, CHANGELOG.md, README.md
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] `eval/questions.example.yaml` committed; the real set has 30–40 owner-verified cases with the agreed mix.
-- [ ] A baseline full run, the owner's review CSV and `report.md` exist; key numbers pasted into the PR.
-- [ ] Top failure categories identified; at most 2 tuning rounds, each logged in `docs/EVAL_LOG.md` with before/after numbers.
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+      _2990 tests; 100% on all four._
+- [x] `eval/questions.example.yaml` committed; the real set has 30–40 owner-verified cases with the agreed mix.
+      _38 cases, git-ignored by the owner's choice._
+- [x] A baseline full run, the owner's review CSV and `report.md` exist; key numbers pasted into the PR.
+      _Run `20261011-200058`. The verdicts in the review CSV were drafted by Claude Code at the owner's request, not independent. Numbers go in the PR description._
+- [x] Top failure categories identified; at most 2 tuning rounds, each logged in `docs/EVAL_LOG.md` with before/after numbers.
+      _Two rounds, both logged. Round 2 is confirmed only on a 20-case subset (16 finished)._
 - [ ] Final full run reported against the MVP targets, with each miss explained.
-- [ ] The release-date (out-of-scope) behaviour is measured and either fixed or explained with evidence.
-- [ ] `eval:from-feedback` produces draft cases from `data/feedback.jsonl`.
-- [ ] Skip link appears on the first Tab (owner confirms).
-- [ ] README, `docs/DEMO.md` and `CHANGELOG.md` complete.
-- [ ] Phase 5 acceptance criteria ticked in `docs/phases/phase-5.md` (first commit of the branch), and all phases' boxes reflect reality.
+      _Not met: the full run was not done, because it would have used up the Copilot allowance (owner's decision). The log's closing summary reports the targets from the baseline and the 20-case subset and explains each miss._
+- [x] The release-date (out-of-scope) behaviour is measured and either fixed or explained with evidence.
+      _Measured in three runs: it never gave a date; it was answered at low confidence at baseline, then `not_found`. Not `out_of_scope`; explained in the log._
+- [x] `eval:from-feedback` produces draft cases from `data/feedback.jsonl`.
+      _Run on the owner's file: 1 draft case written to the git-ignored `eval/questions.from-feedback.yaml`._
+- [x] Skip link appears on the first Tab (owner confirms).
+      _Owner confirmed after the always-visible link replaced the hidden one._
+- [x] README, `docs/DEMO.md` and `CHANGELOG.md` complete.
+- [x] Phase 5 acceptance criteria ticked in `docs/phases/phase-5.md` (first commit of the branch), and all phases' boxes reflect reality.
+      _Two boxes stay open on purpose, with notes: Phase 4 out-of-scope and Phase 5 live rendering of clarify and out-of-scope._
 - [ ] CI green; SonarQube quality gate passes with zero new issues.
 
 ## Git rules for this phase

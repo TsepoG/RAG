@@ -135,11 +135,11 @@ public/
 - [x] Stop cancels a running question; the server log shows the session aborted.
 - [ ] Not-found, clarify and out-of-scope results render correctly (live where
       possible, otherwise via a fake backend in tests).
-      _Not met yet: not-found was seen live; clarify and out-of-scope are covered by unit tests with a fake backend but the live model never produced them (Phase 6 measures this)._
+      _Not met: not-found was seen live, and the evaluation produced `out_of_scope` live for general-knowledge and other-company questions (rounds 1 and 2). A clarifying question was never produced live in four runs: both clarify cases were answered with one reading. Clarify is covered by unit tests with a fake backend only (see `docs/EVAL_LOG.md`)._
 - [x] Feedback writes to `data/feedback.jsonl` with no answer text or tokens.
 - [x] `curl -X POST http://127.0.0.1:3000/api/ask -H "Origin: https://evil.example" -H "Content-Type: application/json" -d '{}'` → 403.
-- [ ] Keyboard-only walkthrough works (pick role, ask, stop, open a source).
-      _Not met yet: everything works except the skip link, which does not show on the first Tab (fixed in Phase 6)._
+- [x] Keyboard-only walkthrough works (pick role, ask, stop, open a source).
+      _The skip link did not show on the first Tab; fixed in Phase 6 and confirmed by the owner._
 - [x] CI green; SonarQube quality gate passes with zero new issues (watch
       for security hotspots on the server and HTML rendering).
 - [x] README: `npm start`, `npm run dev`, the local-only security model,
