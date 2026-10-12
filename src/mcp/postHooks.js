@@ -10,6 +10,9 @@ import { maskSecrets } from '../logger/index.js';
 import { resolveTool } from './allowlist.js';
 import { CODE_SEARCH_HINT, CODE_SEARCH_TOOL } from './hints.js';
 import { SERVER_KEYS } from './servers.js';
+import { capSource, CONFLUENCE_PAGE_TOOL, confluencePageText } from './sourceText.js';
+
+export { CUT_NOTICE, MAX_SOURCE_CHARS } from './sourceText.js';
 
 /** @typedef {import('@github/copilot-sdk').SessionHooks} SessionHooks */
 /** @typedef {import('@github/copilot-sdk').ToolResultObject} ToolResultObject */
@@ -35,24 +38,6 @@ import { SERVER_KEYS } from './servers.js';
 
 /** Longest error text logged for a failed tool call. */
 const ERROR_TEXT_LIMIT = 300;
-
-/**
- * Most characters of one source given to the model: about 6,000 tokens, so a few long pages fit in
- * one answer's budget. Anything longer is cut, and the model is told so.
- */
-export const MAX_SOURCE_CHARS = 24_000;
-
-/** Added where a source is cut, so the model does not take the end of the text for the end. */
-export const CUT_NOTICE = '\n[The rest of this content was cut because it is too long.]';
-
-/**
- * Cuts text that is too long for one source.
- * @param {string} text - What the tool returned.
- * @returns {string} The text, or its first MAX_SOURCE_CHARS characters followed by a notice.
- */
-function capLength(text) {
-  return text.length > MAX_SOURCE_CHARS ? `${text.slice(0, MAX_SOURCE_CHARS)}${CUT_NOTICE}` : text;
-}
 
 /** The result the model gets in place of Confluence content that must not reach it. */
 const REMOVED_RESULT = Object.freeze({
@@ -145,9 +130,10 @@ export function createPostToolHooks({
         : undefined;
     }
     logger.info({ tool: input.toolName, keys }, 'sources registered');
+    const page = target.tool === CONFLUENCE_PAGE_TOOL ? confluencePageText(text) : undefined;
     const wrapped = wrapAsSource(
       { key: keys[0], type: source.type, title: source.title },
-      capLength(text),
+      capSource(page ?? text, { names: page !== undefined }),
     );
     return { modifiedResult: { ...input.toolResult, textResultForLlm: wrapped } };
   }

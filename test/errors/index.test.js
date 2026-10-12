@@ -7,6 +7,7 @@ import {
   CopilotError,
   McpError,
   QuestionCancelledError,
+  EvalError,
   RoleNotFoundError,
   ToolNotAllowedError,
 } from '../../src/errors/index.js';
@@ -212,5 +213,17 @@ describe('RoleNotFoundError', () => {
     const cause = new Error('x');
 
     expect(new RoleNotFoundError('a', [], { cause }).cause).toBe(cause);
+  });
+});
+
+describe('EvalError', () => {
+  it('is an app error that keeps its message and its cause', () => {
+    const cause = new Error('bad yaml');
+    const error = new EvalError('The eval set could not be read', { cause });
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('EvalError');
+    expect(error.message).toBe('The eval set could not be read');
+    expect(error.cause).toBe(cause);
   });
 });

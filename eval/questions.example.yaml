@@ -1,0 +1,67 @@
+# An example eval set, for an invented project ("Acme Shop"). It shows the format and is used by the
+# tests. Your real set goes in eval/questions.yaml, which is git-ignored because it describes your own
+# project. Copy this file to start.
+#
+# Each case:
+#   id        Unique, lower-case words joined by dashes.
+#   role      One of the ids in roles/ (developer, business_analyst, qa, product_owner, project_manager).
+#   question  What to ask, as a person would.
+#   tags      smoke (re-run after every change), not-found, out-of-scope, clarify, style-trap, stale,
+#             conflict, both-sources.
+#   draft     true until you have checked the case yourself. The runner refuses drafts.
+#   expect    status (answered, not_found, clarify, out_of_scope), then for an answered case:
+#               sources      pages or files the answer must cite (type: confluence or github; match:
+#                            a page id, a title fragment or a repo path fragment)
+#               mustNotCite  sources it must not cite
+#               maxConfidence  the highest confidence the answer may honestly claim
+#             and always a short reference answer for the person who reviews the result.
+cases:
+  - id: dev-refund-window
+    role: developer
+    question: Where is the refund window enforced, and how long is it?
+    tags: [smoke, both-sources]
+    expect:
+      status: answered
+      sources:
+        - { type: confluence, match: Refund Policy }
+        - { type: github, match: src/refunds/window.js }
+      maxConfidence: high
+      reference: Refunds are allowed for 30 days; the check is in isRefundAllowed() in src/refunds/window.js.
+
+  - id: po-refund-window-plain
+    role: product_owner
+    question: How long do customers have to ask for a refund?
+    tags: [smoke, style-trap]
+    expect:
+      status: answered
+      sources:
+        - { type: confluence, match: Refund Policy }
+      reference: Thirty days from the order date, in plain words, with no file names or code.
+
+  - id: qa-gift-card-refunds
+    role: qa
+    question: What happens when someone asks to refund a gift card?
+    tags: [smoke, not-found]
+    expect:
+      status: not_found
+      reference: Nothing in the documentation or the code covers gift card refunds.
+
+  - id: pm-next-year-dates
+    role: project_manager
+    question: What are the release dates for next year?
+    tags: [smoke, out-of-scope]
+    expect:
+      status: out_of_scope
+      reference: Future dates are not in the sources, so the assistant says it does not have that information.
+
+  - id: ba-delivery-fee-rules
+    role: business_analyst
+    question: What are the rules for the delivery fee?
+    tags: [conflict, both-sources]
+    expect:
+      status: answered
+      sources:
+        - { type: confluence, match: Delivery Fees }
+        - { type: github, match: src/delivery/fee.js }
+      maxConfidence: low
+      reference: The page says free over 50; the code uses 60. Both are stated and the answer is low confidence.

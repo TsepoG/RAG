@@ -14,6 +14,8 @@ import { assembleAnswer } from './result.js';
  * @typedef {object} Analysis
  * @property {'missing' | 'invalid-json' | 'invalid-shape' | undefined} metaError - Why the model's
  *   report could not be used, if it could not.
+ * @property {string[] | undefined} metaFields - With an invalid report: the names of the fields
+ *   that were wrong.
  * @property {'not-at-end' | undefined} warning - Set when text followed the report.
  * @property {import('../honesty/index.js').AnswerMeta | undefined} meta - The model's report, with
  *   the keys of its conflicts checked.
@@ -114,6 +116,7 @@ export function analyseReply({ reply, role, registry }) {
   const uncitedSentences = findUncitedSentences(marked.answer);
   return {
     metaError: parsed.metaError,
+    metaFields: parsed.metaFields,
     warning: parsed.warning,
     meta: conflicts.meta,
     parts: { ...parts, invalidKeys },

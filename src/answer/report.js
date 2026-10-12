@@ -23,9 +23,9 @@ const INTERPRETATION_NOTE = 'my reading of it';
  * @returns {string[]} Notes for the parentheses after the link.
  */
 function githubNotes(source) {
-  if (source.kind === 'directory') {
+  if (source.kind === 'directory' || source.kind === 'releases') {
     return [
-      'folder listing',
+      source.kind === 'releases' ? 'release list' : 'folder listing',
       ...(source.pinned ? [`commit ${source.commitSha.slice(0, SHORT_SHA_LENGTH)}`] : []),
     ];
   }
@@ -156,6 +156,14 @@ export function formatReport({ result, role }) {
  */
 export function describeStyle(result, role) {
   const notes = [];
+  if (result.metaRepaired) {
+    notes.push('The confidence report was missing, so it was asked for again.');
+  }
+  if (result.metaRepairRejected) {
+    notes.push(
+      `The confidence report was asked for again and not got (${result.metaRepairRejectedReason}).`,
+    );
+  }
   if (result.rewritten) {
     notes.push(`Rewrote the answer to suit a ${role.displayName}.`);
   }

@@ -8,3 +8,8 @@ reports/
 data/
 # Raw MCP results captured by mcp:sample hold real page and code content.
 test/fixtures/raw/
+# The owner's real eval set describes their own project, and its results hold answer text. Only
+# eval/questions.example.yaml (an invented project) is committed.
+eval/questions.yaml
+eval/questions.from-feedback.yaml
+eval/results/

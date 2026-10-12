@@ -359,14 +359,14 @@ function splitSentences(answer, prose) {
 }
 
 /**
- * Lists the sentences of an answer's prose, each with the citations in it.
+ * Lists the paragraphs and list items of an answer's prose, each as its sentences with the
+ * citations in them.
  * @param {string} answer - The answer, with invented keys already removed.
- * @returns {Sentence[]} The sentences, in order.
+ * @returns {Sentence[][]} One list of sentences for each paragraph or list item, in order.
  */
-export function listSentences(answer) {
-  return findProse(answer)
-    .flatMap((prose) => splitSentences(answer, prose))
-    .map(({ start, end }) => {
+export function listParagraphs(answer) {
+  return findProse(answer).map((prose) =>
+    splitSentences(answer, prose).map(({ start, end }) => {
       const text = answer.slice(start, end);
       const brackets = findCitationBrackets(text).map((bracket) => ({
         ...bracket,
@@ -374,5 +374,15 @@ export function listSentences(answer) {
         end: bracket.end + start,
       }));
       return { start, end, text, brackets };
-    });
+    }),
+  );
+}
+
+/**
+ * Lists the sentences of an answer's prose, each with the citations in it.
+ * @param {string} answer - The answer, with invented keys already removed.
+ * @returns {Sentence[]} The sentences, in order.
+ */
+export function listSentences(answer) {
+  return listParagraphs(answer).flat();
 }

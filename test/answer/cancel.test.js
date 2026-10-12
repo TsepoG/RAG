@@ -85,6 +85,22 @@ describe('askQuestion cancellation', () => {
     expect(capture.session.disconnect).toHaveBeenCalledOnce();
   });
 
+  it('does not keep the first answer when stopped while the report is asked for again', async () => {
+    const controller = new AbortController();
+    const capture = /** @type {any} */ ({});
+
+    const failure = await ask({
+      tools: [PAGE],
+      signal: controller.signal,
+      capture,
+      replies: [PLAIN, () => controller.abort()],
+    }).catch((error) => error);
+
+    expect(failure).toBeInstanceOf(QuestionCancelledError);
+    expect(capture.session.sent).toHaveLength(2);
+    expect(capture.session.abort).toHaveBeenCalledOnce();
+  });
+
   it('stops while it is looking up who to ask, without waiting for GitHub', async () => {
     const controller = new AbortController();
     const never = /** @type {typeof fetch} */ (vi.fn(() => new Promise(() => undefined)));

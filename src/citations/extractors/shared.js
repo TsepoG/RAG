@@ -158,3 +158,18 @@ export function isOlderThanAYear(date, now) {
   limit.setUTCMonth(limit.getUTCMonth() - MONTHS_BEFORE_STALE);
   return then < limit.getTime();
 }
+
+/**
+ * Looks up the head commit through the context, never letting a failure there escape.
+ * @param {ExtractContext} context - The context.
+ * @param {string} repo - `owner/repo`.
+ * @returns {Promise<string | undefined>} A full commit SHA, or undefined.
+ */
+export async function lookUpHead(context, repo) {
+  try {
+    const sha = await context.resolveHead(repo);
+    return isFullSha(sha) ? sha : undefined;
+  } catch {
+    return undefined;
+  }
+}

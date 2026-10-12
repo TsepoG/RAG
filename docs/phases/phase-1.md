@@ -223,21 +223,21 @@ in the Claude Code docs before writing it.
 
 ## Acceptance criteria
 
-- [ ] `npm ci && npm run verify` passes on a clean clone.
-- [ ] Coverage is at least 90% for lines, branches, functions and statements,
+- [x] `npm ci && npm run verify` passes on a clean clone.
+- [x] Coverage is at least 90% for lines, branches, functions and statements,
       and lowering a test makes `npm run test:coverage` fail.
-- [ ] Every exported symbol in `src/` has JSDoc; removing one makes `npm run lint`
+- [x] Every exported symbol in `src/` has JSDoc; removing one makes `npm run lint`
       fail.
-- [ ] A deliberate type error in a JSDoc-typed function makes `npm run typecheck`
+- [x] A deliberate type error in a JSDoc-typed function makes `npm run typecheck`
       fail.
-- [ ] `npm start` with a valid `.env` logs one redacted startup line; with a
+- [x] `npm start` with a valid `.env` logs one redacted startup line; with a
       missing variable it exits 1 and names the variable.
-- [ ] `ci.yml` runs the five jobs on a PR; all pass on this phase's PR.
-- [ ] The `sonarqube` job reports to SonarQube Cloud and the quality gate
+- [x] `ci.yml` runs the five jobs on a PR; all pass on this phase's PR.
+- [x] The `sonarqube` job reports to SonarQube Cloud and the quality gate
       passes with zero new bugs, vulnerabilities, hotspots and code smells.
-- [ ] README explains setup, scripts, environment variables, SonarQube Cloud
+- [x] README explains setup, scripts, environment variables, SonarQube Cloud
       setup, the SonarQube MCP server, and the required status checks.
-- [ ] No secrets in the repo (`.env` git-ignored, `.env.example` placeholders only).
+- [x] No secrets in the repo (`.env` git-ignored, `.env.example` placeholders only).
 
 ## Manual steps for the repo owner (Claude Code lists these in the PR, does not do them)
 

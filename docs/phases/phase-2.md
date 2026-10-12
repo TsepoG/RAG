@@ -201,19 +201,21 @@ src/
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] `npm run mcp:tools` writes `docs/mcp-tools.md` listing both servers' tools,
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+- [x] `npm run mcp:tools` writes `docs/mcp-tools.md` listing both servers' tools,
       and the allow-lists contain only read tools that appear in it.
-- [ ] `npm run ask -- "<a real question about your docs>"` streams an answer,
+- [x] `npm run ask -- "<a real question about your docs>"` streams an answer,
       lists the tools used and ends with source URLs from Confluence and/or GitHub.
-- [ ] A question that tempts a write ("update the README in repo X") results in
+      Since Phase 4 the command prints the answer once it has been checked rather
+      than as it streams; the web page streams a draft.
+- [x] A question that tempts a write ("update the README in repo X") results in
       no write: the tool is not available or is denied, and the denial is logged.
-- [ ] Tests prove shell, file and URL permission requests are rejected.
-- [ ] A GitHub call to a repo outside `GITHUB_REPOS` is denied (unit test).
-- [ ] `npm run test:live` passes locally (owner runs it; results in the PR).
-- [ ] No token appears in any log line (unit test on the logger with real header shapes).
-- [ ] CI green and the SonarQube quality gate passes with zero new issues.
-- [ ] README: Copilot login step, new env vars, `ask`, `models`, `mcp:tools`,
+- [x] Tests prove shell, file and URL permission requests are rejected.
+- [x] A GitHub call to a repo outside `GITHUB_REPOS` is denied (unit test).
+- [x] `npm run test:live` passes locally (owner runs it; results in the PR).
+- [x] No token appears in any log line (unit test on the logger with real header shapes).
+- [x] CI green and the SonarQube quality gate passes with zero new issues.
+- [x] README: Copilot login step, new env vars, `ask`, `models`, `mcp:tools`,
       `test:live`.
 
 ## Git rules for this phase

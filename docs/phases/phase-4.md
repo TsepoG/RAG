@@ -134,7 +134,7 @@ src/
       with closest pages, not a guess. Paste the output in the PR.
 - [ ] An out-of-scope question ("What will the release date be next year?")
       returns the out-of-scope text.
-      Not met live: the model answered at medium; unit-tested; Phase 6 measures it.
+      Not met live: the model answered at medium; unit-tested. Phase 6 measured it: that question never got an out-of-scope result (baseline: answered at low; later runs: `not_found`, with no date given), though other out-of-scope questions did (see `docs/EVAL_LOG.md`).
 - [x] An ambiguous question (if the sources allow one) returns a single
       clarifying question; otherwise the unit tests cover it and the PR says so.
       Unit-tested only: no ambiguous question in the sources.

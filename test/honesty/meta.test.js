@@ -202,20 +202,36 @@ describe('parseAnswerMeta a missing or bad block', () => {
 
 describe('parseAnswerMeta a block of the wrong shape', () => {
   it.each([
-    ['an unknown status', { ...META, status: 'maybe' }],
-    ['an out-of-range confidence', { ...META, confidence: 'certain' }],
-    ['a numeric confidence', { ...META, confidence: 3 }],
-    ['an answer with no confidence', { ...META, confidence: undefined }],
-    ['a clarify with no question', { ...META, status: 'clarify', confidence: undefined }],
-    ['no reason', { ...META, confidenceReason: undefined }],
-    ['an empty reason', { ...META, confidenceReason: '  ' }],
-    ['a reason that is far too long', { ...META, confidenceReason: 'x'.repeat(301) }],
-    ['gaps that are not a list', { ...META, gaps: 'none' }],
-    ['no gaps field', { ...META, gaps: undefined }],
-    ['too many gaps', { ...META, gaps: Array.from({ length: 11 }, (_, i) => `gap ${i}`) }],
-    ['a gap that is not text', { ...META, gaps: [1] }],
-    ['conflicts that are not a list', { ...META, conflicts: {} }],
-    ['a conflict missing a side', { ...META, conflicts: [{ topic: 'x', docSays: 'y' }] }],
+    ['an unknown status', { ...META, status: 'maybe' }, ['status']],
+    ['an out-of-range confidence', { ...META, confidence: 'certain' }, ['confidence']],
+    ['a numeric confidence', { ...META, confidence: 3 }, ['confidence']],
+    ['an answer with no confidence', { ...META, confidence: undefined }, ['confidence']],
+    [
+      'a clarify with no question',
+      { ...META, status: 'clarify', confidence: undefined },
+      ['clarifyingQuestion'],
+    ],
+    ['no reason', { ...META, confidenceReason: undefined }, ['confidenceReason']],
+    ['an empty reason', { ...META, confidenceReason: '  ' }, ['confidenceReason']],
+    [
+      'a reason that is far too long',
+      { ...META, confidenceReason: 'x'.repeat(301) },
+      ['confidenceReason'],
+    ],
+    ['gaps that are not a list', { ...META, gaps: 'none' }, ['gaps']],
+    ['no gaps field', { ...META, gaps: undefined }, ['gaps']],
+    [
+      'too many gaps',
+      { ...META, gaps: Array.from({ length: 11 }, (_, i) => `gap ${i}`) },
+      ['gaps'],
+    ],
+    ['a gap that is not text', { ...META, gaps: [1] }, ['gaps.0']],
+    ['conflicts that are not a list', { ...META, conflicts: {} }, ['conflicts']],
+    [
+      'a conflict missing a side',
+      { ...META, conflicts: [{ topic: 'x', docSays: 'y' }] },
+      ['conflicts.0.docKeys', 'conflicts.0.codeSays', 'conflicts.0.codeKeys'],
+    ],
     [
       'too many conflicts',
       {
@@ -228,16 +244,93 @@ describe('parseAnswerMeta a block of the wrong shape', () => {
           codeKeys: [],
         })),
       },
+      ['conflicts'],
     ],
-    ['a JSON array', []],
-    ['a JSON string', 'text'],
-    ['null', null],
-  ])('reports %s as an invalid shape and removes the block', (_name, meta) => {
-    const body = JSON.stringify(meta ?? null);
+    ['a JSON array', [], ['(block)']],
+    ['a JSON string', 'text', ['(block)']],
+    ['null', null, ['(block)']],
+  ])(
+    'reports %s as an invalid shape, names the fields, and removes the block',
+    (_name, meta, fields) => {
+      const body = JSON.stringify(meta ?? null);
 
-    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toEqual({
-      answer: ANSWER,
+      expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toEqual({
+        answer: ANSWER,
+        metaError: 'invalid-shape',
+        metaFields: fields,
+      });
+    },
+  );
+});
+
+describe('parseAnswerMeta the reason of a reply that is not an answer', () => {
+  const DECLINE = { status: 'not_found', gaps: [], conflicts: [] };
+  const CLARIFY = { status: 'clarify', clarifyingQuestion: 'Which one?', gaps: [], conflicts: [] };
+
+  it.each([
+    ['not_found', DECLINE, 'Nothing relevant was found in the sources.'],
+    [
+      'out_of_scope',
+      { ...DECLINE, status: 'out_of_scope' },
+      'The question is outside what the sources cover.',
+    ],
+    ['clarify', CLARIFY, 'The question needs clarifying first.'],
+  ])('gives a %s reply a stock reason when it has none', (_status, meta, reason) => {
+    expect(
+      parseAnswerMeta(`${ANSWER}\n${block(JSON.stringify(meta))}`).meta?.confidenceReason,
+    ).toBe(reason);
+  });
+
+  it.each([
+    ['an empty reason', ''],
+    ['a blank reason', '   '],
+    ['a reason that is not text', 7],
+    ['a null reason', null],
+  ])('gives the stock reason for %s', (_name, confidenceReason) => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`).meta?.confidenceReason).toBe(
+      'Nothing relevant was found in the sources.',
+    );
+  });
+
+  it('keeps a reason it was given', () => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason: '  The pages are silent.  ' });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`).meta?.confidenceReason).toBe(
+      'The pages are silent.',
+    );
+  });
+
+  it('cuts a reason that is too long, instead of refusing the report', () => {
+    const body = JSON.stringify({ ...DECLINE, confidenceReason: 'x'.repeat(500) });
+
+    const parsed = parseAnswerMeta(`${ANSWER}\n${block(body)}`);
+
+    expect(parsed.metaError).toBeUndefined();
+    expect(parsed.meta?.confidenceReason).toBe('x'.repeat(300));
+  });
+
+  it.each([
+    ['no reason', undefined],
+    ['an empty reason', ''],
+    ['a reason that is too long', 'x'.repeat(301)],
+    ['a reason that is not text', 7],
+  ])('still refuses an answer with %s', (_name, confidenceReason) => {
+    const body = JSON.stringify({ ...META, confidenceReason });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toMatchObject({
       metaError: 'invalid-shape',
+      metaFields: ['confidenceReason'],
+    });
+  });
+
+  it('still refuses a decline whose other fields are wrong', () => {
+    const body = JSON.stringify({ ...DECLINE, gaps: 'none' });
+
+    expect(parseAnswerMeta(`${ANSWER}\n${block(body)}`)).toMatchObject({
+      metaError: 'invalid-shape',
+      metaFields: ['gaps'],
     });
   });
 });

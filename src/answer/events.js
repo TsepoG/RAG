@@ -1,5 +1,6 @@
 // @ts-check
 import { AppError, CopilotError } from '../errors/index.js';
+import { describeModelCall, markFinalCall } from './modelCalls.js';
 import { createToolCallLog } from './toolCalls.js';
 
 /**
@@ -13,7 +14,23 @@ import { createToolCallLog } from './toolCalls.js';
  * @property {string} answer - The final answer text.
  * @property {import('./toolCalls.js').ToolCallRecord[]} toolCalls - The tool calls made.
  * @property {string | undefined} model - The model that answered, if the events said.
+ * @property {ModelChange[]} modelChanges - Each time the session changed model, in order.
+ * @property {import('./modelCalls.js').ModelCall[]} modelCalls - Every model call, in order, with
+ *   the one that wrote the answer marked.
  */
+
+/**
+ * A change of model during a question.
+ * @typedef {object} ModelChange
+ * @property {string | undefined} from - The model before the change.
+ * @property {string} to - The model after it.
+ * @property {string} reason - Why, as the runtime says (for example `rate_limit_auto_switch`), or
+ *   `unspecified` when it says nothing.
+ * @property {string | undefined} source - Who chose it, as the runtime says (for example `automatic`).
+ */
+
+/** The reason recorded when the runtime changes the model without saying why. */
+export const UNSPECIFIED_REASON = 'unspecified';
 
 /** @typedef {Pick<import('@github/copilot-sdk').CopilotSession, 'on'>} EventSource */
 
@@ -45,6 +62,12 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
   let finalMessage = '';
   /** @type {string | undefined} */
   let model;
+  /** @type {ModelChange[]} */
+  const modelChanges = [];
+  /** @type {import('./modelCalls.js').ModelCall[]} */
+  const modelCalls = [];
+  /** @type {string | undefined} */
+  let finalApiCallId;
   /** @type {(outcome: Outcome) => void} */
   let settle;
   // Resolves, never rejects, so a failure that arrives before anyone awaits it is not "unhandled".
@@ -75,12 +98,22 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
         source.on('assistant.message', ({ data }) => {
           if (data.content.trim() !== '') {
             finalMessage = data.content;
+            finalApiCallId = data.apiCallId;
           }
           model = data.model ?? model;
         }),
         source.on('assistant.usage', ({ data }) => {
           model = data.model;
+          modelCalls.push(describeModelCall(data, modelCalls.length));
         }),
+        source.on('session.model_change', ({ data }) =>
+          modelChanges.push({
+            from: data.previousModel,
+            to: data.newModel,
+            reason: data.cause ?? UNSPECIFIED_REASON,
+            source: data.source,
+          }),
+        ),
         source.on('tool.execution_start', ({ data }) => onToolStart?.(toolCalls.start(data))),
         source.on('tool.execution_complete', ({ data }) => toolCalls.complete(data)),
         source.on('session.error', ({ data }) =>
@@ -95,7 +128,13 @@ export function createEventRecorder({ clock, onDelta, onToolStart }) {
     settled,
     result() {
       // The last full message is the answer; text streamed during earlier tool-calling turns is not.
-      return { answer: finalMessage || streamed, toolCalls: toolCalls.list(), model };
+      return {
+        answer: finalMessage || streamed,
+        toolCalls: toolCalls.list(),
+        model,
+        modelChanges: [...modelChanges],
+        modelCalls: markFinalCall(modelCalls, finalApiCallId),
+      };
     },
   };
 }

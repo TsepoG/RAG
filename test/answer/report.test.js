@@ -36,6 +36,10 @@ function result(overrides = {}) {
     detailLevel: /** @type {const} */ ('default'),
     toolCalls: [],
     model: 'gpt-x',
+    modelChanges: [],
+    modelCalls: [],
+    metaRepaired: false,
+    metaRepairRejected: false,
     durationMs: 18_240,
     ...overrides,
   };
@@ -215,6 +219,27 @@ describe('formatReport sources for business-facing roles', () => {
     const text = report(result({ sources: [cited(release, 'G1')] }), OWNER);
 
     expect(text).toContain('Release v2 — code (payments-service) — https://x/r (release v2)');
+  });
+
+  it('shows the list of releases as a release list, with the commit when pinned', () => {
+    const pinned = githubSource({
+      kind: 'releases',
+      path: '',
+      title: 'Releases',
+      url: 'https://x/r',
+    });
+    const loose = githubSource({
+      kind: 'releases',
+      path: '',
+      title: 'Releases',
+      url: 'https://x/r',
+      pinned: false,
+    });
+
+    const text = report(result({ sources: [cited(pinned, 'G1'), cited(loose, 'G2')] }), OWNER);
+
+    expect(text).toContain(`(release list, commit ${SHORT_SHA})`);
+    expect(text).toContain('(release list)');
   });
 
   it.each([2, 3])('shows titles, not labels, at depth %i', (depth) => {
@@ -431,6 +456,21 @@ describe('formatReport other statuses', () => {
 describe('describeStyle', () => {
   it('says nothing when the answer already suited the role', () => {
     expect(describeStyle(result(), OWNER)).toEqual([]);
+  });
+
+  it('says the confidence report was asked for again', () => {
+    expect(describeStyle(result({ metaRepaired: true }), OWNER)).toEqual([
+      'The confidence report was missing, so it was asked for again.',
+    ]);
+  });
+
+  it('says the confidence report was asked for again and not got, and why', () => {
+    expect(
+      describeStyle(
+        result({ metaRepairRejected: true, metaRepairRejectedReason: 'missing' }),
+        OWNER,
+      ),
+    ).toEqual(['The confidence report was asked for again and not got (missing).']);
   });
 
   it('says the answer was rewritten', () => {

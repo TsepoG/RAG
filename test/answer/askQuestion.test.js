@@ -127,6 +127,20 @@ describe('askQuestion answer', () => {
       detailLevel: 'default',
       toolCalls: [],
       model: 'gpt-x',
+      modelChanges: [],
+      metaRepaired: false,
+      metaRepairRejected: false,
+      modelCalls: [
+        {
+          index: 0,
+          model: 'gpt-x',
+          apiCallId: undefined,
+          interactionType: undefined,
+          initiator: undefined,
+          fusion: undefined,
+          producedFinal: false,
+        },
+      ],
       durationMs: 750,
     });
   });
@@ -136,7 +150,7 @@ describe('askQuestion answer', () => {
       script(emit) {
         emit('assistant.message_delta', { deltaContent: 'Hel' });
         emit('assistant.message_delta', { deltaContent: 'lo' });
-        emit('assistant.message', { content: 'Hello' });
+        emit('assistant.message', { content: clarifyReply('Hello') });
         emit('session.idle', {});
       },
     });
@@ -663,5 +677,82 @@ describe('askQuestion defaults', () => {
 
     expect(failure).toBeInstanceOf(CopilotError);
     expect(failure.cause).toBe(cause);
+  });
+});
+
+describe('askQuestion model changes', () => {
+  it('records each change of model the runtime makes, with its reason', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('session.model_change', {
+          previousModel: 'gpt-x',
+          newModel: 'fallback-y',
+          cause: 'rate_limit_auto_switch',
+          source: 'automatic',
+        });
+        emit('session.model_change', { newModel: 'other' });
+        emit('assistant.message', { content: 'done' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelChanges } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(modelChanges).toEqual([
+      {
+        from: 'gpt-x',
+        to: 'fallback-y',
+        reason: 'rate_limit_auto_switch',
+        source: 'automatic',
+      },
+      { from: undefined, to: 'other', reason: 'unspecified', source: undefined },
+    ]);
+  });
+});
+
+describe('askQuestion model calls', () => {
+  it('records every model call and marks the one that wrote the answer', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a1' });
+        emit('assistant.message', { content: 'first', apiCallId: 'a1' });
+        emit('assistant.usage', {
+          model: 'gpt-x',
+          apiCallId: 'a2',
+          fusion: { sourceModel: 'small-z' },
+        });
+        emit('assistant.message', { content: 'last', apiCallId: 'a2' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelCalls } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(
+      modelCalls.map(({ index, apiCallId, producedFinal }) => [index, apiCallId, producedFinal]),
+    ).toEqual([
+      [0, 'a1', false],
+      [1, 'a2', true],
+    ]);
+    expect(modelCalls[1].fusion?.sourceModel).toBe('small-z');
+  });
+
+  it('does not move the mark for a message with no text', async () => {
+    const session = createFakeSession({
+      script(emit) {
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a1' });
+        emit('assistant.message', { content: 'answer', apiCallId: 'a1' });
+        emit('assistant.usage', { model: 'gpt-x', apiCallId: 'a2' });
+        emit('assistant.message', { content: '  ', apiCallId: 'a2' });
+        emit('session.idle', {});
+      },
+    });
+    const { deps } = setup({ session });
+
+    const { modelCalls } = await askQuestion({ role: TEST_ROLE, question: 'Hi?' }, deps);
+
+    expect(modelCalls.map(({ producedFinal }) => producedFinal)).toEqual([true, false]);
   });
 });

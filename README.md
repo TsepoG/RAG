@@ -5,12 +5,48 @@ Project Manager), asks a question, and the app answers from Confluence and GitHu
 servers, using GitHub Copilot as the reasoning layer. Every answer cites the pages and files it
 used and states how confident it is.
 
-The project is built in phases (see [docs/ROADMAP.md](docs/ROADMAP.md)). **Phase 1** set up the
-quality gates, CI, and the shared config loader, error classes and logger. **Phase 2** connects
-GitHub Copilot to the Confluence and GitHub MCP servers, read-only. **Phases 3 and 4** add roles,
-citations, confidence levels and the honesty checks. **Phase 5** adds a local web page for asking
-questions: `npm start` and open it (see [Using the web page](#using-the-web-page)). The command
-line (`npm run ask`) still works.
+It runs on one machine, for one person, and everything it does against Confluence and GitHub is
+read-only. The project was built in phases (see [docs/ROADMAP.md](docs/ROADMAP.md)): quality gates
+and config, the Copilot and MCP connection, roles and citations, the honesty checks, the local web
+page, and last an evaluation (see [Evaluation](#evaluation)). The change history is in
+[CHANGELOG.md](CHANGELOG.md) and a ten-minute walkthrough is in [docs/DEMO.md](docs/DEMO.md).
+
+## Quickstart
+
+1. `npm ci`
+2. `cp .env.example .env`, then fill in the GitHub and Atlassian values
+   ([Environment variables](#environment-variables), [Atlassian access](#atlassian-access)).
+3. Sign in to Copilot, for example with `gh auth login` ([Copilot login](#copilot-login)).
+4. `npm start`
+5. Open `http://127.0.0.1:3000`, pick a role and ask a question.
+
+## How it fits together
+
+```
+  Browser (public/)             Command line (npm run ask / npm run eval)
+        |  SSE stream                         |
+        v                                     v
+  Fastify server (src/server) ------> askQuestion (src/answer)
+  local-only guards, CSP                      |
+                                              v
+                      Copilot SDK session (src/copilot) + role block (roles/*.yaml)
+                                              |
+                  tool calls pass through hooks (src/mcp): allow-list, scope, call limit
+                         |                                              |
+                         v                                              v
+            Atlassian MCP server                               GitHub MCP server
+            (Confluence pages, read-only)                    (files, commits, releases, read-only)
+                         |                                              |
+                         +------------- results become sources ---------+
+                                              |
+                                              v
+            citations (src/citations): keys C1, G1..., pinned links
+            honesty   (src/honesty):   status, confidence caps, gaps, conflicts, who to ask
+            style     (src/style):     one rewrite when the answer does not suit the role
+```
+
+The model never sees a write tool, and it never decides what counts as a source or how sure the
+answer is: the application does both, from what the tools actually returned.
 
 ## Requirements
 
@@ -52,6 +88,10 @@ Values already exported in your shell win over `.env`.
 | `npm run mcp:sample -- <tool> '<json args>' [--as <name>]` | Call one allow-listed tool and save its raw result to `test/fixtures/raw/` (git-ignored)                       |
 | `npm run fixtures:sanitise`                                | Turn the raw samples into `test/fixtures/mcp/*.json` with no real names or content                             |
 | `npm run test:live`                                        | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)                              |
+| `npm run eval -- [options]`                                | Run the eval set through the real pipeline (see [Evaluation](#evaluation))                                     |
+| `npm run eval:review -- <run>`                             | Write `review.csv` for a run, for manual verdicts                                                              |
+| `npm run eval:report -- <run> [--compare <run>]`           | Merge the verdicts and write `report.md`: correctness, calibration, targets                                    |
+| `npm run eval:from-feedback`                               | Turn thumbs-down feedback into draft eval cases                                                                |
 | `npm run verify`                                           | lint, format check, typecheck and coverage in sequence; stops at the first failure                             |
 
 Run `npm run verify` before every commit and PR.
@@ -266,19 +306,24 @@ added by the application, not written by the model.
   pinned to a 40-character commit SHA, so the link keeps showing what the model saw. The commit
   comes from the result itself or from the repository's head commit; if neither is found the link
   is to the default branch and says it is not pinned.
-- Search hits and lists (`searchConfluence`, `search_code`, `list_commits`, `list_releases`) are
-  not sources: they appear under **Also consulted** and cannot be cited.
-- A folder listing is a source for which files and folders exist, not for what is inside a file.
-  The check that a claim about a file's contents was backed by reading that file is not done yet
-  (planned for Phase 4).
+- Search hits and commit lists (`searchConfluence`, `search_code`, `list_commits`) are not
+  sources: they appear under **Also consulted** and cannot be cited. The list of releases
+  (`list_releases`) is a source, linked to the repository's releases page and pinned to its head
+  commit when that can be found; each release in it is also listed under **Also consulted**.
+- A folder listing is a source for which files and folders exist, not for what is inside a file. A
+  sentence that rests only on one gets an asterisk from the application and counts as the model's
+  reading (see [Honesty and confidence](#honesty-and-confidence)).
 - Confluence content that is not in `CONFLUENCE_SPACE_KEYS`, or whose space cannot be determined,
   is replaced by a notice before the model sees it. If the check itself fails, the content is
   replaced too.
 - Each question gets two `search_code` calls. An empty code search tells the model to browse
   folders instead.
 - Large results: the Copilot runtime's own "large output" handling is turned off, because it hides
-  a long page behind a file pointer the model cannot read. Instead each source is cut at 24,000
-  characters and the model is told when that happens.
+  a long page behind a file pointer the model cannot read. Instead a Confluence page is given to
+  the model as plain text (headings kept, markup and attributes dropped, which makes a long page
+  about a third shorter), and every source is cut at 60,000 characters. When something is cut, the
+  model is told, and for a page it is given the headings of the sections that were cut so it can
+  report them as unchecked.
 - Set `ATLASSIAN_CLOUD_ID` to save the model two calls: it is then used for every Confluence call.
 
 ### Honesty and confidence
@@ -286,8 +331,9 @@ added by the application, not written by the model.
 Every answer says how sure it is and why. The model reports a status and a level at the end of its
 reply, in a fenced block tagged `answer-meta`; the application checks the block, removes it (it is
 never shown) and has the final say, through caps the model cannot override. A reply with no valid
-block counts as low confidence ("The assistant did not report its confidence"). Text after the
-block is kept and a warning is logged.
+block counts as low confidence ("The assistant did not report its confidence") — but first the
+model is asked once more, with every tool locked, for the block alone, and the answer text is never
+changed (see below). Text after the block is kept and a warning is logged.
 
 **Statuses.** Every result has one:
 
@@ -346,14 +392,25 @@ the answer more confident. Otherwise the first answer is kept and the result say
 (`rewriteRejectedReason`: `citations`, `markers`, `status`, `timeout` or `error`). `ask` prints a
 short note on stderr when a rewrite happened or was refused.
 
+**A missing report, asked for again.** When the reply has an answer but no usable `answer-meta`
+block, the model is asked once, in the same session and with tools locked, for the block alone. Only
+the validated block is taken from that reply, so the answer text stays the first reply's, and the
+repaired report goes through every cap above. The result says so (`metaRepaired`, or
+`metaRepairRejected` with a reason, if no usable block came back). A reply that is not an answer
+(not found, out of scope, a clarifying question) may leave the reason out of its block: it then
+gets a fixed sentence for its status. An answered reply must still give a reason.
+
 **Known limits.**
 
-- The status is the model's call. In live runs the model sometimes answers a question the sources
-  cannot (such as "What will the release date be next year?") instead of reporting `out_of_scope`;
-  the caps then limit it to medium and say why, but they cannot turn it into out of scope.
-- The uncited-sentence check is strict by design. A sentence whose citation sits on the next
-  sentence counts as uncited.
-- Confidence is not yet calibrated; Phase 6 measures it.
+- The status is the model's call. The caps limit how sure an answer may sound, but they cannot
+  turn a wrong status into the right one: in the evaluation the model still answered a question
+  that asks for a fact the sources do not hold (it described something similar instead), and
+  answered one reading of two questions that should have been clarified.
+- The uncited-sentence check is a heuristic. A paragraph of up to three sentences whose last
+  sentence cites a source counts as cited; in a longer paragraph a sentence whose citation sits
+  elsewhere counts as uncited.
+- Confidence was measured on a small sample (see [Evaluation](#evaluation)); treat the levels as
+  a guide, not a probability.
 
 ### Test fixtures
 
@@ -410,10 +467,11 @@ create each token.
 src/
   answer/    askQuestion: runs one question through Copilot; validated result, report, argument parsing
   citations/ source registry, wrapping, labels, citation checking, extractors for each tool result
-  cli/       ask, roles, models, mcp:tools, mcp:sample and fixtures:sanitise commands (wiring only)
+  cli/       ask, roles, models, mcp:tools, mcp:sample, fixtures:sanitise and eval commands (wiring only)
   config/    validated config loader (loadConfig, redactConfig, buildRuntimeEnv)
   copilot/   Copilot client, session config and system message (shared base plus role block)
   errors/    AppError and its subclasses
+  eval/      the evaluation: case loading, scoring, request budget, runner, review sheet, report
   fixtures/  the fixture sanitiser and its leak check
   github/    read-only GitHub REST client; head-commit lookup to pin links; CODEOWNERS reader
   honesty/   answer-meta parsing, confidence caps, uncited-sentence check, who to ask, final rendering
@@ -423,6 +481,7 @@ src/
   style/     checks an answer against what its role allows
   server/    the web server: Fastify app, guards, security headers, SSE, feedback; index.js starts it
   render/    answer markdown to safe HTML with citation chips; removes answer-meta from the stream
+eval/        questions.example.yaml (committed); your real questions.yaml and the results/ are git-ignored
 public/      the web page: index.html, css/ and vanilla JavaScript modules in js/ (no build step)
 test/        mirrors src/ and public/js/; test/helpers holds shared test utilities; test/live runs on demand
 docs/        roadmap, system design, coding principles and one file per phase
@@ -430,6 +489,74 @@ docs/        roadmap, system design, coding principles and one file per phase
 
 Each folder under `src/` has an `index.js` that is its only public entry point. The rules for
 writing code here are in [docs/CODING_PRINCIPLES.md](docs/CODING_PRINCIPLES.md).
+
+## Evaluation
+
+The assistant is measured against a set of real questions, with the answers checked by hand. The
+set (`eval/questions.yaml`) and every run (`eval/results/`) describe your own project, so both are
+git-ignored; `eval/questions.example.yaml` shows the format with an invented project.
+
+```bash
+npm run eval -- --subset smoke                 # the cases tagged smoke
+npm run eval -- --ids case-a,case-b            # chosen cases (add --subset smoke to include the smoke ones)
+npm run eval -- --subset full --max-requests 60
+npm run eval:review -- <run-folder>            # writes review.csv: fill in verdict (correct, partial, wrong)
+npm run eval:report -- <run-folder> --compare <earlier-run-folder>
+npm run eval:from-feedback                     # thumbs-down answers become draft cases
+```
+
+- A case names a role, a question, the expected status and sources, and a short reference answer.
+  The runner refuses a case still marked `draft: true`.
+- `eval` prints the number of cases and the Copilot requests it expects, and asks before it starts
+  (`--yes` skips the question). `--max-requests` stops cleanly when reached. It stops on Ctrl+C
+  and keeps what finished.
+- Each run writes `results.jsonl` and `summary.md`, and records the commit, the model asked for
+  and the models that answered, each role's version and a hash of the shared prompt, so two runs
+  can be compared knowing what differs.
+- The automatic checks cover exact and lenient status, citation recall, forbidden sources,
+  confidence caps, style, missing reports, invented keys, uncited sentences and time. Correctness
+  and calibration come only from the verdicts you give; there is no model judging another model.
+- Asking the same question twice does not always give the same result, so a change counts as an
+  improvement only when it beats the variation measured at baseline.
+
+**What was measured.** [docs/EVAL_LOG.md](docs/EVAL_LOG.md) has the numbers: a baseline over 38
+questions, two tuning rounds with their before and after, and what each change did not fix.
+**The planned final full run was not done**, because it would have used up the Copilot allowance;
+the last numbers are for the 20-question subset that the tuning rounds used, and the MVP targets
+are judged against the baseline in the log, with that stated.
+
+## Limitations
+
+- **One person, one machine.** The web server has no login and listens only on the local machine
+  unless you set `ALLOW_REMOTE=true`, which is not advised. Credentials come from `.env`.
+- **No memory.** Each question is answered on its own; nothing is kept between questions except
+  the thumbs-up and thumbs-down you record (`data/feedback.jsonl`, no answer text).
+- **Code search depends on GitHub's index.** `search_code` may return nothing for a repository;
+  the assistant then browses folders instead, and a repository with a large tree costs tool calls.
+- **Rovo search is not used** (it can surface Jira results and cannot be limited to a space), and
+  there are no Jira tools. Only the listed Confluence spaces and GitHub repositories are read.
+- **Copilot usage.** Every question uses Copilot requests (about 0.4 to 0.6 AI credits each on the
+  Free plan in testing); a rewrite or a repair of the confidence report costs one more. Copilot,
+  not this application, chooses the model for each question, and on some plans it cannot be set.
+- **Speed.** A question takes tens of seconds (the median was 44 to 76 s over the evaluation runs,
+  against a design target of 8 s). Most of it is the model reading sources through tool calls.
+- **Long pages.** A source longer than 60,000 characters is cut; the answer is told what was
+  cut, but cannot use it.
+- **The status and the confidence are partly the model's call.** See the known limits under
+  [Honesty and confidence](#honesty-and-confidence).
+
+## Troubleshooting
+
+| Symptom                                                             | What to check                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `401` or `403` from Atlassian, or Confluence search returns nothing | Use `ATLASSIAN_AUTH_MODE=basic` with `ATLASSIAN_EMAIL` for a personal API token and `bearer` for a service-account key. The organization setting "Allow API token authentication" must be on. The token needs the Rovo scopes under [Atlassian access](#atlassian-access), and a service account needs **view** permission on every space in `CONFLUENCE_SPACE_KEYS`. The first 300 characters of a failed call's error are in the log, with secrets masked. |
+| A Confluence tool is missing, or the model never uses a graph tool  | The allow-list is Confluence-only and read-only. Teamwork Graph tools (`getGraphContext` and others) and Jira tools are left out on purpose; `docs/mcp-tools.md` lists every tool and why.                                                                                                                                                                                                                                                                   |
+| Code search finds nothing                                           | The repository may not be indexed by GitHub code search. Each question gets two searches; after an empty one the model is told to browse folders instead. Check `GITHUB_REPOS` and that the token can read Contents.                                                                                                                                                                                                                                         |
+| "not signed in", or no models listed                                | Sign in with `gh auth login` or `copilot login`, or set `COPILOT_GITHUB_TOKEN` (a fine-grained token with the Copilot Requests permission; classic `ghp_` tokens are not supported). `npm run models` is empty on some plans such as Copilot Free; leave `COPILOT_MODEL` unset or try a name. Never reuse `GITHUB_TOKEN` for Copilot.                                                                                                                        |
+| A question stops with exit code 2 or a `timeout` error              | It exceeded `ASK_TIMEOUT_MS` (default 120000). Raise it, up to 600000. Slow answers are common when a question reads several long pages.                                                                                                                                                                                                                                                                                                                     |
+| The model is not the one in `COPILOT_MODEL`                         | Copilot picks the model for each question and may not honour the setting; the result and the eval summary show which model answered.                                                                                                                                                                                                                                                                                                                         |
+| The assistant cannot find something you know is documented          | The page may be outside `CONFLUENCE_SPACE_KEYS`, or too long: when a page is cut, the model is asked to list the sections it could not read under "What I couldn't confirm", so ask about one of them directly.                                                                                                                                                                                                                                              |
+| The page will not start                                             | The message names the variable that is missing or invalid; nothing is printed about its value.                                                                                                                                                                                                                                                                                                                                                               |
 
 ## Quality gates
 

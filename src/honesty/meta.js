@@ -16,6 +16,8 @@ const MAX_TEXT_LENGTH = 300;
 const MAX_GAPS = 10;
 const MAX_CONFLICTS = 5;
 const MAX_KEYS = 10;
+/** Named for an issue with the block as a whole rather than with one of its fields. */
+const ROOT_FIELD = '(block)';
 const NOT_AT_END = /** @type {const} */ ('not-at-end');
 
 const text = z.string().trim().min(1).max(MAX_TEXT_LENGTH);
@@ -30,14 +32,46 @@ const conflictSchema = z.object({
 });
 
 /**
+ * What the reason is when a reply that is not an answer gives none that can be used. The reason is
+ * for the reader of an answer's confidence; a decline or a question has none to explain, and
+ * leaving it out must not cost the reply its status.
+ */
+export const DEFAULT_REASONS = Object.freeze({
+  not_found: 'Nothing relevant was found in the sources.',
+  out_of_scope: 'The question is outside what the sources cover.',
+  clarify: 'The question needs clarifying first.',
+});
+
+// An answer never gets a made-up reason; a bad one is refused before this is reached.
+const REASON_FOR = Object.freeze({ answered: '', ...DEFAULT_REASONS });
+
+/**
+ * Settles the reason of a report. A usable one is kept; one that is too long is cut when the reply
+ * is not an answer. For an answer, a bad reason has already been refused, and nothing is made up.
+ * @param {{ status: keyof typeof REASON_FOR, confidenceReason?: unknown }} meta - The report as parsed.
+ * @returns {string} The reason.
+ */
+function settleReason({ status, confidenceReason }) {
+  const checked = text.safeParse(confidenceReason);
+  if (checked.success) {
+    return checked.data;
+  }
+  if (typeof confidenceReason === 'string' && confidenceReason.trim() !== '') {
+    return confidenceReason.trim().slice(0, MAX_TEXT_LENGTH);
+  }
+  return REASON_FOR[status];
+}
+
+/**
  * The block the model ends its reply with. Unknown extra fields are ignored rather than rejected,
- * because a harmless extra field should not cost an answer its reported confidence.
+ * because a harmless extra field should not cost an answer its reported confidence. The reason is
+ * required, and strict, only for an answer.
  */
 export const answerMetaSchema = z
   .object({
     status: z.enum(ANSWER_STATUSES),
     confidence: z.enum(CONFIDENCE_LEVELS).optional(),
-    confidenceReason: text,
+    confidenceReason: z.unknown().optional(),
     gaps: z.array(text).max(MAX_GAPS),
     conflicts: z.array(conflictSchema).max(MAX_CONFLICTS),
     clarifyingQuestion: text.optional(),
@@ -49,7 +83,11 @@ export const answerMetaSchema = z
     if (meta.status === 'clarify' && meta.clarifyingQuestion === undefined) {
       context.addIssue({ code: 'custom', path: ['clarifyingQuestion'], message: 'is required' });
     }
-  });
+    if (meta.status === 'answered' && !text.safeParse(meta.confidenceReason).success) {
+      context.addIssue({ code: 'custom', path: ['confidenceReason'], message: 'is required' });
+    }
+  })
+  .transform((meta) => ({ ...meta, confidenceReason: settleReason(meta) }));
 
 /**
  * The checked block.
@@ -63,6 +101,8 @@ export const answerMetaSchema = z
  * @property {AnswerMeta} [meta] - The checked block, when there is a valid one.
  * @property {'missing' | 'invalid-json' | 'invalid-shape'} [metaError] - Why there is no valid
  *   block. The answer treats all three as "the confidence was not reported".
+ * @property {string[]} [metaFields] - With `invalid-shape`: the names of the fields that were
+ *   wrong, such as `confidence` or `conflicts.0.docKeys`. Names only, never what they held.
  * @property {'not-at-end'} [warning] - Set when text followed the block. The block was still
  *   used, and that text was put back into the answer.
  */
@@ -115,7 +155,8 @@ function findLastBlock(lines) {
 /**
  * Checks the text inside a block.
  * @param {string} body - The text between the fences.
- * @returns {{ meta: AnswerMeta } | { metaError: 'invalid-json' | 'invalid-shape' }} The block, or why not.
+ * @returns {{ meta: AnswerMeta } | { metaError: 'invalid-json' } | { metaError: 'invalid-shape', metaFields: string[] }}
+ *   The block, or why not.
  */
 function readBody(body) {
   let value;
@@ -125,7 +166,11 @@ function readBody(body) {
     return { metaError: 'invalid-json' };
   }
   const checked = answerMetaSchema.safeParse(value);
-  return checked.success ? { meta: checked.data } : { metaError: 'invalid-shape' };
+  if (checked.success) {
+    return { meta: checked.data };
+  }
+  const fields = checked.error.issues.map(({ path }) => path.join('.') || ROOT_FIELD);
+  return { metaError: 'invalid-shape', metaFields: [...new Set(fields)] };
 }
 
 /**

@@ -8,6 +8,7 @@ import { extractCodeSearch } from '../../../src/citations/extractors/searchCode.
 import { fixtureInput, makeContext } from '../../helpers/extraction.js';
 
 const SHA = 'ebf99bea1fdf70b3a206c622a5134068c73eb607';
+const HEAD = '0123456789abcdef0123456789abcdef01234567';
 const OTHER = 'ccad636a5d7ead1560bf3516cd95f72ca47bc16d';
 
 /**
@@ -224,7 +225,7 @@ describe('extractRelease', () => {
 });
 
 describe('extractReleaseList', () => {
-  it('makes a candidate of each real release, never a source', async () => {
+  it('makes a candidate of each real release, and no source when the repository is not named', async () => {
     const result = await extractReleaseList(fixtureInput('list_releases'), makeContext());
 
     expect(result.sources).toEqual([]);
@@ -265,6 +266,65 @@ describe('extractReleaseList', () => {
       candidates: [],
       reason: 'unparseable',
     });
+  });
+});
+
+describe('extractReleaseList as a source', () => {
+  const ARGS = { owner: 'acme', repo: 'app' };
+  const items = json([
+    { tag_name: 'v2', html_url: 'https://github.com/acme/app/releases/tag/v2' },
+    { tag_name: 'v1', html_url: 'https://github.com/acme/app/releases/tag/v1' },
+  ]);
+
+  it('makes the list a source, pinned to the head commit, and keeps each release as a candidate', async () => {
+    const result = await extractReleaseList({ args: ARGS, text: items }, makeContext());
+
+    expect(result.sources).toEqual([
+      {
+        type: 'github',
+        repo: 'acme/app',
+        path: '',
+        title: 'Releases',
+        commitSha: HEAD,
+        url: 'https://github.com/acme/app/releases',
+        latestUrl: 'https://github.com/acme/app/releases',
+        kind: 'releases',
+        pinned: true,
+      },
+    ]);
+    expect(result.candidates.map(({ title }) => title)).toEqual(['v2', 'v1']);
+  });
+
+  it.each([
+    ['cannot be looked up', async () => undefined],
+    [
+      'fails',
+      async () => {
+        throw new Error('network');
+      },
+    ],
+  ])('is not pinned when the head commit %s', async (_name, resolveHead) => {
+    const result = await extractReleaseList(
+      { args: ARGS, text: items },
+      makeContext({ resolveHead }),
+    );
+
+    expect(result.sources[0]).toMatchObject({ commitSha: '', pinned: false });
+  });
+
+  it('is no source for an empty list', async () => {
+    const result = await extractReleaseList({ args: ARGS, text: '[]' }, makeContext());
+
+    expect(result).toMatchObject({ sources: [], candidates: [] });
+  });
+
+  it('is no source for a repository that is not allowed', async () => {
+    const result = await extractReleaseList(
+      { args: { owner: 'other', repo: 'repo' }, text: items },
+      makeContext(),
+    );
+
+    expect(result.sources).toEqual([]);
   });
 });
 

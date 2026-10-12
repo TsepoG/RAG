@@ -68,8 +68,6 @@ async function runFixture(hooks, toolName, fixture, args) {
 describe('onPostToolUse wraps what the model fetched', () => {
   it('registers a Confluence page and gives the model its text under its key', async () => {
     const { hooks, registry } = setup();
-    const { text } = fixtureInput('getConfluenceContent');
-
     const result = await runFixture(
       hooks,
       'atlassian-getConfluenceContent',
@@ -77,7 +75,9 @@ describe('onPostToolUse wraps what the model fetched', () => {
     );
 
     expect(result.modifiedResult.textResultForLlm).toBe(
-      `<source key="C1" type="confluence" title="Page title 1">\n${text}\n</source>`,
+      '<source key="C1" type="confluence" title="Page title 1">\n' +
+        'Title: Page title 1\nPage id: 262439\nVersion: 1\nLast updated: 2026-10-10T10:54:29.040Z\n\n' +
+        'Placeholder text 8\n</source>',
     );
     expect(registry.get('C1')).toMatchObject({ id: '262439', spaceKey: 'ENG', version: 1 });
   });
@@ -253,6 +253,29 @@ describe('onPostToolUse wraps what the model fetched', () => {
     });
   });
 
+  it('gives a page as plain text with its headings, and names the sections it had to cut', async () => {
+    const { hooks } = setup();
+    const filler = `<p>${'word '.repeat(MAX_SOURCE_CHARS / 5)}</p>`;
+    const page = JSON.stringify({
+      data: {
+        id: '262439',
+        title: 'Long page',
+        body: {
+          format: 'html',
+          value: `<h2 data-local-id="a">First</h2>${filler}<h2>Hidden one</h2><p>x</p><h3>Hidden two</h3>`,
+        },
+        metadata: { version: { number: 3 } },
+      },
+    });
+
+    const result = await run(hooks, 'atlassian-getConfluenceContent', PAGE, page);
+
+    const text = result.modifiedResult.textResultForLlm;
+    expect(text).toContain('\n## First\n');
+    expect(text).not.toContain('data-local-id');
+    expect(text).toContain('Sections that were cut and not read: Hidden one; Hidden two.');
+  });
+
   it('does not cut text that is exactly at the limit', async () => {
     const { hooks } = setup();
     const base = JSON.stringify({
@@ -410,6 +433,30 @@ describe('onPostToolUse notes search hits as candidates', () => {
 
     expect(registry.candidates().length).toBeGreaterThan(0);
     expect(registry.list()).toEqual([]);
+  });
+
+  it('registers the list of releases as a source and gives the model its text under the key', async () => {
+    const { hooks, registry } = setup();
+    const text = JSON.stringify([
+      {
+        tag_name: 'v1',
+        html_url: `${SITE.replace('acme.atlassian.net', 'github.com')}/acme/app/releases/tag/v1`,
+      },
+    ]);
+
+    const result = await run(
+      hooks,
+      'github_repos-list_releases',
+      { owner: 'acme', repo: 'app' },
+      text,
+    );
+
+    expect(registry.list().map((source) => [source.key, /** @type {any} */ (source).kind])).toEqual(
+      [['G1', 'releases']],
+    );
+    expect(
+      result.modifiedResult.textResultForLlm.startsWith('<source key="G1" type="github"'),
+    ).toBe(true);
   });
 
   it('keeps the hits of a code search, leaving out a repository that is not allowed', async () => {
