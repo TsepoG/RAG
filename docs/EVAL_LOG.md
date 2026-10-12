@@ -137,3 +137,68 @@ Not tuned in this phase, but recorded:
 - The release-date question (`oos-pm-next-year-releases`) was measured: it did not make up dates,
   answering in substance that there is no schedule at low confidence, but its status was `answered`
   because of finding 2.
+
+## Tuning round 1 (2026-10-12)
+
+Run `20261012-163319`, commit `208de073cf89`, base prompt hash `81ddc08c88b9` (baseline
+`7acf4fe854aa`). It ran 20 cases: the 8 smoke cases and the 12 other cases the three changes
+target. It used 20 requests.
+
+What changed:
+
+1. Confluence pages reach the model as plain text with their headings, and the cap is 60,000
+   characters instead of 24,000. When a page is still cut, the notice names the sections that
+   were cut. The design page goes from about 80,500 characters to about 49,900 and is now read
+   whole.
+2. The base prompt asks for the answer-meta block on every reply, including declines and
+   clarifying questions.
+3. The base prompt separates `out_of_scope` (not about the project) from `not_found` (about the
+   project, not answered by the sources), and forbids answering from something merely similar.
+
+### Result on the same 20 cases
+
+| | Baseline (`20261011-200058`) | Round 1 |
+| --- | --- | --- |
+| Passed every check that applies | 11 of 20 | 10 of 20 |
+| Status exactly as expected | 11 of 20 | 10 of 20 |
+| Smoke cases that passed | 5 of 8 | 4 of 8 |
+| Meta block missing | 5 | 4 |
+| Expected sources missed (sum over the 7 long-page cases) | 7 | 3 |
+
+Two cases changed outcome: `nf-dev-grade-thresholds` (`not_found` to `answered`) and
+`oos-pm-next-year-releases` (`answered` to `not_found`, still a miss). `nf-dev-grade-thresholds`
+is the same case that changed outcome between the baseline smoke run and the baseline full run, so
+it is part of the measured variation. **The smoke result went from 5 to 4 passed, a change of one
+case, which is not larger than the baseline variation of 1 case of 8. Round 1 shows no
+improvement on the smoke set and, by the rule in this log, none is claimed.**
+
+### Effect per change
+
+1. **Page text and the larger cap.** The only change that shows an effect, on the cases it
+   targets: expected sources missed fell from 7 to 3 (`ba-sector-membership-built` 2 to 0,
+   `ba-survivor-universe` 1 to 0, `ba-trailing-high-basis` 2 to 1, `pm-open-decision-dip` 1 to 0;
+   `pm-phase-status` went from 0 to 1, `po-backtest-trust` stayed at 1). `pm-open-decision-dip`,
+   the baseline's wrong answer, now says the trailing-high basis is not recorded as settled and
+   lists the options. Whether that is correct is for the review to say. Cost: 20 requests for 20
+   cases, the same as one request per case; credits per case were not measured separately.
+2. **Answer-meta on every reply.** Three of the five cases that lacked the block now have it
+   (`qa-backfill-clarify`, `nf-qa-load-tests`, `oos-pm-next-year-releases`), and two others lost
+   it (`nf-dev-grade-thresholds`, `oos-qa-python-gc`). Net 5 to 4, within the variation. The
+   replies that still lack it are one-call declines with no tool use (`oos-po-weather`,
+   `oos-qa-python-gc`): the model answers "I couldn't find this" and stops, ignoring the rule.
+   A rule in the prompt is not enough for these.
+3. **`out_of_scope`, `not_found`, and "merely similar".** No effect that can be seen. The two
+   `out_of_scope` cases that came back `not_found` are the ones with no block, so their status is
+   guessed from the lack of citations and the new wording never applies. `nf-ba-fx-rates` was
+   still answered from something similar, at `medium` confidence, and `dev-rate-limit-clarify`
+   still answered one reading of a two-way question.
+
+### Which model answered
+
+Every case was answered start to finish by one model: 12 by `gpt-6-luna`, 8 by
+`mai-code-1.1-flash`, none by both. No call carried routing details and no model change was
+reported. The eight `mai-code-1.1-flash` cases are the same eight, among these 20, as in the
+baseline, so the model is chosen for the whole question, from the question, before the first
+call. It is not a switch during a question and it is not random. The cause is still unknown; what
+decides it is outside what the SDK reports. Because each case keeps its model from run to run,
+comparing a case with itself is fair.
