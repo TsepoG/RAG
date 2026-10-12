@@ -30,6 +30,8 @@ import { MAX_ALSO_CONSULTED } from './result.js';
  * @property {boolean} rewritten - True when the answer was rewritten for the role.
  * @property {boolean} rewriteRejected - True when a rewrite was tried and not used.
  * @property {string} [rewriteRejectedReason] - Why it was not used.
+ * @property {boolean} metaRepaired - True when the answer-meta block was missing or unusable and a
+ *   valid one was got by asking again; the answer text is the first reply's.
  * @property {import('../honesty/index.js').WhoToAsk[]} whoToAsk - People worth asking.
  */
 
@@ -58,10 +60,12 @@ export function wantsWhoToAsk({ status, confidence }) {
  *   role: import('../roles/index.js').Role,
  *   whoToAsk: import('../honesty/index.js').WhoToAsk[],
  *   style: StyleOutcome,
- * }} input - The analysis of the final reply, the role, who to ask, and what happened to the style.
+ *   metaRepaired?: boolean,
+ * }} input - The analysis of the final reply, the role, who to ask, what happened to the style, and
+ *   whether the answer-meta block was got by asking again.
  * @returns {ComposedResult} The result.
  */
-export function composeResult({ analysis, role, whoToAsk, style }) {
+export function composeResult({ analysis, role, whoToAsk, style, metaRepaired = false }) {
   const { caps, meta, parts } = analysis;
   const answered = caps.status === 'answered';
   // Nothing counts as cited when the question was not answered, so what was fetched is "consulted".
@@ -95,6 +99,7 @@ export function composeResult({ analysis, role, whoToAsk, style }) {
     ...(style.rewriteRejectedReason === undefined
       ? {}
       : { rewriteRejectedReason: style.rewriteRejectedReason }),
+    metaRepaired,
     whoToAsk,
   };
   const shown = renderFinalAnswer(composed, role);

@@ -58,4 +58,10 @@ describe('friendlyLabel for commits and releases', () => {
 
     expect(label).toBe('Release v1.2.0 — code (payments-service)');
   });
+
+  it('names the list of releases', () => {
+    const label = friendlyLabel(githubSource({ kind: 'releases', path: '', title: 'Releases' }));
+
+    expect(label).toBe('Releases — code (payments-service)');
+  });
 });

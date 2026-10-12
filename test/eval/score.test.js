@@ -307,6 +307,16 @@ describe('scoreCase: the answer’s own checks', () => {
     expect(score.metaError).toBe(true);
   });
 
+  it('notes a report that was got by asking again, and then it is no meta error', () => {
+    const score = scoreCase(makeCase(), makeResult({ metaRepaired: true }), CONTEXT);
+
+    expect(score).toMatchObject({ metaRepaired: true, metaError: false });
+  });
+
+  it('says a report was not asked for again when the result does not say, as in older results', () => {
+    expect(scoreCase(makeCase(), makeResult(), CONTEXT).metaRepaired).toBe(false);
+  });
+
   it('does not flag other rules as a meta error', () => {
     const score = scoreCase(makeCase(), makeResult({ capsApplied: [{ code: 'gaps' }] }), CONTEXT);
 

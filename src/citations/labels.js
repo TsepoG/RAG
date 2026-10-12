@@ -40,6 +40,9 @@ export function friendlyLabel(source) {
   if (source.kind === 'release') {
     return `Release ${source.title} — code (${repoName})`;
   }
+  if (source.kind === 'releases') {
+    return `Releases — code (${repoName})`;
+  }
   if (source.kind === 'directory') {
     const name = source.path === '' ? 'Top-level' : humaniseFileName(source.path);
     return `${name} folder — code (${repoName})`;

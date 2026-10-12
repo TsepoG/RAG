@@ -25,7 +25,8 @@
  * @property {string} commitSha - The commit the content is pinned to, or an empty string.
  * @property {string} url - Link to it, pinned to the commit when `pinned` is true.
  * @property {string} latestUrl - The same thing on the default branch.
- * @property {'file' | 'directory' | 'commit' | 'release'} kind - What it is.
+ * @property {'file' | 'directory' | 'commit' | 'release' | 'releases'} kind - What it is; `releases`
+ *   is the list of a repository's releases.
  * @property {boolean} pinned - True when the link names an exact commit.
  */
 

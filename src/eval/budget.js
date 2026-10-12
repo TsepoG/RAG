@@ -4,16 +4,21 @@ import { EvalError } from '../errors/index.js';
 /** The depth of the most plain-spoken roles, whose answers are the ones most often rewritten. */
 const PLAIN_DEPTH = 1;
 
+/** A question, then a request for the report, then a rewrite. */
+const MAX_REQUESTS_PER_CASE = 3;
+
 /** The tag of a case written to tempt the assistant into code or file paths. */
 const STYLE_TRAP_TAG = 'style-trap';
 
 /**
  * What a run is expected to cost in Copilot requests. One question is one request, and an answer
- * that does not suit its role is rewritten with a second one.
+ * that does not suit its role is rewritten with a second one, and one whose confidence report is
+ * missing is asked for it again with another.
  * @typedef {object} Estimate
  * @property {number} cases - How many cases will run.
- * @property {number} expected - Requests if only the cases likely to be rewritten are.
- * @property {number} worstCase - Requests if every case is rewritten.
+ * @property {number} expected - Requests if only the cases likely to be rewritten, or to lack a
+ *   report, are.
+ * @property {number} worstCase - Requests if every case is rewritten and has its report asked for again.
  */
 
 /**
@@ -28,10 +33,14 @@ export function estimateRequests(cases, roles) {
       expected.status === 'answered' &&
       (roles.get(role)?.depth === PLAIN_DEPTH || tags.includes(STYLE_TRAP_TAG)),
   ).length;
+  // Every miss of the report so far was on a reply that declines or asks a question.
+  const likelyRepairs = cases.filter(
+    ({ expect: expected }) => expected.status !== 'answered',
+  ).length;
   return {
     cases: cases.length,
-    expected: cases.length + likelyRewrites,
-    worstCase: cases.length * 2,
+    expected: cases.length + likelyRewrites + likelyRepairs,
+    worstCase: cases.length * MAX_REQUESTS_PER_CASE,
   };
 }
 
@@ -40,6 +49,7 @@ export function estimateRequests(cases, roles) {
  * @typedef {object} RequestOutcome
  * @property {boolean} [rewritten] - Whether the answer was rewritten.
  * @property {boolean} [rewriteRejected] - Whether a rewrite was tried and not used.
+ * @property {boolean} [metaRepaired] - Whether the confidence report was asked for again and got.
  */
 
 /**
@@ -73,8 +83,8 @@ export function createRequestGuard(limit) {
       }
       return !stoppedEarly;
     },
-    record({ rewritten = false, rewriteRejected = false }) {
-      used += rewritten || rewriteRejected ? 2 : 1;
+    record({ rewritten = false, rewriteRejected = false, metaRepaired = false }) {
+      used += 1 + (rewritten || rewriteRejected ? 1 : 0) + (metaRepaired ? 1 : 0);
       casesRun += 1;
     },
     report() {

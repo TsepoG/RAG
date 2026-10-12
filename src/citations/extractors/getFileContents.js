@@ -1,7 +1,7 @@
 // @ts-check
 import {
   isAllowedRepo,
-  isFullSha,
+  lookUpHead,
   nothing,
   repoFromArguments,
   asObject,
@@ -72,21 +72,6 @@ function commitOfListing(listing, repo) {
     }
   }
   return undefined;
-}
-
-/**
- * Looks up the head commit through the context, never letting a failure there escape.
- * @param {import('./shared.js').ExtractContext} context - The context.
- * @param {string} repo - `owner/repo`.
- * @returns {Promise<string | undefined>} A full commit SHA, or undefined.
- */
-async function lookUpHead(context, repo) {
-  try {
-    const sha = await context.resolveHead(repo);
-    return isFullSha(sha) ? sha : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /**

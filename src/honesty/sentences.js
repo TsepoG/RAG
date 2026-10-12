@@ -1,11 +1,18 @@
 // @ts-check
-import { listSentences } from './prose.js';
+import { listParagraphs, listSentences } from './prose.js';
 
 /** Most uncited sentences the result reports; enough for Phase 6 to measure, small to log. */
 export const MAX_UNCITED_SENTENCES = 5;
 
 /** Longest an uncited sentence is reported before it is cut. */
 export const MAX_REPORTED_LENGTH = 160;
+
+/**
+ * A paragraph with at most this many sentences, whose last sentence cites a source, counts as
+ * cited. A model often puts one citation at the end of a short paragraph, and the claims before it
+ * rest on it; in a longer paragraph a citation at the end cannot be tied to the first sentences.
+ */
+export const MAX_COVERED_SENTENCES = 3;
 
 /** A sentence shorter than this is not judged. */
 const MIN_WORDS = 6;
@@ -37,12 +44,19 @@ function shorten(text) {
 /**
  * Finds the sentences of an answer that make a claim without citing a source. Headings, the
  * sections the application writes itself, code, tables, list lead-ins ending in a colon and
- * sentences under six words are not judged. It is a heuristic by design.
+ * sentences under six words are not judged. A short paragraph (up to three sentences) whose last
+ * sentence cites a source counts as cited as a whole. It is a heuristic by design.
  * @param {string} answer - The answer, after invalid keys were removed.
  * @returns {string[]} At most five sentences, each cut to 160 characters.
  */
 export function findUncitedSentences(answer) {
-  return listSentences(answer)
+  return listParagraphs(answer)
+    .filter(
+      (sentences) =>
+        sentences.length > MAX_COVERED_SENTENCES ||
+        sentences[sentences.length - 1].brackets.length === 0,
+    )
+    .flat()
     .filter((sentence) => sentence.brackets.length === 0 && needsCitation(sentence.text))
     .slice(0, MAX_UNCITED_SENTENCES)
     .map(({ text }) => shorten(text));

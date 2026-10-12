@@ -2,6 +2,7 @@
 import { buildWhoToAsk } from '../honesty/index.js';
 import { analyseReply } from './analyse.js';
 import { composeResult, wantsWhoToAsk } from './compose.js';
+import { repairMeta } from './repairMeta.js';
 import { rewriteAnswer } from './rewrite.js';
 
 /**
@@ -11,8 +12,8 @@ import { rewriteAnswer } from './rewrite.js';
  * @property {import('../roles/index.js').DetailedRole} role - The role as it is for this question.
  * @property {import('../citations/index.js').CitationRegistry} registry - The question's sources.
  * @property {Pick<import('@github/copilot-sdk').CopilotSession, 'on' | 'send' | 'abort'> | undefined} session
- *   The open session, used for a rewrite.
- * @property {import('../mcp/index.js').ToolGate} gate - Locked for the rewrite.
+ *   The open session, used for a rewrite or to ask again for the answer-meta block.
+ * @property {import('../mcp/index.js').ToolGate} gate - Locked for the rewrite and the repair.
  * @property {{ now: () => number }} clock - Time source.
  * @property {Promise<never>} interrupt - Rejects when the time runs out or the question is stopped.
  * @property {Promise<never>} cancellation - Rejects only when the question is stopped.
@@ -37,8 +38,9 @@ function logReportProblems({ metaError, warning }, logger) {
 }
 
 /**
- * Turns the model's reply into the result: checks it, rewrites it once if it does not suit the
- * role, and works out who to ask. A stop from the person asking ends it with a
+ * Turns the model's reply into the result: checks it, asks once for the answer-meta block if there
+ * was none that could be used, rewrites the answer once if it does not suit the role, and works out
+ * who to ask. A stop from the person asking ends it with a
  * QuestionCancelledError, even while the lookup of who to ask is running.
  * @param {FinishInput} input - The reply and what is needed to check it.
  * @returns {Promise<import('./compose.js').ComposedResult>} The result, without how it was reached.
@@ -60,15 +62,12 @@ export async function finishAnswer({
   notify({ kind: 'checking' });
   const first = analyseReply({ reply, role, registry });
   logReportProblems(first, logger);
-  const needsRewrite = first.caps.status === 'answered' && first.violations.length > 0;
-  if (needsRewrite) {
-    notify({ kind: 'rewriting' });
-  }
-  const rewrite =
-    needsRewrite && session !== undefined
-      ? await rewriteAnswer({
+  const repair =
+    first.metaError !== undefined && session !== undefined
+      ? await repairMeta({
           session,
           original: first,
+          reply,
           role,
           registry,
           gate,
@@ -76,7 +75,25 @@ export async function finishAnswer({
           deadline: { promise: interrupt },
           logger,
         })
-      : { analysis: first, rewritten: false, rewriteRejected: false };
+      : { analysis: first, metaRepaired: false };
+  const needsRewrite =
+    repair.analysis.caps.status === 'answered' && repair.analysis.violations.length > 0;
+  if (needsRewrite) {
+    notify({ kind: 'rewriting' });
+  }
+  const rewrite =
+    needsRewrite && session !== undefined
+      ? await rewriteAnswer({
+          session,
+          original: repair.analysis,
+          role,
+          registry,
+          gate,
+          clock,
+          deadline: { promise: interrupt },
+          logger,
+        })
+      : { analysis: repair.analysis, rewritten: false, rewriteRejected: false };
   const { analysis } = rewrite;
   const whoToAsk = wantsWhoToAsk(analysis.caps)
     ? await Promise.race([
@@ -88,6 +105,7 @@ export async function finishAnswer({
     analysis,
     role,
     whoToAsk,
+    metaRepaired: repair.metaRepaired,
     style: {
       ...rewrite,
       violations: analysis.caps.status === 'answered' ? analysis.violations : [],

@@ -3,17 +3,21 @@ import {
   asObject,
   asString,
   isAllowedRepo,
+  lookUpHead,
   MAX_CANDIDATES,
   nothing,
   parseJson,
+  repoFromArguments,
   repoFromUrl,
 } from './shared.js';
 
 /**
- * Reads a list of releases. They are candidates only; to cite one the model fetches it.
+ * Reads a list of releases the model fetched. The list is a source for which releases exist and
+ * when they were made, pinned like a folder listing: to the head commit when it can be found. Each
+ * release in it is also a candidate; to cite one on its own the model fetches it.
  * @type {import('./shared.js').Extractor}
  */
-export async function extractReleaseList({ text }, { repos }) {
+export async function extractReleaseList({ args, text }, context) {
   const items = parseJson(text);
   if (!Array.isArray(items)) {
     return nothing('unparseable');
@@ -27,11 +31,33 @@ export async function extractReleaseList({ text }, { repos }) {
     if (
       url !== '' &&
       title !== '' &&
-      isAllowedRepo(repos, repoFromUrl(url)) &&
+      isAllowedRepo(context.repos, repoFromUrl(url)) &&
       candidates.length < MAX_CANDIDATES
     ) {
       candidates.push({ type: 'github', title, url });
     }
   }
-  return { sources: [], candidates, blocked: false };
+  const repo = repoFromArguments(args);
+  if (items.length === 0 || repo === undefined || !isAllowedRepo(context.repos, repo)) {
+    return { sources: [], candidates, blocked: false };
+  }
+  const commitSha = (await lookUpHead(context, repo)) ?? '';
+  const url = `https://github.com/${repo}/releases`;
+  return {
+    sources: [
+      {
+        type: 'github',
+        repo,
+        path: '',
+        title: 'Releases',
+        commitSha,
+        url,
+        latestUrl: url,
+        kind: 'releases',
+        pinned: commitSha !== '',
+      },
+    ],
+    candidates,
+    blocked: false,
+  };
 }

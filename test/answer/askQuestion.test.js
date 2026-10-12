@@ -128,6 +128,7 @@ describe('askQuestion answer', () => {
       toolCalls: [],
       model: 'gpt-x',
       modelChanges: [],
+      metaRepaired: false,
       modelCalls: [
         {
           index: 0,
@@ -148,7 +149,7 @@ describe('askQuestion answer', () => {
       script(emit) {
         emit('assistant.message_delta', { deltaContent: 'Hel' });
         emit('assistant.message_delta', { deltaContent: 'lo' });
-        emit('assistant.message', { content: 'Hello' });
+        emit('assistant.message', { content: clarifyReply('Hello') });
         emit('session.idle', {});
       },
     });

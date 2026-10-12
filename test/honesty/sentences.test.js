@@ -374,3 +374,44 @@ describe('markCitationsAsInferred', () => {
     );
   });
 });
+
+describe('findUncitedSentences short paragraphs that end with a citation', () => {
+  const CLAIM_A = 'Refunds are allowed within thirty days of the order date.';
+  const CLAIM_B = 'Large refunds also need a manager to approve them first.';
+  const CLAIM_C = 'The approval is recorded in the order history for audit.';
+  const CLAIM_D = 'Staff can see the history from the order detail screen.';
+
+  it('counts a paragraph of up to three sentences as cited when the last one cites', () => {
+    const answer = `${CLAIM_A} ${CLAIM_B} ${CLAIM_C} [C1]`;
+
+    expect(findUncitedSentences(answer)).toEqual([]);
+  });
+
+  it('does not cover a paragraph of four sentences', () => {
+    const answer = `${CLAIM_A} ${CLAIM_B} ${CLAIM_C} ${CLAIM_D} [C1]`;
+
+    expect(findUncitedSentences(answer)).toEqual([CLAIM_A, CLAIM_B, CLAIM_C]);
+  });
+
+  it('does not cover a short paragraph whose last sentence has no citation', () => {
+    const answer = `${CLAIM_A} [C1] ${CLAIM_B}`;
+
+    expect(findUncitedSentences(answer)).toEqual([CLAIM_B]);
+  });
+
+  it('does not let a citation in the next paragraph cover this one', () => {
+    const answer = `${CLAIM_A}\n\n${CLAIM_B} [C1]`;
+
+    expect(findUncitedSentences(answer)).toEqual([CLAIM_A]);
+  });
+
+  it('judges each list item as its own paragraph', () => {
+    const answer = `- ${CLAIM_A} [C1]\n- ${CLAIM_B}`;
+
+    expect(findUncitedSentences(answer)).toEqual([CLAIM_B]);
+  });
+
+  it('counts a citation with an asterisk as a citation', () => {
+    expect(findUncitedSentences(`${CLAIM_A} ${CLAIM_B} [G1*]`)).toEqual([]);
+  });
+});

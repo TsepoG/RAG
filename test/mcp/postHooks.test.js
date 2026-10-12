@@ -435,6 +435,30 @@ describe('onPostToolUse notes search hits as candidates', () => {
     expect(registry.list()).toEqual([]);
   });
 
+  it('registers the list of releases as a source and gives the model its text under the key', async () => {
+    const { hooks, registry } = setup();
+    const text = JSON.stringify([
+      {
+        tag_name: 'v1',
+        html_url: `${SITE.replace('acme.atlassian.net', 'github.com')}/acme/app/releases/tag/v1`,
+      },
+    ]);
+
+    const result = await run(
+      hooks,
+      'github_repos-list_releases',
+      { owner: 'acme', repo: 'app' },
+      text,
+    );
+
+    expect(registry.list().map((source) => [source.key, /** @type {any} */ (source).kind])).toEqual(
+      [['G1', 'releases']],
+    );
+    expect(
+      result.modifiedResult.textResultForLlm.startsWith('<source key="G1" type="github"'),
+    ).toBe(true);
+  });
+
   it('keeps the hits of a code search, leaving out a repository that is not allowed', async () => {
     const { hooks, registry } = setup();
 

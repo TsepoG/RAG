@@ -14,7 +14,7 @@ describe('estimateRequests', () => {
   it('is one request per case when no case is likely to be rewritten', () => {
     const cases = [makeCase({ id: 'a' }), makeCase({ id: 'b', role: 'qa' })];
 
-    expect(estimateRequests(cases, ROLES)).toEqual({ cases: 2, expected: 2, worstCase: 4 });
+    expect(estimateRequests(cases, ROLES)).toEqual({ cases: 2, expected: 2, worstCase: 6 });
   });
 
   it('adds one request for an answered case for a plain-spoken role', () => {
@@ -29,7 +29,7 @@ describe('estimateRequests', () => {
     expect(estimateRequests(cases, ROLES).expected).toBe(2);
   });
 
-  it('adds nothing for a case that is not expected to be answered, since there is nothing to rewrite', () => {
+  it('adds one request, for the report, for a case that is not expected to be answered, but no rewrite', () => {
     const cases = [
       makeCase({
         id: 'a',
@@ -39,7 +39,7 @@ describe('estimateRequests', () => {
       }),
     ];
 
-    expect(estimateRequests(cases, ROLES).expected).toBe(1);
+    expect(estimateRequests(cases, ROLES).expected).toBe(2);
   });
 
   it('counts a case once, though it is both plain-spoken and a style trap', () => {
@@ -91,6 +91,15 @@ describe('createRequestGuard', () => {
     guard.record({ rewritten: true });
 
     expect(guard.report().used).toBe(3);
+  });
+
+  it('counts a request more when the confidence report was asked for again', () => {
+    const guard = createRequestGuard(10);
+
+    guard.record({ metaRepaired: true });
+    guard.record({ metaRepaired: true, rewritten: true });
+
+    expect(guard.report().used).toBe(5);
   });
 
   it('counts two requests for a rewrite that was tried and not used', () => {

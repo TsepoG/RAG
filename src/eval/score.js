@@ -25,6 +25,8 @@ export const ERROR_STATUS = 'error';
  * @property {ReadonlyArray<string>} styleViolations - How the answer still does not suit its role.
  * @property {boolean} rewritten - Whether the answer was rewritten.
  * @property {boolean} rewriteRejected - Whether a rewrite was tried and not used.
+ * @property {boolean} [metaRepaired] - Whether the confidence report was asked for again and got;
+ *   left out of results from before it was recorded.
  * @property {ReadonlyArray<unknown>} toolCalls - The tool calls made.
  * @property {number} durationMs - How long the question took.
  */
@@ -56,7 +58,8 @@ export const ERROR_STATUS = 'error';
  * @property {boolean | undefined} maxConfidenceRespected - For a case with a highest confidence.
  * @property {number} styleViolations - Style problems left after any rewrite.
  * @property {number} plainStyleViolations - The same, counted only for the most plain-spoken roles.
- * @property {boolean} metaError - Whether the assistant failed to report its confidence.
+ * @property {boolean} metaError - Whether the assistant failed to report its confidence, even when asked again.
+ * @property {boolean} metaRepaired - Whether the first reply had no usable report and a second request got one.
  * @property {number} invalidKeys - Keys that were never given out.
  * @property {number} uncitedSentences - Sentences without a citation.
  * @property {number | undefined} inferredShare - The share of cited sources that are the assistant's reading.
@@ -146,6 +149,7 @@ export function scoreCase(one, result, { depth, maxToolCalls }) {
     styleViolations: style,
     plainStyleViolations: depth === PLAIN_DEPTH ? style : 0,
     metaError: result.capsApplied.some(({ code }) => code === 'no-meta'),
+    metaRepaired: result.metaRepaired === true,
     invalidKeys: result.invalidKeys.length,
     uncitedSentences: result.uncitedSentences.length,
     rewritten: result.rewritten,
@@ -182,6 +186,7 @@ export function scoreFailure(one, latencyMs) {
     styleViolations: 0,
     plainStyleViolations: 0,
     metaError: false,
+    metaRepaired: false,
     invalidKeys: 0,
     uncitedSentences: 0,
     inferredShare: undefined,

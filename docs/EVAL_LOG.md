@@ -202,3 +202,79 @@ baseline, so the model is chosen for the whole question, from the question, befo
 call. It is not a switch during a question and it is not random. The cause is still unknown; what
 decides it is outside what the SDK reports. Because each case keeps its model from run to run,
 comparing a case with itself is fair.
+
+### Correctness on the seven long-page cases
+
+The verdicts for these seven were drafted by Claude Code, as were the baseline's, so both sets
+have the same author and are not an independent judgement. Seven cases is also too few to
+conclude from.
+
+| Case | Baseline | Round 1 |
+| --- | --- | --- |
+| `pm-open-decision-dip` | wrong | correct |
+| `ba-trailing-high-basis` | partial | correct |
+| `ba-sector-membership-built` | partial | correct |
+| `ba-survivor-universe` | correct | correct |
+| `po-backtest-trust` | correct | partial |
+| `pm-phase-status` | partial | partial |
+| `po-short-term-picks` | partial | correct |
+| Share correct (partial counts half) | 57% | 86% |
+
+The four improvements are in cases whose answers depend on sections of the design page that used
+to be cut. `po-backtest-trust` went down: the answer is right that the backtest cannot be trusted
+yet but no longer says why results would look better than reality.
+
+## Tuning round 2 (2026-10-12), before its live run
+
+Three changes, none run live yet:
+
+1. **A short paragraph that ends with a citation counts as cited.** A paragraph or list item of up
+   to three sentences whose last sentence carries a citation is not asked for citations on its
+   other sentences. A longer paragraph is judged sentence by sentence as before.
+2. **The list of releases is a citable source** (kind `releases`, titled "Releases", linked to the
+   repository's releases page, pinned to the head commit when it can be found, like a folder
+   listing). `pm-release-history` expected a source matching `v0.2.0`, which a list cannot give, so
+   its expectation in the eval set now matches `Releases`. That is a change to the case made
+   after seeing it fail, because the source it asked for can no longer exist as such; it is
+   noted here so it is not mistaken for tuning to the result.
+3. **A missing or unusable answer-meta block is asked for once more.** Only when it is missing or
+   invalid and the reply has an answer; at most once per question; tools locked; the request
+   asks for the block alone for the previous reply; the answer text is the first reply's and is
+   never replaced; the repaired report goes through all the confidence rules. The result records
+   `metaRepaired`, the run summary shows how many reports were got this way, and the request
+   guard counts the extra request. It was applied because round 1 left the missing-report rate at
+   4 of 20 (20%), above the 10% bar.
+
+### The uncited-sentence rule, re-scored offline
+
+The stored answers of the baseline and of round 1 were run through the new rule. No requests were
+made. The model's own reported confidence is not stored, so the effect on confidence has two
+bounds: a floor, where no answer moves, and a ceiling, where every answer that is freed of its only
+cap goes from `medium` to `high`, as if the model had said `high`. The ceiling probably overstates.
+
+| | Baseline (31 answered) | Round 1 (16 answered) |
+| --- | --- | --- |
+| Answers with an uncited sentence, before | 16 | 10 |
+| Answers with an uncited sentence, after | 4 | 3 |
+| Answers freed of the uncited cap | 12 | 7 |
+| Of those, answers with no other cap | 6 | 2 |
+
+Calibration of the baseline (verdicts for all 31), with partial counting half:
+
+| Level | Before: judged, share correct | After, floor | After, ceiling |
+| --- | --- | --- | --- |
+| high | 3, 100% (small sample) | 3, 100% | 9, 89% (7 correct, 2 partial) |
+| medium | 20, 73% (11 / 7 / 2) | 20, 73% | 14, 68% (7 / 5 / 2) |
+| low | 8, 94% | 8, 94% | 8, 94% |
+
+The six answers that could become `high`: `dev-alias-chain-order`, `dev-point-in-time-guard`,
+`ba-derived-values`, `pm-biggest-risk` (all correct), `dev-rate-limit-clarify` and
+`ba-trailing-high-basis` (partial). For round 1 only 7 of 16 answers have a verdict: at the ceiling
+`high` would hold one correct answer and `medium` four (75%). That is too few to say anything.
+
+What it shows: the rule removes most of the uncited flags (16 to 4 of 31), as intended. It does not
+fix the inverted calibration. Even at the ceiling `medium` is correct 68% of the time against 94%
+for `low`, and `high` (89%) would sit just under the 90% target. The inversion comes mostly from
+what each level holds: `low` answers are the ones that hedge, and are right; `medium` holds the
+partial and wrong answers. The live run will show the real effect, since the model's reported
+level will then be seen after the rule.
