@@ -30,7 +30,9 @@ export function diffRunInfo(before, after) {
   note('model asked for', before.model, after.model);
   note('models that answered', before.models.join(', '), after.models.join(', '));
   note('base prompt hash', before.basePromptHash, after.basePromptHash);
-  const ids = [...new Set([...Object.keys(before.roles), ...Object.keys(after.roles)])].sort();
+  const ids = [...new Set([...Object.keys(before.roles), ...Object.keys(after.roles)])].sort(
+    (a, b) => a.localeCompare(b),
+  );
   for (const id of ids) {
     note(`role ${id} version`, before.roles[id] ?? 'none', after.roles[id] ?? 'none');
   }

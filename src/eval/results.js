@@ -1,5 +1,5 @@
 // @ts-check
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { z } from 'zod';
 import { EvalError } from '../errors/index.js';
 
@@ -10,14 +10,21 @@ export const RESULTS_FILE = 'results.jsonl';
 export const RESULTS_DIRECTORY = 'eval/results';
 
 /**
- * Finds a run's folder from what was typed: a bare name is looked for under `eval/results`, and
- * anything with a path in it is used as it is.
+ * Finds a run's folder from what was typed: a bare name is looked for under `eval/results`, and a
+ * name with a path in it is taken from the working directory. Either way the folder must be inside
+ * `eval/results`, so a typed path cannot read or write anywhere else.
  * @param {string} name - A folder name or path.
- * @returns {string} The folder.
+ * @returns {string} The folder, relative to the working directory.
+ * @throws {EvalError} When the folder is not inside `eval/results`.
  */
 export function resolveRunFolder(name) {
+  const base = resolve(RESULTS_DIRECTORY);
   const hasPath = isAbsolute(name) || name.includes('/') || name.includes('\\');
-  return hasPath ? name : join(RESULTS_DIRECTORY, name);
+  const inside = relative(base, hasPath ? resolve(name) : resolve(base, name));
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+    throw new EvalError(`"${name}" is not a run folder under ${RESULTS_DIRECTORY}.`);
+  }
+  return join(RESULTS_DIRECTORY, inside);
 }
 
 /** The name of the file a run's summary is written to. */

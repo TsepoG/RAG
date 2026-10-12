@@ -1,5 +1,7 @@
 // @ts-check
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { EvalError } from '../../src/errors/index.js';
 import { buildCalibration, MIN_SAMPLE } from '../../src/eval/calibration.js';
 import { parseFeedbackLines, summariseFeedback } from '../../src/eval/feedback.js';
 import { buildReport, diffRunInfo } from '../../src/eval/report.js';
@@ -541,14 +543,30 @@ describe('resolveRunFolder', () => {
     );
   });
 
-  it('uses a name with a path in it as it is', () => {
-    expect(resolveRunFolder('somewhere/else')).toBe('somewhere/else');
-    expect(resolveRunFolder('somewhere\\else')).toBe('somewhere\\else');
+  it('takes a path from the working directory when it leads into eval/results', () => {
+    expect(resolveRunFolder('eval/results/20261011-180000').replaceAll('\\', '/')).toBe(
+      'eval/results/20261011-180000',
+    );
+    expect(resolveRunFolder(resolve('eval/results/one')).replaceAll('\\', '/')).toBe(
+      'eval/results/one',
+    );
   });
 
-  it('uses an absolute path as it is', () => {
+  it.each([
+    '..',
+    '../other',
+    'eval/results/../../elsewhere',
+    'somewhere/else',
+    '.',
+    'eval/results',
+  ])('refuses %j, which is not a run folder under eval/results', (name) => {
+    expect(() => resolveRunFolder(name)).toThrow(EvalError);
+    expect(() => resolveRunFolder(name)).toThrow('is not a run folder under eval/results');
+  });
+
+  it('refuses an absolute path outside eval/results', () => {
     const absolute = process.platform === 'win32' ? 'C:\\runs\\one' : '/runs/one';
 
-    expect(resolveRunFolder(absolute)).toBe(absolute);
+    expect(() => resolveRunFolder(absolute)).toThrow(EvalError);
   });
 });

@@ -72,7 +72,7 @@ export function modelsSeen(entries) {
   const names = entries.flatMap(({ result }) =>
     typeof result?.model === 'string' ? [result.model] : [],
   );
-  return [...new Set(names)].sort();
+  return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
 
 /**
