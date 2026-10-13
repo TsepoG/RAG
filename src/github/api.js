@@ -100,3 +100,15 @@ export function describeFailure(error) {
   }
   return error.name === 'Error' ? error.message : error.name;
 }
+
+/** The message `getJson` and `getRaw` fail with when GitHub answers 404. */
+const NOT_FOUND_MESSAGE = `GitHub answered ${NOT_FOUND}`;
+
+/**
+ * Whether a failure of the client is GitHub saying the thing is not there.
+ * @param {unknown} error - What was thrown.
+ * @returns {boolean} True for a 404.
+ */
+export function isNotFound(error) {
+  return error instanceof Error && error.message === NOT_FOUND_MESSAGE;
+}
