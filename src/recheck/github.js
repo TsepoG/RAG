@@ -13,7 +13,7 @@ import { describeFailure, isNotFound } from '../github/index.js';
  * throws: a source that cannot be checked is `unavailable`, and the reason (never a path, a token
  * or any content) is logged.
  * @typedef {object} GithubChecker
- * @property {(source: import('../citations/index.js').GithubSource & { fingerprint: string }) => Promise<CheckStatus>} check - Checks one file, folder or list of releases.
+ * @property {(source: import('../citations/index.js').GithubSource) => Promise<CheckStatus>} check - Checks one file, folder or list of releases.
  */
 
 /**
@@ -78,6 +78,12 @@ function fingerprintReleases(answer) {
 
 /**
  * Creates the checker.
+ *
+ * A source is compared with what the model read: the fingerprint stored when it was fetched, looked
+ * at again in the same ref the model read (the default branch when it named none). A source with no
+ * stored fingerprint is compared with itself at the commit its link is pinned to, which takes a
+ * second request; with no commit either, there is nothing to compare, and it is `unavailable`,
+ * never `changed`.
  * @param {object} deps - What it needs.
  * @param {Pick<import('../github/index.js').GithubApi, 'getJson'>} deps.api - The GitHub client.
  * @param {ReadonlyArray<string>} deps.repos - The repositories it may ask about (GITHUB_REPOS).
@@ -88,15 +94,56 @@ export function createGithubChecker({ api, repos, logger }) {
   const allowed = new Set(repos.map((repo) => repo.toLowerCase()));
 
   /**
-   * Fetches what the source is now, as a fingerprint. A file or folder that is gone has none.
+   * Fetches what a source is at a ref, as a fingerprint.
    * @param {import('../citations/index.js').GithubSource} source - The source.
-   * @returns {Promise<string | undefined>} The fingerprint now.
+   * @param {string | undefined} ref - A branch, tag or commit; the default branch when undefined.
+   * @returns {Promise<string | undefined>} The fingerprint, or undefined when the answer is not recognised.
    */
-  async function liveFingerprint({ kind, repo, path }) {
+  async function fingerprintAt({ kind, repo, path }, ref) {
     if (kind === 'releases') {
       return fingerprintReleases(await api.getJson(`/repos/${repo}/releases?per_page=1`));
     }
-    return fingerprintContents(await api.getJson(`/repos/${repo}/contents/${encodePath(path)}`));
+    const query = ref === undefined ? '' : `?ref=${encodeURIComponent(ref)}`;
+    return fingerprintContents(
+      await api.getJson(`/repos/${repo}/contents/${encodePath(path)}${query}`),
+    );
+  }
+
+  /**
+   * Finds what the model read: the stored fingerprint, or the source at its pinned commit.
+   * @param {import('../citations/index.js').GithubSource} source - The source.
+   * @returns {Promise<string | undefined>} The fingerprint, or undefined when there is nothing to compare with.
+   */
+  async function baselineOf(source) {
+    if (source.fingerprint !== undefined) {
+      return source.fingerprint;
+    }
+    // A list of releases has no commit to look at it in.
+    const lookable = source.kind !== 'releases' && source.commitSha !== '';
+    return lookable ? fingerprintAt(source, source.commitSha) : undefined;
+  }
+
+  /**
+   * Compares the source as it is now with what the model read.
+   * @param {import('../citations/index.js').GithubSource} source - The source.
+   * @param {string} baseline - What the model read.
+   * @returns {Promise<CheckStatus>} The status.
+   */
+  async function compareWithLive(source, baseline) {
+    try {
+      const live = await fingerprintAt(source, source.ref);
+      if (live === undefined) {
+        // An answer that cannot be read tells nothing, so it does not count as a change.
+        return 'unavailable';
+      }
+      return live === baseline ? 'unchanged' : 'changed';
+    } catch (error) {
+      if (isNotFound(error)) {
+        // It was read once, so its being gone now is a change to what was read.
+        return 'changed';
+      }
+      throw error;
+    }
   }
 
   return {
@@ -109,17 +156,9 @@ export function createGithubChecker({ api, repos, logger }) {
         return 'unavailable';
       }
       try {
-        const live = await liveFingerprint(source);
-        if (live === undefined) {
-          // An answer that cannot be read tells nothing, so it does not count as a change.
-          return 'unavailable';
-        }
-        return live === source.fingerprint ? 'unchanged' : 'changed';
+        const baseline = await baselineOf(source);
+        return baseline === undefined ? 'unavailable' : await compareWithLive(source, baseline);
       } catch (error) {
-        if (isNotFound(error)) {
-          // The file or folder is no longer there, which is a change to what was read.
-          return 'changed';
-        }
         logger.warn(
           { kind: source.kind, reason: describeFailure(error) },
           'could not re-check a source',

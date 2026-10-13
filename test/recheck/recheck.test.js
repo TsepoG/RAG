@@ -50,6 +50,27 @@ describe('recheckSources', () => {
     expect(github).not.toHaveBeenCalled();
   });
 
+  it('still checks a file, a folder or a list of releases that has no fingerprint', async () => {
+    const { checkers, github } = setup();
+    const bare = [
+      { ...githubSource({ kind: 'file' }), key: 'G2' },
+      { ...githubSource({ kind: 'directory' }), key: 'G3' },
+      { ...githubSource({ kind: 'releases' }), key: 'G4' },
+    ];
+
+    const results = await recheckSources(bare, checkers);
+
+    expect(results.map(({ key }) => key)).toEqual(['G2', 'G3', 'G4']);
+    expect(github).toHaveBeenCalledTimes(3);
+  });
+
+  it('leaves out a single release, which never changes', async () => {
+    const { checkers } = setup();
+    const release = { ...githubSource({ kind: 'release' }), key: 'G2' };
+
+    expect(await recheckSources([release], checkers)).toEqual([]);
+  });
+
   it('keeps the order it was given, and reports a source it could not check beside the others', async () => {
     const { checkers } = setup({ github: 'unavailable' });
 

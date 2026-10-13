@@ -1,6 +1,15 @@
 // @ts-check
 
+import { isCheckable } from './recheck.js';
+
 const MS_PER_MINUTE = 60_000;
+
+/**
+ * How recently a source must have been checked for the sweep at the last turn to leave it out. It
+ * is short and fixed, so the sweep really does check what has not just been checked, whatever
+ * RECHECK_AFTER_MINUTES is.
+ */
+export const LAST_TURN_FRESH_MINUTES = 2;
 
 /**
  * What decides which sources are checked after a turn.
@@ -15,21 +24,20 @@ const MS_PER_MINUTE = 60_000;
  */
 
 /**
- * Whether a source is worth looking at: it can be compared, and a newer state has not already
- * replaced it.
+ * Whether a source is worth looking at: it can change, and a newer state has not already replaced it.
  * @param {import('../citations/index.js').RegisteredSource} source - The source.
  * @returns {boolean} True when a check could tell something.
  */
-function isCheckable(source) {
-  return source.fingerprint !== undefined && source.changed !== true;
+function isWorthChecking(source) {
+  return isCheckable(source) && source.changed !== true;
 }
 
 /**
  * Chooses the sources to check on their own after a turn. Pure. A source is checked when the
  * answer cites it and either an earlier turn fetched it or it is older than `afterMinutes`, but
  * not when it was checked within that time. When the conversation is full, every checkable source
- * cited anywhere in it is checked, once more, so that nothing is left unchecked at the end; the
- * ones just checked are still skipped.
+ * cited anywhere in it is checked, so that nothing is left unchecked at the end; only one checked
+ * within the last {@link LAST_TURN_FRESH_MINUTES} minutes is left out.
  * @param {TriggerInput} input - The sources and the times.
  * @returns {import('../citations/index.js').RegisteredSource[]} The sources to check.
  */
@@ -42,15 +50,16 @@ export function selectForAutoRecheck({
   afterMinutes,
   lastCheckedAt,
 }) {
-  const windowMs = afterMinutes * MS_PER_MINUTE;
-  const checkedRecently = (
-    /** @type {import('../citations/index.js').RegisteredSource} */ { key },
-  ) => {
+  const afterMs = afterMinutes * MS_PER_MINUTE;
+  const lastTurnMs = LAST_TURN_FRESH_MINUTES * MS_PER_MINUTE;
+  const wasCheckedWithin = (/** @type {string} */ key, /** @type {number} */ windowMs) => {
     const checked = lastCheckedAt(key);
     return checked !== undefined && now - checked < windowMs;
   };
   const isDue = (/** @type {import('../citations/index.js').RegisteredSource} */ source) =>
-    (source.fetchedInTurn ?? turn) < turn || now - (source.fetchedAt ?? now) >= windowMs;
-  const candidates = isLastTurn ? conversationSources : turnSources.filter(isDue);
-  return candidates.filter((source) => isCheckable(source) && !checkedRecently(source));
+    (source.fetchedInTurn ?? turn) < turn || now - (source.fetchedAt ?? now) >= afterMs;
+  const chosen = isLastTurn
+    ? conversationSources.filter(({ key }) => !wasCheckedWithin(key, lastTurnMs))
+    : turnSources.filter((source) => isDue(source) && !wasCheckedWithin(source.key, afterMs));
+  return chosen.filter(isWorthChecking);
 }

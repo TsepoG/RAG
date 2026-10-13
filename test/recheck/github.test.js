@@ -94,6 +94,94 @@ describe('checking a file', () => {
   });
 });
 
+describe('checking at the ref the model read', () => {
+  it('looks at the same branch, tag or commit, not the default branch', async () => {
+    const { checker, getJson } = setup(() => ({ sha: BLOB }));
+
+    const status = await checker.check({ ...FILE, ref: 'refs/heads/release' });
+
+    expect(status).toBe('unchanged');
+    expect(getJson).toHaveBeenCalledExactlyOnceWith(
+      `/repos/${REPO}/contents/src/a.js?ref=refs%2Fheads%2Frelease`,
+    );
+  });
+
+  it('is changed when the file at that ref has a new blob, whatever the default branch holds', async () => {
+    const { checker } = setup((path) => ({ sha: path.includes('ref=') ? OTHER_BLOB : BLOB }));
+
+    expect(await checker.check({ ...FILE, ref: 'v1' })).toBe('changed');
+  });
+});
+
+describe('checking a source with no stored fingerprint', () => {
+  const { fingerprint, ...bare } = FILE;
+  const COMMIT = 'a'.repeat(40);
+  const PINNED = { ...bare, commitSha: COMMIT };
+
+  it('compares it with the same file at its pinned commit: two requests', async () => {
+    const { checker, getJson } = setup(() => ({ sha: BLOB }));
+
+    expect(fingerprint).toBeDefined();
+    expect(await checker.check(PINNED)).toBe('unchanged');
+    expect(getJson.mock.calls.map(([path]) => path)).toEqual([
+      `/repos/${REPO}/contents/src/a.js?ref=${COMMIT}`,
+      `/repos/${REPO}/contents/src/a.js`,
+    ]);
+  });
+
+  it('is changed when the file now differs from the pinned commit', async () => {
+    const { checker } = setup((path) => ({ sha: path.includes('ref=') ? BLOB : OTHER_BLOB }));
+
+    expect(await checker.check(PINNED)).toBe('changed');
+  });
+
+  it('uses the ref the model read for the live side, and the commit for the baseline', async () => {
+    const { checker, getJson } = setup(() => ({ sha: BLOB }));
+
+    await checker.check({ ...PINNED, ref: 'v1' });
+
+    expect(getJson.mock.calls.map(([path]) => path)).toEqual([
+      `/repos/${REPO}/contents/src/a.js?ref=${COMMIT}`,
+      `/repos/${REPO}/contents/src/a.js?ref=v1`,
+    ]);
+  });
+
+  it('is never changed when the pinned commit cannot be read: it is unavailable', async () => {
+    const { checker } = setup(() => {
+      throw answered(404);
+    });
+
+    expect(await checker.check(PINNED)).toBe('unavailable');
+  });
+
+  it('is unavailable, with no request, when it names no commit either', async () => {
+    const { checker, getJson } = setup(() => ({ sha: OTHER_BLOB }));
+
+    expect(await checker.check({ ...bare, commitSha: '' })).toBe('unavailable');
+    expect(getJson).not.toHaveBeenCalled();
+  });
+
+  it('is unavailable for a list of releases, which has no commit to compare at', async () => {
+    const { checker, getJson } = setup(() => [{ tag_name: 'v2' }]);
+
+    const status = await checker.check({ ...PINNED, kind: 'releases', path: '' });
+
+    expect(status).toBe('unavailable');
+    expect(getJson).not.toHaveBeenCalled();
+  });
+
+  it('is changed when the file has since been removed', async () => {
+    const { checker } = setup((path) => {
+      if (path.includes('ref=')) {
+        return { sha: BLOB };
+      }
+      throw answered(404);
+    });
+
+    expect(await checker.check(PINNED)).toBe('changed');
+  });
+});
+
 describe('checking a folder', () => {
   const entries = [
     { name: 'a.py', sha: BLOB },

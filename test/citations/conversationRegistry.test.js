@@ -138,6 +138,17 @@ describe('conversation registry when a source was fetched', () => {
     expect(registry.list().some(({ changed }) => changed)).toBe(false);
   });
 
+  it('keeps the same file read at two refs apart: one is not a new version of the other', () => {
+    const { registry } = setup();
+    const onMain = file('blob-1', COMMIT_1);
+    const onRelease = { ...file('blob-2', COMMIT_1), ref: 'refs/heads/release' };
+
+    const keys = [registry.register(onMain), registry.register(onRelease)];
+
+    expect(keys).toEqual(['G1', 'G2']);
+    expect(registry.list().some(({ changed }) => changed)).toBe(false);
+  });
+
   it('treats a source with no fingerprint as the same only when it is identical', () => {
     const { registry } = setup();
     const plain = (/** @type {string} */ commit) => githubSource({ commitSha: commit });

@@ -78,6 +78,16 @@ function commitOfListing(listing, repo) {
 }
 
 /**
+ * Writes the field naming the ref the model asked to read, or nothing for the default branch.
+ * @param {unknown} args - The arguments of the call.
+ * @returns {{ ref?: string }} The field to spread into a source.
+ */
+function refField(args) {
+  const ref = asString(asObject(args).ref).trim();
+  return ref === '' ? {} : { ref };
+}
+
+/**
  * Writes the fingerprint field, or nothing when there is none.
  * @param {string | undefined} fingerprint - The fingerprint, if it could be worked out.
  * @returns {{ fingerprint?: string }} The field to spread into a source.
@@ -146,6 +156,7 @@ async function extractDirectory({ args, text }, context) {
         latestUrl: treeUrl(repo, 'HEAD', path),
         kind: 'directory',
         pinned,
+        ...refField(args),
         ...fingerprintField(listingFingerprint(listing)),
       },
     ],
@@ -189,6 +200,7 @@ export async function extractFileContents({ args, text, log }, context) {
         latestUrl: blobUrl(repo, 'HEAD', path),
         kind: 'file',
         pinned,
+        ...refField(args),
         ...fingerprintField(fileFingerprint(text)),
       },
     ],

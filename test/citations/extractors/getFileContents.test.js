@@ -412,3 +412,35 @@ describe('extractFileContents fingerprints', () => {
     expect(sources[0].fingerprint).toBe(entriesFingerprint([]));
   });
 });
+
+describe('extractFileContents refs', () => {
+  it('records the ref the model asked to read a file at, so a re-check looks at the same one', async () => {
+    const { sources } = await extractFileContents(
+      { args: { ...ARGS, ref: 'refs/heads/release' }, text: FILE_TEXT },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({ ref: 'refs/heads/release' });
+  });
+
+  it('records the ref of a folder too', async () => {
+    const { sources } = await extractFileContents(
+      { args: { owner: 'acme', repo: 'app', path: 'src', ref: 'v1.2.0' }, text: '[]' },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({ kind: 'directory', ref: 'v1.2.0' });
+  });
+
+  it.each([[{}], [{ ref: '' }], [{ ref: '   ' }], [{ ref: 7 }]])(
+    'records no ref when the model named none (%j)',
+    async (extra) => {
+      const { sources } = await extractFileContents(
+        { args: { ...ARGS, ...extra }, text: FILE_TEXT },
+        makeContext(),
+      );
+
+      expect(sources[0]).not.toHaveProperty('ref');
+    },
+  );
+});

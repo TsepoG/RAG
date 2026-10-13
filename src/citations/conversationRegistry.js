@@ -31,7 +31,9 @@ const SEPARATOR = '\u0000';
 function subjectOf(source) {
   return source.type === 'confluence'
     ? ['confluence', source.id].join(SEPARATOR)
-    : ['github', source.repo.toLowerCase(), source.path, source.kind].join(SEPARATOR);
+    : ['github', source.repo.toLowerCase(), source.path, source.kind, source.ref ?? ''].join(
+        SEPARATOR,
+      );
 }
 
 /**

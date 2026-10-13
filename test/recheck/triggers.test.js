@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { blobFingerprint, pageFingerprint } from '../../src/citations/index.js';
 import { selectForAutoRecheck } from '../../src/recheck/index.js';
+import { LAST_TURN_FRESH_MINUTES } from '../../src/recheck/triggers.js';
 import { confluenceSource, githubSource } from '../helpers/sources.js';
 
 const MINUTE = 60_000;
@@ -69,14 +70,21 @@ describe('after a turn', () => {
     ]);
   });
 
-  it('skips what cannot be compared: no fingerprint, or already replaced by a newer state', () => {
+  it('skips what never changes (a commit) or has been replaced by a newer state', () => {
+    const commit = { ...registered('G1', { turn: 1 }), kind: /** @type {const} */ ('commit') };
     const sources = [
-      registered('G1', { turn: 1, fingerprint: null }),
+      commit,
       registered('G2', { turn: 1, changed: true }),
       registered('G3', { turn: 1 }),
     ];
 
     expect(choose({ turnSources: sources })).toEqual(['G3']);
+  });
+
+  it('still checks a file with no fingerprint, which the checker compares another way', () => {
+    expect(choose({ turnSources: [registered('G1', { turn: 1, fingerprint: null })] })).toEqual([
+      'G1',
+    ]);
   });
 
   it('only looks at what the turn cited, not the rest of the conversation', () => {
@@ -105,6 +113,23 @@ describe('at the last turn', () => {
     ];
 
     expect(choose({ isLastTurn: true, conversationSources: everything })).toEqual(['C1', 'G1']);
+  });
+
+  it('skips a source only if it was checked within two minutes, not within the longer re-check time', () => {
+    const everything = [registered('C1', { turn: 1 }), registered('C2', { turn: 1 })];
+
+    expect(
+      choose({
+        isLastTurn: true,
+        conversationSources: everything,
+        afterMinutes: 15,
+        lastCheckedAt: (key) => NOW - (key === 'C1' ? 119_000 : 121_000),
+      }),
+    ).toEqual(['C2']);
+  });
+
+  it('names the two minutes as a constant', () => {
+    expect(LAST_TURN_FRESH_MINUTES).toBe(2);
   });
 
   it('still skips a source checked a moment ago', () => {

@@ -29,6 +29,8 @@
  * @property {'file' | 'directory' | 'commit' | 'release' | 'releases'} kind - What it is; `releases`
  *   is the list of a repository's releases.
  * @property {boolean} pinned - True when the link names an exact commit.
+ * @property {string} [ref] - The branch, tag or commit the model asked to read the file or folder at;
+ *   absent when it read the default branch. A re-check looks at the same ref.
  * @property {string} [fingerprint] - Says which state of the file, folder or release list this
  *   is, to tell whether it has changed since; absent for a commit or a release, which do not change.
  */
