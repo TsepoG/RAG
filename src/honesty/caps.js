@@ -165,6 +165,34 @@ export const SOURCE_CHANGED_CODE = 'source-changed';
 /** The reason a reader is told when a cited source has changed. */
 export const SOURCE_CHANGED_REASON = 'A source has changed since this answer was written.';
 
+/** The code of the rule that holds when the runtime dropped part of a conversation's history. */
+export const MEMORY_DROPPED_CODE = 'memory-dropped';
+
+/** The reason a reader is told when the assistant may have lost sight of an earlier source. */
+export const MEMORY_DROPPED_REASON =
+  "Some earlier sources were dropped from the assistant's memory.";
+
+/**
+ * Lowers an answered result to at most medium, once, and says why. It only ever lowers the level.
+ * @template {CapsResult} T
+ * @param {T} caps - The status, confidence and reasons the answer has.
+ * @param {{ code: string, reason: string }} rule - The rule that holds.
+ * @returns {T} A copy with the rule added; the same object when it does not apply.
+ */
+function capAtMedium(caps, { code, reason }) {
+  if (caps.status !== 'answered' || caps.confidence === null) {
+    return caps;
+  }
+  const alreadyApplied = caps.capsApplied.some((applied) => applied.code === code);
+  const confidence = RANK.medium < RANK[caps.confidence] ? 'medium' : caps.confidence;
+  return {
+    ...caps,
+    confidence,
+    confidenceReason: alreadyApplied ? caps.confidenceReason : `${caps.confidenceReason} ${reason}`,
+    capsApplied: alreadyApplied ? caps.capsApplied : [...caps.capsApplied, { code, reason }],
+  };
+}
+
 /**
  * Applies the rule for a changed source to an answer that already has its confidence: when a source
  * it cites has changed since it was fetched, the answer is at most medium, and says why. This is
@@ -174,24 +202,25 @@ export const SOURCE_CHANGED_REASON = 'A source has changed since this answer was
  *
  * It only ever lowers the level, and applying it twice changes nothing more than applying it once.
  * An answer with no confidence (not found, clarify, out of scope) is left alone.
- * @param {CapsResult} caps - The status, confidence and reasons the answer has.
+ * @template {CapsResult} T
+ * @param {T} caps - The status, confidence and reasons the answer has.
  * @param {ReadonlyArray<string>} changedKeys - The keys of the cited sources found to have changed.
- * @returns {CapsResult} The same object when nothing applies, otherwise a copy with the rule added.
+ * @returns {T} The same object when nothing applies, otherwise a copy with the rule added.
  */
 export function applySourceChangeCap(caps, changedKeys) {
-  if (changedKeys.length === 0 || caps.status !== 'answered' || caps.confidence === null) {
-    return caps;
-  }
-  const alreadyApplied = caps.capsApplied.some(({ code }) => code === SOURCE_CHANGED_CODE);
-  const confidence = RANK.medium < RANK[caps.confidence] ? 'medium' : caps.confidence;
-  return {
-    ...caps,
-    confidence,
-    confidenceReason: alreadyApplied
-      ? caps.confidenceReason
-      : `${caps.confidenceReason} ${SOURCE_CHANGED_REASON}`,
-    capsApplied: alreadyApplied
-      ? caps.capsApplied
-      : [...caps.capsApplied, { code: SOURCE_CHANGED_CODE, reason: SOURCE_CHANGED_REASON }],
-  };
+  return changedKeys.length === 0
+    ? caps
+    : capAtMedium(caps, { code: SOURCE_CHANGED_CODE, reason: SOURCE_CHANGED_REASON });
+}
+
+/**
+ * Applies the rule for a conversation whose history the runtime cut short: the answer may rest on
+ * a source the assistant could no longer see, so it is at most medium, and says why. Like the rule
+ * for a changed source it lowers the level only, once, and leaves answers with no confidence alone.
+ * @template {CapsResult} T
+ * @param {T} caps - The status, confidence and reasons the answer has.
+ * @returns {T} The same object when nothing applies, otherwise a copy with the rule added.
+ */
+export function applyMemoryDroppedCap(caps) {
+  return capAtMedium(caps, { code: MEMORY_DROPPED_CODE, reason: MEMORY_DROPPED_REASON });
 }

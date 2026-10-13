@@ -20,8 +20,11 @@ export {
 } from './sentences.js';
 export {
   applyConfidenceCaps,
+  applyMemoryDroppedCap,
   applySourceChangeCap,
   NO_META_REASON,
+  MEMORY_DROPPED_CODE,
+  MEMORY_DROPPED_REASON,
   SOURCE_CHANGED_CODE,
   SOURCE_CHANGED_REASON,
 } from './caps.js';

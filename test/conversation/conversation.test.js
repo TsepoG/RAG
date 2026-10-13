@@ -120,6 +120,26 @@ describe('turns', () => {
   });
 });
 
+describe('annotating a turn', () => {
+  it('adds to what the turn recorded, keeping the rest', () => {
+    const { conversation } = setup();
+    conversation.beginTurn(ASK);
+    conversation.finishTurn(1, 'answered', { result: 'r' });
+
+    conversation.annotateTurn(1, { answerId: 'a1' });
+
+    expect(conversation.turns()[0]?.outcome).toEqual({ result: 'r', answerId: 'a1' });
+  });
+
+  it('ignores a turn that does not exist', () => {
+    const { conversation } = setup();
+
+    conversation.annotateTurn(3, { answerId: 'a1' });
+
+    expect(conversation.turns()).toEqual([]);
+  });
+});
+
 describe('the source budget', () => {
   it('adds up the source text given to the model', () => {
     const { conversation } = setup();

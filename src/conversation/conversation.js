@@ -44,6 +44,7 @@ export const FULL_MESSAGE = 'This conversation is full — start a new one to ke
  * @property {() => boolean} isBusy - Whether a turn is running.
  * @property {(input: { question: string, detailLevel: import('../roles/index.js').DetailLevel }) => { ok: true, turn: number } | { ok: false, refusal: Refusal }} beginTurn - Starts a turn, or says why not.
  * @property {(turn: number, status: 'answered' | 'cancelled' | 'failed', outcome?: Record<string, unknown>) => void} finishTurn - Ends a turn.
+ * @property {(turn: number, patch: Record<string, unknown>) => void} annotateTurn - Adds to what a finished turn recorded: the answer id, the rendered answer, a re-check.
  * @property {() => ReadonlyArray<TurnRecord>} turns - Every turn so far.
  * @property {() => number} turnCount - How many turns have started.
  * @property {(chars: number) => void} addSourceChars - Counts source text given to the model.
@@ -128,6 +129,15 @@ export function createConversation({ id, role, registry, clock, limits }) {
       if (index >= 0) {
         records[index] = { ...records[index], status, finishedAt: clock.now(), outcome };
         lastActivity = clock.now();
+      }
+    },
+    annotateTurn(turn, patch) {
+      const index = records.findIndex((record) => record.turn === turn);
+      if (index >= 0) {
+        records[index] = {
+          ...records[index],
+          outcome: { ...records[index].outcome, ...patch },
+        };
       }
     },
     turns: () => records.map((record) => ({ ...record })),

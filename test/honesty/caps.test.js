@@ -2,7 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyConfidenceCaps,
+  applyMemoryDroppedCap,
   applySourceChangeCap,
+  MEMORY_DROPPED_CODE,
+  MEMORY_DROPPED_REASON,
   NO_META_REASON,
   SOURCE_CHANGED_CODE,
   SOURCE_CHANGED_REASON,
@@ -379,5 +382,54 @@ describe('applySourceChangeCap', () => {
 
     expect(RANK[result.confidence ?? 'low']).toBeLessThanOrEqual(RANK.medium);
     expect(result.capsApplied.at(-1)?.code).toBe('source-changed');
+  });
+});
+
+describe('applyMemoryDroppedCap', () => {
+  const answered = (/** @type {'high' | 'medium' | 'low'} */ confidence) => ({
+    status: /** @type {const} */ ('answered'),
+    confidence,
+    confidenceReason: 'Stated in the page.',
+    capsApplied: [],
+  });
+
+  it('lowers high to medium and says the assistant lost earlier sources', () => {
+    const result = applyMemoryDroppedCap(answered('high'));
+
+    expect(result).toMatchObject({
+      confidence: 'medium',
+      confidenceReason:
+        "Stated in the page. Some earlier sources were dropped from the assistant's memory.",
+      capsApplied: [{ code: MEMORY_DROPPED_CODE, reason: MEMORY_DROPPED_REASON }],
+    });
+  });
+
+  it.each(['medium', 'low'])('never raises %s', (level) => {
+    const result = applyMemoryDroppedCap(answered(/** @type {'medium' | 'low'} */ (level)));
+
+    expect(result.confidence).toBe(level);
+    expect(result.capsApplied.map(({ code }) => code)).toEqual([MEMORY_DROPPED_CODE]);
+  });
+
+  it('is idempotent and leaves an answer with no confidence alone', () => {
+    const once = applyMemoryDroppedCap(answered('high'));
+    const notFound = {
+      status: /** @type {const} */ ('not_found'),
+      confidence: null,
+      confidenceReason: '',
+      capsApplied: [],
+    };
+
+    expect(applyMemoryDroppedCap(once)).toEqual(once);
+    expect(applyMemoryDroppedCap(notFound)).toBe(notFound);
+  });
+
+  it('does not clash with the rule for a changed source', () => {
+    const both = applySourceChangeCap(applyMemoryDroppedCap(answered('high')), ['C1']);
+
+    expect(both.capsApplied.map(({ code }) => code)).toEqual([
+      MEMORY_DROPPED_CODE,
+      SOURCE_CHANGED_CODE,
+    ]);
   });
 });

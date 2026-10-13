@@ -1,6 +1,8 @@
 // @ts-check
 
 /** @typedef {import('./toolGate.js').ToolGate} ToolGate */
+/** @typedef {import('./toolGate.js').TurnGate} TurnGate */
+/** @typedef {import('./hooks.js').CallBudget} CallBudget */
 
 export {
   ALLOWLIST,

@@ -55,7 +55,7 @@ export function reply(text, meta = {}) {
  * @param {string} fixture - Fixture holding the result.
  * @param {Record<string, unknown>} [args] - Arguments to use instead of the fixture's.
  */
-async function toolReturns(client, toolName, fixture, args) {
+export async function toolReturns(client, toolName, fixture, args) {
   const { hooks } = client.configs[0];
   const { args: toolArgs, text, log } = fixtureInput(fixture, args);
   const toolResult = {

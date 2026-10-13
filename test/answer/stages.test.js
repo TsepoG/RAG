@@ -11,6 +11,7 @@ import {
 import { createLogger } from '../../src/logger/index.js';
 import { createToolGate } from '../../src/mcp/index.js';
 import {
+  awaitQuiet,
   buildQuestionHooks,
   createLookups,
   createNotifier,
@@ -241,5 +242,63 @@ describe('disconnectSession', () => {
     expect(lines()).toContainEqual(
       expect.objectContaining({ msg: 'could not disconnect the session' }),
     );
+  });
+});
+
+describe('awaitQuiet', () => {
+  /**
+   * A session that lets the test send it events.
+   * @returns {{ session: any, emit: (type: string) => void, listeners: () => number }} The session and its controls.
+   */
+  function fakeSession() {
+    /** @type {Map<string, Array<() => void>>} */
+    const handlers = new Map();
+    return {
+      session: {
+        on: (/** @type {string} */ type, /** @type {() => void} */ handler) => {
+          handlers.set(type, [...(handlers.get(type) ?? []), handler]);
+          return () =>
+            handlers.set(
+              type,
+              (handlers.get(type) ?? []).filter((h) => h !== handler),
+            );
+        },
+      },
+      emit: (type) => (handlers.get(type) ?? []).forEach((handler) => handler()),
+      listeners: () => [...handlers.values()].reduce((total, list) => total + list.length, 0),
+    };
+  }
+
+  it.each(['session.idle', 'session.error'])(
+    'is quiet once the session reports %s',
+    async (type) => {
+      const { session, emit } = fakeSession();
+      const watch = awaitQuiet(session);
+
+      emit(type);
+
+      expect(await watch.quiet()).toBe(true);
+    },
+  );
+
+  it('is not quiet when the session says nothing within the shutdown time', async () => {
+    vi.useFakeTimers();
+    const { session } = fakeSession();
+    const watch = awaitQuiet(session);
+
+    const outcome = watch.quiet();
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(await outcome).toBe(false);
+  });
+
+  it('stops listening when told to', () => {
+    const { session, listeners } = fakeSession();
+    const watch = awaitQuiet(session);
+    expect(listeners()).toBe(2);
+
+    watch.stop();
+
+    expect(listeners()).toBe(0);
   });
 });

@@ -8,7 +8,8 @@ import {
 } from '../errors/index.js';
 import { createCodeownersLookup, createCommitResolver, createGithubApi } from '../github/index.js';
 import { createToolHooks } from '../mcp/index.js';
-import { bestEffort, createCancellation, createDeadline } from './deadline.js';
+import { finishesWithin } from '../copilot/index.js';
+import { bestEffort, createCancellation, createDeadline, SHUTDOWN_TIMEOUT_MS } from './deadline.js';
 import { finishAnswer } from './finish.js';
 
 /**
@@ -94,10 +95,22 @@ export function createLookups({ config, fetch, logger }) {
  *   commits: { resolveHead: (repo: string) => Promise<string | undefined> },
  *   logger: import('../logger/index.js').Logger,
  *   clock: { now: () => number },
- * }} input - What the hooks check against and write to.
+ *   budget?: import('../mcp/index.js').CallBudget,
+ *   onSourceText?: (chars: number) => void,
+ * }} input - What the hooks check against and write to. A conversation passes its own call budget
+ *   and a receiver for the size of each source.
  * @returns {ReturnType<typeof createToolHooks>} The hooks.
  */
-export function buildQuestionHooks({ config, registry, gate, commits, logger, clock }) {
+export function buildQuestionHooks({
+  config,
+  registry,
+  gate,
+  commits,
+  logger,
+  clock,
+  budget,
+  onSourceText,
+}) {
   return createToolHooks({
     repos: config.github.repos,
     spaceKeys: config.atlassian.spaceKeys,
@@ -108,6 +121,8 @@ export function buildQuestionHooks({ config, registry, gate, commits, logger, cl
     registry,
     resolveHead: commits.resolveHead,
     gate,
+    budget,
+    onSourceText,
     logger,
     clock,
   });
@@ -169,4 +184,28 @@ export async function disconnectSession(session, logger) {
   if (session !== undefined) {
     await bestEffort('disconnect the session', () => session.disconnect(), logger);
   }
+}
+
+/**
+ * Starts watching for the session to go quiet again. Call it before aborting a turn, then wait on
+ * the result: the abort ends with the runtime saying the session is idle, and an idle that arrived
+ * late would otherwise be taken for the end of the next turn.
+ * @param {Pick<SessionHandle, 'on'>} session - The session.
+ * @returns {{ quiet: () => Promise<boolean>, stop: () => void }} `quiet` resolves true when the
+ *   session went idle (or reported an error) within the shutdown time, false when it did not;
+ *   `stop` removes the listeners.
+ */
+export function awaitQuiet(session) {
+  /** @type {Array<() => void>} */
+  const unsubscribers = [];
+  const heard = new Promise((done) => {
+    unsubscribers.push(
+      session.on('session.idle', () => done(undefined)),
+      session.on('session.error', () => done(undefined)),
+    );
+  });
+  return {
+    quiet: () => finishesWithin(heard, SHUTDOWN_TIMEOUT_MS),
+    stop: () => unsubscribers.forEach((unsubscribe) => unsubscribe()),
+  };
 }

@@ -30,6 +30,8 @@ import { asRecord } from './scopeCommon.js';
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
  * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
  *   are recorded; a fresh one when omitted.
+ * @property {(chars: number) => void} [onSourceText] - Told how many characters of each source
+ *   were given to the model; a conversation adds them up.
  * @property {(repo: string) => Promise<string | undefined>} [resolveHead] - Looks up a repository's
  *   head commit, for pinning file links.
  * @property {HookLogger} logger - Where denials, completions and failures are logged.
