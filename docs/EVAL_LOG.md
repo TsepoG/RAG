@@ -453,3 +453,58 @@ status is `not_found` and not `out_of_scope`, and the changes to the prompt did 
 - **Clarifying questions.** The assistant almost never asks; a question that fits two things is
   answered with one reading. This is the clearest remaining weakness.
 - **Request cost.** About 0.4 to 0.6 AI credits a question on the Free plan, measured at the start.
+
+# Phase 7
+
+## Baseline for the conversation work (2026-10-13)
+
+The regression of Phase 7 (the full set through the conversation path) is compared with this run,
+not with the Phase 6 baseline above: Phase 6 never had a final full run, and this one is on a
+different account with one pinned model.
+
+| | |
+| --- | --- |
+| Run | `20261013-163928` |
+| Path | single question (`askQuestion`), the 38 cases of the eval set |
+| Account | Copilot Pro+ |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `f42ddca0cc85`, base prompt hash `81ddc08c88b9` (unchanged since Phase 6) |
+| Requests | 44 for 38 cases (limit 70) |
+| Verdicts | drafted by Claude Code for the 27 answered cases (22 correct, 5 partial, 0 wrong) and marked as drafts; the owner reviews each one |
+
+### Against the MVP targets
+
+| Target | Should be | Phase 6 baseline (Free plan, two models) | Phase 7 baseline (Pro+, `gpt-6-luna`) | Result |
+| --- | --- | --- | --- | --- |
+| Status exactly as expected | at least 85% | 76% | 82% (31 of 38) | not met |
+| Citation recall | at least 70% | 75% | 83% | met |
+| Answered cases that are correct | at least 80% | 81% | 91% (22 correct, 5 partial of 27) | met |
+| `high` answers that are correct | at least 90% | 3 of 3 | 92% (6 judged: 5 correct, 1 partial) | met |
+| Declines handled honestly | at least 80% | 90% | 100% (9 of 9) | met |
+| Style problems at depth 1 | none | 0 | 1 (`pm-ci-checks`, inline code left after the rewrite) | not met |
+| Answers with no confidence report | at most 10% | 13% | 3% (1 of 38) after asking again; 11% (4 of 38) in the first reply | met with the repair |
+
+Other numbers: 30 of 38 cases passed every check that applies (79%); declined when it should 9 of
+10; sentences without a citation 3 of 38; questions that used every tool call 10; 2 questions timed
+out at 240 s (`po-built-vs-planned`, `nf-pm-hosting-cost`); median time to an answer 57.2 s, 95th
+percentile 241.5 s.
+
+The two runs differ in account, model routing, the tuning of Phase 6 and the timeout, so the
+difference between them cannot be put down to any one of those.
+
+### What still misses
+
+- **Status (7 cases).** The two clarify cases are answered (`dev-rate-limit-clarify`,
+  `qa-backfill-clarify`); `oos-dev-bloomberg-scores` and `oos-pm-next-year-releases` are
+  `not_found` where `out_of_scope` was expected; `oos-qa-python-gc` is `not_found` and its report
+  was asked for and still not usable; the two timeouts have no status.
+- **Calibration.** `high` 92%, `medium` 88%, `low` 100% on 4 answers (too few to read). The
+  inversion seen at baseline is gone, but one `high` answer is a partial (`dev-rate-limit-clarify`).
+- **Release list.** `pm-release-history` is answered and correct; it was `not_found` in Phase 6.
+- **Source cut notice.** Several questions use all their tool calls (10 of 38) and a long page
+  can still be cut; `ba-derived-values`, `ba-trailing-high-basis`, `po-what-it-does`,
+  `po-built-vs-planned`, `po-advice` and `pm-ci-checks` each miss an expected source.
+- **Tool catalog message.** A first manual question on this account logged `MCP tool catalog
+  changed before tool "…" could be invoked` for its first two tool calls, which then worked on
+  the retry. It was seen once in a single question and was not counted in this run.
