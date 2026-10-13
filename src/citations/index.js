@@ -1,6 +1,7 @@
 // @ts-check
 
 /** @typedef {import('./registry.js').CitationRegistry} CitationRegistry */
+/** @typedef {import('./conversationRegistry.js').ConversationRegistry} ConversationRegistry */
 /** @typedef {import('./registry.js').Source} Source */
 /** @typedef {import('./registry.js').RegisteredSource} RegisteredSource */
 /** @typedef {import('./registry.js').Candidate} Candidate */

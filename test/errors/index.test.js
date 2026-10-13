@@ -7,6 +7,7 @@ import {
   CopilotError,
   McpError,
   QuestionCancelledError,
+  ConversationEndedError,
   EvalError,
   RoleNotFoundError,
   ToolNotAllowedError,
@@ -224,6 +225,18 @@ describe('EvalError', () => {
     expect(error).toBeInstanceOf(AppError);
     expect(error.name).toBe('EvalError');
     expect(error.message).toBe('The eval set could not be read');
+    expect(error.cause).toBe(cause);
+  });
+});
+
+describe('ConversationEndedError', () => {
+  it('is an app error that tells the person to start a new conversation', () => {
+    const cause = new Error('gone');
+    const error = new ConversationEndedError({ cause });
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('ConversationEndedError');
+    expect(error.message).toContain('Start a new one');
     expect(error.cause).toBe(cause);
   });
 });

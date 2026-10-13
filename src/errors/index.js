@@ -131,3 +131,17 @@ function formatIssues(issues) {
  * or cases that are still drafts.
  */
 export class EvalError extends AppError {}
+
+/**
+ * Thrown when a message or a request names a conversation that is closed, expired or unknown. The
+ * web layer answers it with a 404 and the code `conversation_ended`.
+ */
+export class ConversationEndedError extends AppError {
+  /**
+   * Creates the error.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(options) {
+    super('That conversation has ended. Start a new one to keep going.', options);
+  }
+}
