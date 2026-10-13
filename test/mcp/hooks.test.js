@@ -1,8 +1,8 @@
 // @ts-check
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../../src/logger/index.js';
-import { createToolHooks } from '../../src/mcp/hooks.js';
-import { createToolGate } from '../../src/mcp/toolGate.js';
+import { createCallBudget, createToolHooks } from '../../src/mcp/hooks.js';
+import { createToolGate, createTurnGate } from '../../src/mcp/toolGate.js';
 import { createMemoryStream } from '../helpers/memory-stream.js';
 
 /** @typedef {import('../../src/mcp/hooks.js').ToolHooks} ToolHooks */
@@ -809,5 +809,77 @@ describe('onPreToolUse refuses every call while the gate is locked', () => {
       pre(hooks, 'github_repos-get_file_contents', { owner: 'acme', repo: 'app' })
         .permissionDecision,
     ).toBe('allow');
+  });
+});
+
+describe('createCallBudget', () => {
+  it('counts attempts and code searches from zero', () => {
+    const budget = createCallBudget();
+
+    expect(budget.attempt()).toBe(1);
+    expect(budget.attempt()).toBe(2);
+    expect(budget.searches()).toBe(0);
+    budget.addSearch();
+    expect(budget.searches()).toBe(1);
+  });
+
+  it('starts again from zero when reset', () => {
+    const budget = createCallBudget();
+    budget.attempt();
+    budget.addSearch();
+
+    budget.reset();
+
+    expect(budget.attempt()).toBe(1);
+    expect(budget.searches()).toBe(0);
+  });
+});
+
+describe('hooks shared by the turns of a conversation', () => {
+  const SEARCH = { query: 'refund repo:acme/app' };
+  const FILE = { owner: 'acme', repo: 'app', path: 'a.js' };
+
+  it('lets a new turn use the full call limit again after the budget is reset', () => {
+    const budget = createCallBudget();
+    const { hooks } = setup({ maxToolCalls: 2, budget });
+    pre(hooks, 'github_repos-get_file_contents', FILE);
+    pre(hooks, 'github_repos-get_file_contents', FILE);
+    expect(pre(hooks, 'github_repos-get_file_contents', FILE).permissionDecision).toBe('deny');
+
+    budget.reset();
+
+    expect(pre(hooks, 'github_repos-get_file_contents', FILE).permissionDecision).toBe('allow');
+  });
+
+  it('lets a new turn run code searches again after the budget is reset', () => {
+    const budget = createCallBudget();
+    const { hooks } = setup({ maxToolCalls: 50, budget });
+    pre(hooks, 'github_repos-search_code', SEARCH);
+    pre(hooks, 'github_repos-search_code', SEARCH);
+    expect(pre(hooks, 'github_repos-search_code', SEARCH).permissionDecision).toBe('deny');
+
+    budget.reset();
+
+    expect(pre(hooks, 'github_repos-search_code', SEARCH).permissionDecision).toBe('allow');
+  });
+
+  it('refuses every call in the turn whose gate was locked, and allows them in the next', () => {
+    const gate = createTurnGate();
+    const { hooks } = setup({ gate });
+    gate.lock();
+    expect(pre(hooks, 'github_repos-get_file_contents', FILE).permissionDecision).toBe('deny');
+
+    gate.startTurn();
+
+    expect(pre(hooks, 'github_repos-get_file_contents', FILE).permissionDecision).toBe('allow');
+  });
+
+  it('counts calls separately for hooks with their own budget', () => {
+    const first = setup({ maxToolCalls: 1, budget: createCallBudget() }).hooks;
+    const second = setup({ maxToolCalls: 1, budget: createCallBudget() }).hooks;
+    pre(first, 'github_repos-get_file_contents', FILE);
+    pre(first, 'github_repos-get_file_contents', FILE);
+
+    expect(pre(second, 'github_repos-get_file_contents', FILE).permissionDecision).toBe('allow');
   });
 });

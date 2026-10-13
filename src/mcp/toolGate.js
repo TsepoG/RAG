@@ -25,3 +25,26 @@ export function createToolGate() {
     isLocked: () => locked,
   };
 }
+
+/**
+ * A gate for a conversation: the same as a question's gate within a turn, and a new open one for
+ * each turn. A rewrite in one turn locks tools for the rest of that turn only; the next turn must
+ * be able to fetch again.
+ * @typedef {ToolGate & { startTurn: () => void }} TurnGate
+ */
+
+/**
+ * Creates the gate for a conversation. `startTurn` swaps in a fresh open gate; nothing else can
+ * reopen it, so within a turn it is as one-way as a question's gate.
+ * @returns {TurnGate} The gate.
+ */
+export function createTurnGate() {
+  let current = createToolGate();
+  return {
+    lock: () => current.lock(),
+    isLocked: () => current.isLocked(),
+    startTurn() {
+      current = createToolGate();
+    },
+  };
+}

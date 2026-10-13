@@ -276,6 +276,59 @@ describe('onPostToolUse wraps what the model fetched', () => {
     expect(text).toContain('Sections that were cut and not read: Hidden one; Hidden two.');
   });
 
+  it('tells the owner how many characters of each source the model was given', async () => {
+    const sizes = /** @type {number[]} */ ([]);
+    const { hooks } = setup({ onSourceText: (chars) => sizes.push(chars) });
+
+    const result = await runFixture(
+      hooks,
+      'atlassian-getConfluenceContent',
+      'getConfluenceContent',
+    );
+
+    const wrapped = result.modifiedResult.textResultForLlm;
+    const given = wrapped.slice(wrapped.indexOf('\n') + 1, wrapped.lastIndexOf('\n</source>'));
+    expect(sizes).toEqual([given.length]);
+  });
+
+  it('counts a source after it was cut, not before', async () => {
+    const sizes = /** @type {number[]} */ ([]);
+    const { hooks } = setup({ onSourceText: (chars) => sizes.push(chars) });
+    const long = JSON.stringify({
+      data: {
+        id: '262439',
+        title: 'Long page',
+        body: { value: 'x'.repeat(MAX_SOURCE_CHARS * 2) },
+        metadata: { version: { number: 1 } },
+      },
+    });
+
+    await run(hooks, 'atlassian-getConfluenceContent', PAGE, long);
+
+    expect(sizes).toHaveLength(1);
+    expect(sizes[0]).toBeGreaterThan(MAX_SOURCE_CHARS);
+    expect(sizes[0]).toBeLessThan(MAX_SOURCE_CHARS + 300);
+  });
+
+  it('does not count a search, which gives the model no source', async () => {
+    const sizes = /** @type {number[]} */ ([]);
+    const { hooks } = setup({ onSourceText: (chars) => sizes.push(chars) });
+
+    await runFixture(hooks, 'atlassian-searchConfluence', 'searchConfluence');
+
+    expect(sizes).toEqual([]);
+  });
+
+  it('does not count a page that was removed', async () => {
+    const sizes = /** @type {number[]} */ ([]);
+    const { hooks } = setup({ onSourceText: (chars) => sizes.push(chars) });
+    const elsewhere = { content_url: `${SITE}/wiki/spaces/OTHER/pages/262439` };
+
+    await run(hooks, 'atlassian-getConfluenceContent', elsewhere, 'ignored');
+
+    expect(sizes).toEqual([]);
+  });
+
   it('does not cut text that is exactly at the limit', async () => {
     const { hooks } = setup();
     const base = JSON.stringify({

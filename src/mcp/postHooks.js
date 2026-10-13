@@ -32,6 +32,9 @@ export { CUT_NOTICE, MAX_SOURCE_CHARS } from './sourceText.js';
  *   Measures how long each call took.
  * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
  *   are recorded; a fresh one when omitted.
+ * @property {(chars: number) => void} [onSourceText] - Told how many characters of a source were
+ *   given to the model, after any cut, each time one is. A conversation adds them up to keep its
+ *   context in bounds.
  * @property {(repo: string) => Promise<string | undefined>} [resolveHead] - Looks up a repository's
  *   head commit, for pinning a file link; finds nothing when omitted.
  */
@@ -92,6 +95,7 @@ export function createPostToolHooks({
   timer,
   registry = createCitationRegistry(),
   resolveHead = async () => undefined,
+  onSourceText,
 }) {
   const context = { siteUrl, spaceKeys, repos, now: () => clock.now(), resolveHead };
 
@@ -131,10 +135,9 @@ export function createPostToolHooks({
     }
     logger.info({ tool: input.toolName, keys }, 'sources registered');
     const page = target.tool === CONFLUENCE_PAGE_TOOL ? confluencePageText(text) : undefined;
-    const wrapped = wrapAsSource(
-      { key: keys[0], type: source.type, title: source.title },
-      capSource(page ?? text, { names: page !== undefined }),
-    );
+    const capped = capSource(page ?? text, { names: page !== undefined });
+    onSourceText?.(capped.length);
+    const wrapped = wrapAsSource({ key: keys[0], type: source.type, title: source.title }, capped);
     return { modifiedResult: { ...input.toolResult, textResultForLlm: wrapped } };
   }
 
