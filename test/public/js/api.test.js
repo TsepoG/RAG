@@ -1,6 +1,15 @@
 // @ts-check
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError, askStream, fetchRoles, sendFeedback } from '../../../public/js/api.js';
+import {
+  ApiError,
+  createConversation,
+  deleteConversation,
+  fetchConversation,
+  fetchRoles,
+  recheckAnswer,
+  sendFeedback,
+  sendMessage,
+} from '../../../public/js/api.js';
 
 /**
  * A response whose body arrives in the given pieces.
@@ -37,6 +46,7 @@ function fakeFetch(outcome) {
   );
 }
 
+const CONVERSATION = '11111111-2222-4333-8444-555555555555';
 const EVENTS = [
   'event: progress\ndata: {"message":"Searching…"}\n\n',
   'event: token\ndata: {"text":"Hi"}\n\n',
@@ -99,24 +109,24 @@ describe('fetchRoles', () => {
   });
 });
 
-describe('askStream', () => {
+describe('sendMessage', () => {
   it('posts the question as JSON and reports each event with its data parsed', async () => {
     const fetchFunction = fakeFetch(streamResponse(EVENTS));
     const seen = /** @type {any[]} */ ([]);
 
-    await askStream({
+    await sendMessage({
       question: 'How?',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'more',
       onEvent: (event) => seen.push(event),
       fetchFunction,
     });
 
     const [url, init] = fetchFunction.mock.calls[0];
-    expect(url).toBe('/api/ask');
+    expect(url).toBe(`/api/conversations/${CONVERSATION}/messages`);
     expect(init.method).toBe('POST');
     expect(init.headers['Content-Type']).toBe('application/json');
-    expect(JSON.parse(init.body)).toEqual({ question: 'How?', role: 'qa', detailLevel: 'more' });
+    expect(JSON.parse(init.body)).toEqual({ question: 'How?', detailLevel: 'more' });
     expect(seen).toEqual([
       { event: 'progress', data: { message: 'Searching…' } },
       { event: 'token', data: { text: 'Hi' } },
@@ -135,9 +145,9 @@ describe('askStream', () => {
     });
     const seen = /** @type {any[]} */ ([]);
 
-    await askStream({
+    await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent: (event) => seen.push(event),
       fetchFunction: fakeFetch(new Response(body)),
@@ -150,9 +160,9 @@ describe('askStream', () => {
     const fetchFunction = fakeFetch(streamResponse([]));
     const controller = new AbortController();
 
-    await askStream({
+    await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       signal: controller.signal,
       onEvent: () => undefined,
@@ -170,9 +180,9 @@ describe('askStream', () => {
     const onEvent = vi.fn();
     const fetchFunction = fakeFetch(Response.json({ message }, { status }));
 
-    const failure = await askStream({
+    const failure = await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent,
       fetchFunction,
@@ -185,9 +195,9 @@ describe('askStream', () => {
   it('lets an abort through as an AbortError, not an ApiError', async () => {
     const abort = new DOMException('aborted', 'AbortError');
 
-    const failure = await askStream({
+    const failure = await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent: () => undefined,
       fetchFunction: fakeFetch(abort),
@@ -198,9 +208,9 @@ describe('askStream', () => {
 
   it('says the server could not be reached when the request fails', async () => {
     await expect(
-      askStream({
+      sendMessage({
         question: 'q',
-        role: 'qa',
+        conversationId: CONVERSATION,
         detailLevel: 'default',
         onEvent: () => undefined,
         fetchFunction: fakeFetch(new TypeError('failed')),
@@ -209,9 +219,9 @@ describe('askStream', () => {
   });
 
   it('throws when an event holds data that is not JSON', async () => {
-    const failure = await askStream({
+    const failure = await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent: () => undefined,
       fetchFunction: fakeFetch(streamResponse(['event: token\ndata: {broken\n\n'])),
@@ -225,9 +235,9 @@ describe('askStream', () => {
     const response = new Response(null, { status: 200 });
 
     await expect(
-      askStream({
+      sendMessage({
         question: 'q',
-        role: 'qa',
+        conversationId: CONVERSATION,
         detailLevel: 'default',
         onEvent: () => undefined,
         fetchFunction: fakeFetch(response),
@@ -238,9 +248,9 @@ describe('askStream', () => {
   it('resolves, with no events, when the stream is empty', async () => {
     const onEvent = vi.fn();
 
-    await askStream({
+    await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent,
       fetchFunction: fakeFetch(streamResponse([])),
@@ -253,9 +263,9 @@ describe('askStream', () => {
     const real = vi.fn(async () => streamResponse([]));
     vi.stubGlobal('fetch', real);
 
-    await askStream({
+    await sendMessage({
       question: 'q',
-      role: 'qa',
+      conversationId: CONVERSATION,
       detailLevel: 'default',
       onEvent: () => undefined,
     });
@@ -302,5 +312,138 @@ describe('sendFeedback', () => {
 
     expect(real).toHaveBeenCalledOnce();
     vi.unstubAllGlobals();
+  });
+});
+
+describe('the conversation calls', () => {
+  it('createConversation posts the role and gives the id and turn cap', async () => {
+    const fetchFunction = fakeFetch(Response.json({ conversationId: CONVERSATION, maxTurns: 5 }));
+
+    const created = await createConversation('qa', fetchFunction);
+
+    expect(created).toEqual({ conversationId: CONVERSATION, maxTurns: 5 });
+    const [url, init] = fetchFunction.mock.calls[0];
+    expect(url).toBe('/api/conversations');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ role: 'qa' });
+  });
+
+  it('fetchConversation reads the transcript', async () => {
+    const fetchFunction = fakeFetch(Response.json({ conversationId: CONVERSATION, turns: [] }));
+
+    expect(await fetchConversation(CONVERSATION, fetchFunction)).toEqual({
+      conversationId: CONVERSATION,
+      turns: [],
+    });
+    expect(fetchFunction).toHaveBeenCalledWith(
+      `/api/conversations/${CONVERSATION}`,
+      expect.any(Object),
+    );
+  });
+
+  it('deleteConversation sends DELETE with an empty JSON body, which the server requires', async () => {
+    const fetchFunction = fakeFetch(Response.json({ deleted: true }));
+
+    await deleteConversation(CONVERSATION, fetchFunction);
+
+    const [url, init] = fetchFunction.mock.calls[0];
+    expect(url).toBe(`/api/conversations/${CONVERSATION}`);
+    expect(init.method).toBe('DELETE');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.body).toBe('{}');
+  });
+
+  it('recheckAnswer posts the answer id and gives back what the server found', async () => {
+    const found = { ignored: false, updates: [] };
+    const fetchFunction = fakeFetch(Response.json(found));
+
+    expect(await recheckAnswer(CONVERSATION, 'a1', fetchFunction)).toEqual(found);
+
+    const [url, init] = fetchFunction.mock.calls[0];
+    expect(url).toBe(`/api/conversations/${CONVERSATION}/recheck`);
+    expect(JSON.parse(init.body)).toEqual({ answerId: 'a1' });
+  });
+
+  it('sendMessage also sends the answer to ask again, only when there is one', async () => {
+    const fetchFunction = fakeFetch(streamResponse([]));
+
+    await sendMessage({
+      conversationId: CONVERSATION,
+      question: 'q',
+      detailLevel: 'default',
+      reaskAnswerId: 'a1',
+      onEvent: () => undefined,
+      fetchFunction,
+    });
+
+    expect(JSON.parse(fetchFunction.mock.calls[0][1].body)).toEqual({
+      question: 'q',
+      detailLevel: 'default',
+      reaskAnswerId: 'a1',
+    });
+  });
+
+  it.each([
+    [
+      'createConversation',
+      () =>
+        createConversation(
+          'qa',
+          fakeFetch(Response.json({ message: 'No.', code: 'nope' }, { status: 403 })),
+        ),
+    ],
+    [
+      'fetchConversation',
+      () =>
+        fetchConversation(
+          CONVERSATION,
+          fakeFetch(Response.json({ message: 'No.', code: 'nope' }, { status: 403 })),
+        ),
+    ],
+    [
+      'deleteConversation',
+      () =>
+        deleteConversation(
+          CONVERSATION,
+          fakeFetch(Response.json({ message: 'No.', code: 'nope' }, { status: 403 })),
+        ),
+    ],
+    [
+      'recheckAnswer',
+      () =>
+        recheckAnswer(
+          CONVERSATION,
+          'a1',
+          fakeFetch(Response.json({ message: 'No.', code: 'nope' }, { status: 403 })),
+        ),
+    ],
+  ])('%s throws the server message, status and code when it is refused', async (_name, call) => {
+    await expect(call()).rejects.toMatchObject({
+      name: 'ApiError',
+      message: 'No.',
+      status: 403,
+      code: 'nope',
+    });
+  });
+
+  it('use the browser fetch when none is given', async () => {
+    const real = vi.fn(async () => Response.json({ conversationId: CONVERSATION, maxTurns: 5 }));
+    vi.stubGlobal('fetch', real);
+
+    await createConversation('qa');
+    await fetchConversation(CONVERSATION);
+    await deleteConversation(CONVERSATION);
+    await recheckAnswer(CONVERSATION, 'a1');
+
+    expect(real).toHaveBeenCalledTimes(4);
+    vi.unstubAllGlobals();
+  });
+
+  it('give no code when the server gave none', async () => {
+    const failure = await fetchRoles(
+      fakeFetch(Response.json({ message: 'Plain.' }, { status: 400 })),
+    ).catch((error) => error);
+
+    expect(failure.code).toBeUndefined();
   });
 });

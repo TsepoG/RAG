@@ -1,175 +1,52 @@
 // @ts-check
-import { ApiError, askStream, fetchRoles, sendFeedback } from './api.js';
-import { markRating, readFeedbackDetails, showFeedbackStatus } from './feedback.js';
+import {
+  ApiError,
+  createConversation,
+  deleteConversation,
+  fetchConversation,
+  fetchRoles,
+  recheckAnswer,
+  sendFeedback,
+  sendMessage,
+} from './api.js';
+import { AGE_REFRESH_MS, createChat } from './chat.js';
 import { findRefs } from './refs.js';
-import { moveFocus, showRoles, showState } from './render.js';
-import { focusSource } from './sources.js';
-import { fromServerEvent, INITIAL_STATE, isBusy, next } from './state.js';
-import { loadRole, saveRole } from './storage.js';
+import {
+  clearConversationId,
+  loadConversationId,
+  loadRole,
+  saveConversationId,
+  saveRole,
+} from './storage.js';
 
-// Promises started from an event are marked `void`: ask, submitFeedback and loadRoleChoices catch
-// their own failures and show them on the page.
-// Wiring only: this file connects the tested page modules to the browser's events and the network,
-// and holds no logic of its own that is worth a test. It is checked by hand and by the live test.
+// Wiring only: this file connects the tested page modules to the browser and the network, and holds
+// no logic of its own that is worth a test. It is checked by hand and by the live test.
 
-const refs = findRefs();
-/** @type {import('./render.js').RoleSummary[]} */
-let roles = [];
-let state = /** @type {import('./state.js').PageState} */ (INITIAL_STATE);
-/** @type {AbortController | undefined} */
-let controller;
-
-/**
- * Applies something that happened and redraws the page.
- * @param {import('./state.js').PageAction} action - What happened.
- */
-function dispatch(action) {
-  const before = state;
-  state = next(state, action);
-  if (state !== before) {
-    showState(refs, state);
-    moveFocus(refs, before, state);
-  }
-}
-
-/**
- * Asks a question and feeds what comes back into the state.
- * @param {{ question: string, roleId: string, detailLevel: 'default' | 'more' }} request - What to ask.
- */
-async function ask({ question, roleId, detailLevel }) {
-  const role = roles.find(({ id }) => id === roleId);
-  if (role === undefined || isBusy(state)) {
-    return;
-  }
-  controller = new AbortController();
-  dispatch({ type: 'ask', question, role: role.id, roleDepth: role.depth, detailLevel });
-  try {
-    await askStream({
-      question,
-      role: role.id,
-      detailLevel,
-      signal: controller.signal,
-      onEvent: (event) => {
-        const action = fromServerEvent(event);
-        if (action !== undefined) {
-          dispatch(action);
-        }
-      },
-    });
-    dispatch({ type: 'ended' });
-  } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'AbortError')) {
-      const message = error instanceof ApiError ? error.message : 'Something went wrong.';
-      dispatch({ type: 'error', kind: 'request', message });
-    }
-  }
-}
-
-/** Stops the question that is running. */
-function stop() {
-  if (!isBusy(state)) {
-    return;
-  }
-  dispatch({ type: 'stop' });
-  controller?.abort();
-}
-
-/**
- * Sends feedback for the answer on screen and says what happened.
- * @param {'up' | 'down'} rating - The thumb pressed.
- */
-async function sendRating(rating) {
-  const answerId = state.answer?.answerId;
-  if (answerId === undefined) {
-    return;
-  }
-  markRating(refs, rating);
-  if (rating === 'down') {
-    return;
-  }
-  await submitFeedback(answerId, rating);
-}
-
-/**
- * Sends the feedback and shows whether it was saved.
- * @param {string} answerId - The answer's id.
- * @param {'up' | 'down'} rating - The rating.
- * @param {{ comment?: string, wrongSourceKey?: string }} [details] - What was added.
- */
-async function submitFeedback(answerId, rating, details = {}) {
-  try {
-    await sendFeedback({ answerId, rating, ...details });
-    showFeedbackStatus(refs, 'Thank you. Your feedback was saved.', true);
-  } catch (error) {
-    const message = error instanceof ApiError ? error.message : 'It could not be sent.';
-    showFeedbackStatus(refs, message, false);
-  }
-}
-
-/**
- * Starts loading the roles and selects the remembered one.
- */
-async function loadRoleChoices() {
-  try {
-    roles = await fetchRoles();
-    showRoles(refs, roles, loadRole());
-  } catch (error) {
-    refs.roleDescription.textContent =
-      error instanceof ApiError ? error.message : 'The roles could not be loaded.';
-  }
-}
-
-refs.form.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const question = /** @type {HTMLTextAreaElement} */ (refs.question).value.trim();
-  const roleId = /** @type {HTMLSelectElement} */ (refs.role).value;
-  if (question !== '') {
-    void ask({ question, roleId, detailLevel: 'default' });
-  }
+const chat = createChat({
+  refs: findRefs(),
+  api: {
+    fetchRoles,
+    createConversation,
+    sendMessage,
+    fetchConversation,
+    deleteConversation,
+    recheckAnswer,
+    sendFeedback,
+  },
+  storage: {
+    loadRole: () => loadRole(),
+    saveRole: (roleId) => saveRole(roleId),
+    loadConversationId: () => loadConversationId(),
+    saveConversationId: (conversationId) => saveConversationId(conversationId),
+    clearConversationId: () => clearConversationId(),
+  },
+  clock: { now: () => Date.now() },
 });
 
-refs.question.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
-    event.preventDefault();
-    /** @type {HTMLFormElement} */ (refs.form).requestSubmit();
+// A failure to start is shown on the page by the chat itself; only an unexpected one reaches here.
+chat.start().catch((error) => {
+  if (!(error instanceof ApiError)) {
+    throw error;
   }
 });
-
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
-    stop();
-  }
-});
-
-refs.role.addEventListener('change', () => {
-  const id = /** @type {HTMLSelectElement} */ (refs.role).value;
-  saveRole(id);
-  showRoles(refs, roles, id);
-});
-
-refs.stop.addEventListener('click', stop);
-refs.retry.addEventListener('click', () =>
-  ask({ question: state.question, roleId: state.role, detailLevel: state.detailLevel }),
-);
-refs.moreDetail.addEventListener('click', () =>
-  ask({ question: state.question, roleId: state.role, detailLevel: 'more' }),
-);
-refs.thumbsUp.addEventListener('click', () => sendRating('up'));
-refs.thumbsDown.addEventListener('click', () => sendRating('down'));
-refs.feedbackForm.addEventListener('submit', (event) => {
-  event.preventDefault();
-  const answerId = state.answer?.answerId;
-  if (answerId !== undefined) {
-    void submitFeedback(answerId, 'down', readFeedbackDetails(refs));
-  }
-});
-refs.result.addEventListener('click', (event) => {
-  const chip = event.target instanceof Element ? event.target.closest('button.cite') : null;
-  if (chip !== null) {
-    focusSource(refs.sourcesList, chip.getAttribute('data-key') ?? '');
-  }
-});
-
-// These handle their own failures, so nothing is left to catch here.
-void loadRoleChoices();
-showState(refs, state);
+setInterval(chat.tick, AGE_REFRESH_MS);

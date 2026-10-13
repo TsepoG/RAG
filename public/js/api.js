@@ -16,12 +16,15 @@ export class ApiError extends Error {
    * Creates the error.
    * @param {string} message - What to show.
    * @param {number} [status] - The HTTP status, when the server answered at all.
+   * @param {string} [code] - The code the server gave for what went wrong, such as `conversation_ended`.
    */
-  constructor(message, status) {
+  constructor(message, status, code) {
     super(message);
     this.name = 'ApiError';
     /** @type {number | undefined} */
     this.status = status;
+    /** @type {string | undefined} */
+    this.code = code;
   }
 }
 
@@ -36,20 +39,21 @@ export class ApiError extends Error {
  */
 
 /**
- * Reads the message the server put in an error response.
+ * Reads the message and the code the server put in an error response.
  * @param {Response} response - A response that is not ok.
- * @returns {Promise<string>} The server's message, or the status text.
+ * @returns {Promise<{ message: string, code: string | undefined }>} The message the server gave,
+ *   or the status text, and its code if it gave one.
  */
-async function messageOf(response) {
+async function describeError(response) {
   try {
     const body = await response.json();
     if (typeof body?.message === 'string') {
-      return body.message;
+      return { message: body.message, code: typeof body.code === 'string' ? body.code : undefined };
     }
   } catch {
     // The body was not JSON; fall through to the status text.
   }
-  return response.statusText || FALLBACK_MESSAGE;
+  return { message: response.statusText || FALLBACK_MESSAGE, code: undefined };
 }
 
 /**
@@ -72,7 +76,8 @@ async function send(fetchFunction, path, init) {
     throw new ApiError(FALLBACK_MESSAGE);
   }
   if (!response.ok) {
-    throw new ApiError(await messageOf(response), response.status);
+    const { message, code } = await describeError(response);
+    throw new ApiError(message, response.status, code);
   }
   return response;
 }
@@ -118,32 +123,14 @@ function parseMessage({ event, data }) {
 }
 
 /**
- * Asks a question and reports each event of the answer as it arrives. EventSource cannot send a
- * POST, so the stream is read from the response body. Resolves when the stream ends.
- * @param {object} request - The question.
- * @param {string} request.question - What to ask.
- * @param {string} request.role - The role id.
- * @param {'default' | 'more'} request.detailLevel - How much detail to ask for.
- * @param {AbortSignal} [request.signal] - Aborting it stops reading, and the server stops the question.
- * @param {(event: StreamEvent) => void} request.onEvent - Called for each event, in order.
- * @param {FetchFunction} [request.fetchFunction] - Replaces `fetch`.
+ * Reads an event stream from a response body, reporting each event as it arrives. EventSource
+ * cannot send a POST, so the stream is read from the response body.
+ * @param {Response} response - A response with an event stream as its body.
+ * @param {(event: StreamEvent) => void} onEvent - Called for each event, in order.
  * @returns {Promise<void>} Resolves once the stream has ended.
- * @throws {ApiError} When the server refuses the question, cannot be reached, or sends unreadable data.
- * @throws {DOMException} An AbortError when `signal` is aborted.
+ * @throws {ApiError} When there is no body, or an event holds data that is not JSON.
  */
-export async function askStream({
-  question,
-  role,
-  detailLevel,
-  signal,
-  onEvent,
-  fetchFunction = (...args) => fetch(...args),
-}) {
-  const response = await send(
-    fetchFunction,
-    '/ask',
-    postJson({ question, role, detailLevel }, signal),
-  );
+async function readEvents(response, onEvent) {
   if (response.body === null) {
     throw new ApiError('The server sent no answer.');
   }
@@ -159,6 +146,109 @@ export async function askStream({
       onEvent(parseMessage(message));
     }
   }
+}
+
+/**
+ * Starts a conversation.
+ * @param {string} role - The role id.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<{ conversationId: string, maxTurns: number }>} Its id and turn cap.
+ * @throws {ApiError} When the server cannot be reached or refuses.
+ */
+export async function createConversation(role, fetchFunction = (...args) => fetch(...args)) {
+  const response = await send(fetchFunction, '/conversations', postJson({ role }));
+  return response.json();
+}
+
+/**
+ * Asks a question in a conversation and reports each event of the answer as it arrives: progress
+ * and tokens, then `done`, then (separately) `recheck`. Resolves when the stream ends.
+ * @param {object} request - The question.
+ * @param {string} request.conversationId - The conversation.
+ * @param {string} request.question - What to ask.
+ * @param {'default' | 'more'} request.detailLevel - How much detail to ask for.
+ * @param {string} [request.reaskAnswerId] - An earlier answer to ask again with the latest versions of its sources.
+ * @param {AbortSignal} [request.signal] - Aborting it stops reading, and the server stops that turn.
+ * @param {(event: StreamEvent) => void} request.onEvent - Called for each event, in order.
+ * @param {FetchFunction} [request.fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<void>} Resolves once the stream has ended.
+ * @throws {ApiError} When the server refuses the question, cannot be reached, or sends unreadable data.
+ * @throws {DOMException} An AbortError when `signal` is aborted.
+ */
+export async function sendMessage({
+  conversationId,
+  question,
+  detailLevel,
+  reaskAnswerId,
+  signal,
+  onEvent,
+  fetchFunction = (...args) => fetch(...args),
+}) {
+  const response = await send(
+    fetchFunction,
+    `/conversations/${conversationId}/messages`,
+    postJson(
+      { question, detailLevel, ...(reaskAnswerId === undefined ? {} : { reaskAnswerId }) },
+      signal,
+    ),
+  );
+  await readEvents(response, onEvent);
+}
+
+/**
+ * Reads a conversation back, for a page that is reloading or catching up.
+ * @param {string} conversationId - The conversation.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<import('./chatState.js').Transcript>} The transcript.
+ * @throws {ApiError} When it is gone (code `conversation_ended`) or the server cannot be reached.
+ */
+export async function fetchConversation(
+  conversationId,
+  fetchFunction = (...args) => fetch(...args),
+) {
+  const response = await send(fetchFunction, `/conversations/${conversationId}`, {
+    headers: { Accept: JSON_TYPE },
+  });
+  return response.json();
+}
+
+/**
+ * Ends a conversation. The body is `{}` because the server wants a JSON body on every change.
+ * @param {string} conversationId - The conversation.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<void>} Resolves once the server has ended it.
+ * @throws {ApiError} When it was already gone or the server cannot be reached.
+ */
+export async function deleteConversation(
+  conversationId,
+  fetchFunction = (...args) => fetch(...args),
+) {
+  await send(fetchFunction, `/conversations/${conversationId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': JSON_TYPE },
+    body: '{}',
+  });
+}
+
+/**
+ * Asks the server to check an answer's sources again now.
+ * @param {string} conversationId - The conversation.
+ * @param {string} answerId - The answer.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<import('./chatState.js').RecheckPayload>} What was found, and the answers whose sources were checked.
+ * @throws {ApiError} When the server refuses or cannot be reached.
+ */
+export async function recheckAnswer(
+  conversationId,
+  answerId,
+  fetchFunction = (...args) => fetch(...args),
+) {
+  const response = await send(
+    fetchFunction,
+    `/conversations/${conversationId}/recheck`,
+    postJson({ answerId }),
+  );
+  return response.json();
 }
 
 /**

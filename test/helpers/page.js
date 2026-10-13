@@ -32,15 +32,20 @@ export function chip(key, inferred = false) {
   return `<button type="button" class="cite" data-key="${key}" data-inferred="${inferred}">${label}</button>`;
 }
 
+/** The time the fake answers were made at. */
+export const FETCHED_AT = Date.parse('2026-10-13T09:00:00Z');
+
 /**
- * What the server sends for a finished question, with the parts a test may change.
+ * What the server sends for an answered turn of a conversation, with the parts a test may change.
  * @param {Record<string, any>} [changes] - Parts to change, merged one level deep.
- * @returns {import('../../public/js/state.js').DonePayload} The payload.
+ * @returns {import('../../public/js/chatState.js').AnswerView} The answer.
  */
-export function makePayload(changes = {}) {
+export function makeAnswer(changes = {}) {
   /** @type {Record<string, any>} */
-  const payload = {
+  const answer = {
     answerId: 'a1',
+    turn: 1,
+    changedKeys: [],
     result: {
       status: 'answered',
       confidence: 'medium',
@@ -82,10 +87,33 @@ export function makePayload(changes = {}) {
       whoToAsk: [{ name: '@acme/payments', sourceKeys: ['G1'] }],
     },
     html: { answer: `<p>Refunds are allowed for 30 days ${chip('C1')}.</p>`, conflicts: [] },
+    sourceStates: [
+      { key: 'C1', fetchedInTurn: 1, fetchedAt: FETCHED_AT, changed: false, check: null },
+      { key: 'G1', fetchedInTurn: 1, fetchedAt: FETCHED_AT, changed: false, check: null },
+    ],
   };
   for (const [part, value] of Object.entries(changes)) {
-    payload[part] =
-      typeof value === 'object' && !Array.isArray(value) ? { ...payload[part], ...value } : value;
+    answer[part] =
+      typeof value === 'object' && !Array.isArray(value) ? { ...answer[part], ...value } : value;
   }
-  return /** @type {any} */ (payload);
+  return /** @type {any} */ (answer);
+}
+
+/**
+ * Where a conversation stands, with the parts a test may change.
+ * @param {Partial<import('../../public/js/chatState.js').ConversationInfo>} [changes] - Parts to change.
+ * @returns {import('../../public/js/chatState.js').ConversationInfo} The state.
+ */
+export function makeConversation(changes = {}) {
+  return {
+    conversationId: '11111111-2222-4333-8444-555555555555',
+    role: 'dev',
+    roleDepth: 1,
+    maxTurns: 5,
+    turnCount: 1,
+    full: null,
+    fullMessage: null,
+    ended: null,
+    ...changes,
+  };
 }
