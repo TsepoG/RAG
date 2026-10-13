@@ -9,6 +9,13 @@
 
 export { getExtractor, MAX_CANDIDATES, NO_RESULTS } from './extractors/index.js';
 export { friendlyLabel } from './labels.js';
+export {
+  blobFingerprint,
+  entriesFingerprint,
+  pageFingerprint,
+  releaseListFingerprint,
+} from './fingerprints.js';
+export { createConversationRegistry } from './conversationRegistry.js';
 export { createCitationRegistry, isKeyShaped } from './registry.js';
 export { parseCitationKeys, validateCitations } from './validate.js';
 export { removedNotice, wrapAsSource } from './wrap.js';

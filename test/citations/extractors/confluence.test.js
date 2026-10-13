@@ -46,6 +46,7 @@ describe('extractConfluenceContent from a real fixture', () => {
           title: 'Page title 1',
           spaceKey: 'ENG',
           version: 1,
+          fingerprint: 'page:1',
           lastUpdated: '2026-10-10T10:54:29.040Z',
           url: PAGE_URL,
           stale: false,

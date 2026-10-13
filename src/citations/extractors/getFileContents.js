@@ -1,4 +1,5 @@
 // @ts-check
+import { blobFingerprint, entriesFingerprint } from '../fingerprints.js';
 import {
   isAllowedRepo,
   lookUpHead,
@@ -18,6 +19,8 @@ const DIRECTORY_START = '[';
 // double slash in the link and make one file two sources.
 const LEADING_SLASHES = /^\/+/;
 // A listed entry's link names the commit the listing was read at: .../blob|tree/<commit>/<path>.
+// The first line of a downloaded file names its blob: "successfully downloaded text file (SHA: …)".
+const BLOB_LINE = /^successfully downloaded [a-z ]*file \(SHA: ([0-9a-f]{40})\)/;
 const ENTRY_LINK = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(?:blob|tree)\/([0-9a-f]{40})\//;
 
 /**
@@ -75,6 +78,41 @@ function commitOfListing(listing, repo) {
 }
 
 /**
+ * Writes the fingerprint field, or nothing when there is none.
+ * @param {string | undefined} fingerprint - The fingerprint, if it could be worked out.
+ * @returns {{ fingerprint?: string }} The field to spread into a source.
+ */
+function fingerprintField(fingerprint) {
+  return fingerprint === undefined ? {} : { fingerprint };
+}
+
+/**
+ * Fingerprints a downloaded file by the blob SHA on the first line of the result.
+ * @param {string} text - The result text.
+ * @returns {string | undefined} The fingerprint, or undefined when the result names no blob.
+ */
+function fileFingerprint(text) {
+  const blob = BLOB_LINE.exec(text)?.[1];
+  return blob === undefined ? undefined : blobFingerprint(blob);
+}
+
+/**
+ * Fingerprints a folder listing by the name and SHA of each entry. Nothing when an entry lacks
+ * either, because a listing that cannot be compared whole cannot be compared.
+ * @param {ReadonlyArray<unknown>} listing - The parsed listing.
+ * @returns {string | undefined} The fingerprint, or undefined.
+ */
+function listingFingerprint(listing) {
+  const entries = listing.map((entry) => {
+    const { name, sha } = asObject(entry);
+    return { name: asString(name), sha: asString(sha) };
+  });
+  return entries.every(({ name, sha }) => name !== '' && sha !== '')
+    ? entriesFingerprint(entries)
+    : undefined;
+}
+
+/**
  * Reads a folder listing the model fetched. It is a source for which files and folders exist, and
  * pinned like a file: to the commit its entries' links name, else the head commit, else not pinned.
  * @param {import('./shared.js').ExtractInput} input - The arguments and text of the call.
@@ -108,6 +146,7 @@ async function extractDirectory({ args, text }, context) {
         latestUrl: treeUrl(repo, 'HEAD', path),
         kind: 'directory',
         pinned,
+        ...fingerprintField(listingFingerprint(listing)),
       },
     ],
     candidates: [],
@@ -150,6 +189,7 @@ export async function extractFileContents({ args, text, log }, context) {
         latestUrl: blobUrl(repo, 'HEAD', path),
         kind: 'file',
         pinned,
+        ...fingerprintField(fileFingerprint(text)),
       },
     ],
     candidates: [],

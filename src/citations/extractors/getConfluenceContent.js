@@ -1,4 +1,5 @@
 // @ts-check
+import { pageFingerprint } from '../fingerprints.js';
 import { asObject, asString, blocked, isOlderThanAYear, parseJson } from './shared.js';
 
 const PAGE_PATH = /^\/wiki\/spaces\/([^/]+)\/pages\/(\d+)(?:\/|$)/;
@@ -73,6 +74,7 @@ export async function extractConfluenceContent({ args, text }, { siteUrl, spaceK
         title: asString(data.title) || `Page ${id}`,
         spaceKey: space.spaceKey,
         version: version.number,
+        fingerprint: pageFingerprint(version.number),
         ...(lastUpdated === undefined ? {} : { lastUpdated }),
         ...(lastEditor === undefined ? {} : { lastEditor }),
         url: `${siteUrl}/wiki/spaces/${space.spaceKey}/pages/${id}`,

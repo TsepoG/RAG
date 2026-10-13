@@ -13,6 +13,7 @@
  *   names one. Only ever shown to the user as someone to ask; never logged.
  * @property {string} url - Link to the page.
  * @property {boolean} [stale] - True when the page was last updated over 12 months ago.
+ * @property {string} [fingerprint] - Says which version of the page this is; see fingerprints.js.
  */
 
 /**
@@ -28,6 +29,8 @@
  * @property {'file' | 'directory' | 'commit' | 'release' | 'releases'} kind - What it is; `releases`
  *   is the list of a repository's releases.
  * @property {boolean} pinned - True when the link names an exact commit.
+ * @property {string} [fingerprint] - Says which state of the file, folder or release list this
+ *   is, to tell whether it has changed since; absent for a commit or a release, which do not change.
  */
 
 /**
@@ -35,8 +38,14 @@
  */
 
 /**
- * A source with the key the model cites it by.
- * @typedef {Source & { key: string }} RegisteredSource
+ * A source with the key the model cites it by. In a conversation it also says when it was fetched
+ * and whether a later fetch found it changed.
+ * @typedef {Source & {
+ *   key: string,
+ *   fetchedInTurn?: number,
+ *   fetchedAt?: number,
+ *   changed?: boolean,
+ * }} RegisteredSource
  */
 
 /**
@@ -59,7 +68,7 @@
  */
 
 /** Key letters by source type. */
-const KEY_PREFIX = Object.freeze({ confluence: 'C', github: 'G' });
+export const KEY_PREFIX = Object.freeze({ confluence: 'C', github: 'G' });
 const KEY_PATTERN = /^[CG][1-9]\d*$/;
 
 /**
@@ -77,7 +86,7 @@ export function isKeyShaped(text) {
  * @param {Source} source - The source.
  * @returns {string} The identity of the source.
  */
-function identityOf(source) {
+export function identityOf(source) {
   if (source.type === 'confluence') {
     return `confluence\u0000${source.id}\u0000${source.version}`;
   }
@@ -93,7 +102,7 @@ function identityOf(source) {
  * @param {RegisteredSource} b - Another source.
  * @returns {number} Negative when `a` comes first.
  */
-function byKey(a, b) {
+export function byKey(a, b) {
   const letters = a.key.charAt(0).localeCompare(b.key.charAt(0));
   return letters === 0 ? Number(a.key.slice(1)) - Number(b.key.slice(1)) : letters;
 }

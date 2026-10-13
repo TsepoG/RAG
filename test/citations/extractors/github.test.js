@@ -290,6 +290,7 @@ describe('extractReleaseList as a source', () => {
         latestUrl: 'https://github.com/acme/app/releases',
         kind: 'releases',
         pinned: true,
+        fingerprint: 'releases:v2',
       },
     ]);
     expect(result.candidates.map(({ title }) => title)).toEqual(['v2', 'v1']);
@@ -310,6 +311,28 @@ describe('extractReleaseList as a source', () => {
     );
 
     expect(result.sources[0]).toMatchObject({ commitSha: '', pinned: false });
+  });
+
+  it('fingerprints the list by its newest release, the first in it', async () => {
+    const result = await extractReleaseList({ args: ARGS, text: items }, makeContext());
+
+    expect(result.sources[0].fingerprint).toBe('releases:v2');
+  });
+
+  it('names the newest release by its name when it has no tag', async () => {
+    const text = json([{ name: 'Spring', html_url: 'https://github.com/acme/app/releases/tag/s' }]);
+
+    const result = await extractReleaseList({ args: ARGS, text }, makeContext());
+
+    expect(result.sources[0].fingerprint).toBe('releases:Spring');
+  });
+
+  it('gives no fingerprint when the newest release has neither a tag nor a name', async () => {
+    const text = json([{ html_url: 'https://github.com/acme/app/releases/tag/s' }]);
+
+    const result = await extractReleaseList({ args: ARGS, text }, makeContext());
+
+    expect(result.sources[0]).not.toHaveProperty('fingerprint');
   });
 
   it('is no source for an empty list', async () => {
