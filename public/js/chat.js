@@ -379,6 +379,7 @@ export function createChat({ refs, api, storage, clock }) {
       state.conversation.role !== role.id
     ) {
       pendingRole = role.id;
+      refs.roleDescription.textContent = role.description;
       showRoleConfirm(refs, role.displayName);
       return;
     }

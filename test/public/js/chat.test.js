@@ -872,6 +872,19 @@ describe('the role', () => {
     expect(storage.saveRole).not.toHaveBeenCalled();
   });
 
+  it('describes the role being asked about while the question is open, and the current one again if it is kept', async () => {
+    await setup();
+    await ask('How?');
+    const select = /** @type {HTMLSelectElement} */ (refs.role);
+
+    select.value = 'po';
+    select.dispatchEvent(new Event('change'));
+    expect(refs.roleDescription.textContent).toBe('Owns the product.');
+
+    refs.roleConfirmNo.click();
+    expect(refs.roleDescription.textContent).toBe('Writes the code.');
+  });
+
   it('goes back to the conversation’s role when the reader keeps the conversation', async () => {
     await setup();
     await ask('How?');
