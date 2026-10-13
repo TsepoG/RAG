@@ -125,7 +125,8 @@ docs/EVAL_LOG.md, docs/DEMO.md, CHANGELOG.md, README.md
 - [x] README, `docs/DEMO.md` and `CHANGELOG.md` complete.
 - [x] Phase 5 acceptance criteria ticked in `docs/phases/phase-5.md` (first commit of the branch), and all phases' boxes reflect reality.
       _Two boxes stay open on purpose, with notes: Phase 4 out-of-scope and Phase 5 live rendering of clarify and out-of-scope._
-- [ ] CI green; SonarQube quality gate passes with zero new issues.
+- [x] CI green; SonarQube quality gate passes with zero new issues.
+      _PR #7: all checks passed and the quality gate passed with 0 new issues, after two fixes for Sonar findings._
 
 ## Git rules for this phase
 
