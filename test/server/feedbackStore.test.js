@@ -62,7 +62,19 @@ describe('buildFeedbackLine', () => {
       comment: 'Wrong window',
       wrongSourceKey: 'C1',
       model: 'gpt-x',
+      turn: null,
+      conversationTurns: null,
     });
+  });
+
+  it('records which turn of a conversation was rated, and how many turns it had', () => {
+    const line = buildFeedbackLine(
+      { ...answerRecord(), turn: 2, conversationTurns: 3 },
+      { rating: 'up' },
+      WHEN,
+    );
+
+    expect(JSON.parse(line)).toMatchObject({ turn: 2, conversationTurns: 3 });
   });
 
   it('never holds the answer text or a token, even when the record carries them', () => {

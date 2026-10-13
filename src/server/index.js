@@ -1,14 +1,23 @@
 // @ts-check
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { askQuestion } from '../answer/index.js';
 import { loadConfig, loadEnvFileIfPresent, redactConfig } from '../config/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../copilot/index.js';
 import { AppError, ConfigError } from '../errors/index.js';
 import { createLogger } from '../logger/index.js';
+import {
+  createConversationRunner,
+  createConversationStore,
+  createSessionCloser,
+} from '../conversation/index.js';
+import { createGithubApi } from '../github/index.js';
+import { createConfluenceChecker, createGithubChecker } from '../recheck/index.js';
 import { loadRoles } from '../roles/index.js';
 import { createAnswerMemory } from './answers.js';
 import { buildApp } from './app.js';
 import { appendFeedback } from './feedbackStore.js';
+import { createRecheckService } from './recheckService.js';
 import { listStaticFiles } from './static.js';
 
 const APP_NAME = 'role-aware-assistant';
@@ -16,6 +25,9 @@ const EXIT_FAILURE = 1;
 const SCHEME = 'http:';
 const ADDRESS_IN_USE = 'EADDRINUSE';
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM'];
+
+/** How often an idle conversation is looked for and closed, in ms. */
+const IDLE_SWEEP_INTERVAL_MS = 60_000;
 
 /** The page's files and the feedback folder, found from this file so the folder it is run from does not matter. */
 const PUBLIC_DIRECTORY = fileURLToPath(new URL('../../public', import.meta.url));
@@ -55,6 +67,45 @@ async function main() {
   const handle = await createCopilotClient(config, { logger });
   try {
     await ensureAuthenticated(handle.client);
+    const clock = { now: () => Date.now() };
+    const store = createConversationStore({
+      clock,
+      limits: {
+        maxTurns: config.conversation.maxTurns,
+        maxSourceChars: config.conversation.maxSourceChars,
+        idleMinutes: config.conversation.idleMinutes,
+      },
+      closeSession: createSessionCloser(logger),
+      newId: randomUUID,
+    });
+    const runner = createConversationRunner({
+      client: handle.client,
+      workingDirectory: handle.workingDirectory,
+      config,
+      logger,
+      clock,
+      endConversation: (conversation, reason) => store.end(conversation, reason),
+    });
+    const recheck = createRecheckService({
+      checkers: {
+        github: createGithubChecker({
+          api: createGithubApi({ token: config.github.token }),
+          repos: config.github.repos,
+          logger,
+        }),
+        confluence: createConfluenceChecker({ atlassian: config.atlassian, logger }),
+      },
+      clock,
+      afterMinutes: config.conversation.recheckAfterMinutes,
+      logger,
+    });
+    const sweepTimer = setInterval(() => {
+      store
+        .sweep()
+        .catch((error) => logger.error({ err: error }, 'could not close idle conversations'));
+    }, IDLE_SWEEP_INTERVAL_MS);
+    // An idle sweep must not keep the process alive at exit.
+    sweepTimer.unref();
     const app = buildApp({
       config,
       roles,
@@ -67,11 +118,14 @@ async function main() {
         }),
       answers: createAnswerMemory(),
       saveFeedback: (answer, input) => appendFeedback(answer, input, { dir: DATA_DIRECTORY }),
+      conversations: { store, runner, recheck },
       staticFiles: await listStaticFiles(PUBLIC_DIRECTORY),
       logger,
     });
     const stop = async () => {
+      clearInterval(sweepTimer);
       await app.close();
+      await store.close();
       await handle.stop();
     };
     for (const signal of STOP_SIGNALS) {

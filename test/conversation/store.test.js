@@ -187,3 +187,36 @@ describe('ending and removing', () => {
     expect(await store.remove('id-1')).toBe(false);
   });
 });
+
+describe('the active conversation', () => {
+  it('is the one just created, and none once it is removed', async () => {
+    const { store } = setup();
+    expect(store.active()).toBeUndefined();
+
+    const conversation = await store.create(ROLE);
+    expect(store.active()).toBe(conversation);
+
+    await store.remove(conversation.id);
+    expect(store.active()).toBeUndefined();
+  });
+
+  it('is closed on shutdown: ended, its session closed, none left', async () => {
+    const { store, closeSession } = setup();
+    const conversation = await store.create(ROLE);
+    conversation.setSession({});
+
+    await store.close();
+
+    expect(conversation.endedReason()).toBe('shutdown');
+    expect(closeSession).toHaveBeenCalledOnce();
+    expect(store.active()).toBeUndefined();
+  });
+
+  it('is fine to close when there is none', async () => {
+    const { store, closeSession } = setup();
+
+    await store.close();
+
+    expect(closeSession).not.toHaveBeenCalled();
+  });
+});

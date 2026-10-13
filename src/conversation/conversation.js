@@ -1,4 +1,5 @@
 // @ts-check
+import { createCheckLog } from './checkLog.js';
 
 /** Shown when a conversation cannot take another question. */
 export const FULL_MESSAGE = 'This conversation is full — start a new one to keep going.';
@@ -36,6 +37,7 @@ export const FULL_MESSAGE = 'This conversation is full — start a new one to ke
  * @property {import('../roles/index.js').Role} role - The role it was started with.
  * @property {import('../citations/index.js').ConversationRegistry} registry - Its citations.
  * @property {number} createdAt - When it started, in ms.
+ * @property {import('./checkLog.js').CheckLog} checks - What its re-checks have found.
  * @property {() => number} lastActivityAt - When it last did anything, in ms.
  * @property {() => void} touch - Records activity now.
  * @property {() => unknown} session - The open session, if any.
@@ -92,6 +94,7 @@ export function createConversation({ id, role, registry, clock, limits }) {
     role,
     registry,
     createdAt,
+    checks: createCheckLog(),
     maxTurns: limits.maxTurns,
     lastActivityAt: () => lastActivity,
     touch() {

@@ -19,10 +19,12 @@ const MS_PER_MINUTE = 60_000;
  * one person; starting another closes the first.
  * @typedef {object} ConversationStore
  * @property {(input: { role: import('../roles/index.js').Role }) => Promise<import('./conversation.js').Conversation>} create - Starts a conversation, closing the active one.
+ * @property {() => import('./conversation.js').Conversation | undefined} active - The active conversation, if there is one.
  * @property {(id: string) => import('./conversation.js').Conversation | undefined} get - The conversation, unless it is unknown or has expired.
  * @property {(id: string) => import('./conversation.js').Conversation} require - Like `get`, but throws when there is none.
  * @property {(conversation: import('./conversation.js').Conversation, reason: string) => Promise<void>} end - Closes it to new questions and frees its session; its transcript stays.
  * @property {(id: string) => Promise<boolean>} remove - Closes and forgets a conversation; false when there was none.
+ * @property {() => Promise<void>} close - Ends and closes the active conversation, for shutdown.
  * @property {() => Promise<string[]>} sweep - Forgets the active conversation if it has been idle too long; gives its id.
  */
 
@@ -80,6 +82,7 @@ export function createConversationStore({ clock, limits, closeSession, newId }) 
       }
       return conversation;
     },
+    active: () => active,
     get(id) {
       return active?.id === id && !isIdle(active) ? active : undefined;
     },
@@ -103,6 +106,14 @@ export function createConversationStore({ clock, limits, closeSession, newId }) 
       conversation.end('deleted');
       await release(conversation);
       return true;
+    },
+    async close() {
+      const open = active;
+      active = undefined;
+      if (open !== undefined) {
+        open.end('shutdown');
+        await release(open);
+      }
     },
     async sweep() {
       const idle = active;
