@@ -471,7 +471,7 @@ different account with one pinned model.
 | Timeout | `ASK_TIMEOUT_MS=240000` |
 | Commit | `f42ddca0cc85`, base prompt hash `81ddc08c88b9` (unchanged since Phase 6) |
 | Requests | 44 for 38 cases (limit 70) |
-| Verdicts | drafted by Claude Code for the 27 answered cases (22 correct, 5 partial, 0 wrong) and marked as drafts; the owner reviews each one |
+| Verdicts | drafted by Claude Code for the 27 answered cases (22 correct, 5 partial, 0 wrong); the owner reviewed each one and agreed with all of them, so they are the owner's verdicts, written by Claude Code |
 
 ### Against the MVP targets
 
