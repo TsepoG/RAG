@@ -1,6 +1,12 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { applyConfidenceCaps, NO_META_REASON } from '../../src/honesty/index.js';
+import {
+  applyConfidenceCaps,
+  applySourceChangeCap,
+  NO_META_REASON,
+  SOURCE_CHANGED_CODE,
+  SOURCE_CHANGED_REASON,
+} from '../../src/honesty/index.js';
 
 const RANK = { high: 3, medium: 2, low: 1 };
 const MODEL_REASON = 'Every statement is in the page.';
@@ -287,5 +293,91 @@ describe('applyConfidenceCaps a missing report', () => {
 
     expect(result.status).toBe('not_found');
     expect(result.capsApplied.map(({ code }) => code)).toEqual(['no-meta', 'no-citations']);
+  });
+});
+
+describe('applySourceChangeCap', () => {
+  /**
+   * The caps an answered result has.
+   * @param {Record<string, any>} [changes] - Fields to change.
+   * @returns {import('../../src/honesty/caps.js').CapsResult} The caps.
+   */
+  function caps(changes = {}) {
+    return {
+      status: 'answered',
+      confidence: 'high',
+      confidenceReason: MODEL_REASON,
+      capsApplied: [],
+      ...changes,
+    };
+  }
+
+  it('limits a high answer to medium and says why', () => {
+    const result = applySourceChangeCap(caps(), ['C1']);
+
+    expect(result.confidence).toBe('medium');
+    expect(result.confidenceReason).toBe(
+      `${MODEL_REASON} A source has changed since this answer was written.`,
+    );
+    expect(result.capsApplied).toEqual([{ code: 'source-changed', reason: SOURCE_CHANGED_REASON }]);
+  });
+
+  it('names the rule and the reason in plain words', () => {
+    expect(SOURCE_CHANGED_CODE).toBe('source-changed');
+    expect(SOURCE_CHANGED_REASON).toBe('A source has changed since this answer was written.');
+  });
+
+  it.each(['medium', 'low'])('never raises a %s answer', (confidence) => {
+    expect(applySourceChangeCap(caps({ confidence }), ['C1']).confidence).toBe(confidence);
+  });
+
+  it('still says why when the answer was not above medium', () => {
+    const result = applySourceChangeCap(caps({ confidence: 'low' }), ['G2']);
+
+    expect(result.confidenceReason).toContain(SOURCE_CHANGED_REASON);
+  });
+
+  it('keeps the rules that held before, and adds this one after them', () => {
+    const before = [{ code: 'gaps', reason: 'Some parts could not be confirmed.' }];
+
+    const result = applySourceChangeCap(caps({ capsApplied: before }), ['C1']);
+
+    expect(result.capsApplied.map(({ code }) => code)).toEqual(['gaps', 'source-changed']);
+  });
+
+  it('changes nothing when no cited source changed, and returns the same object', () => {
+    const original = caps();
+
+    expect(applySourceChangeCap(original, [])).toBe(original);
+  });
+
+  it('is the same applied twice as applied once', () => {
+    const once = applySourceChangeCap(caps(), ['C1']);
+
+    expect(applySourceChangeCap(once, ['C1', 'G2'])).toEqual(once);
+  });
+
+  it.each(['not_found', 'clarify', 'out_of_scope'])(
+    'leaves a %s result alone, since it has no confidence to lower',
+    (status) => {
+      const original = caps({ status, confidence: null });
+
+      expect(applySourceChangeCap(original, ['C1'])).toBe(original);
+    },
+  );
+
+  it('does not change the result it was given', () => {
+    const original = caps();
+
+    applySourceChangeCap(original, ['C1']);
+
+    expect(original).toEqual(caps());
+  });
+
+  it('works on what applyConfidenceCaps produced', () => {
+    const result = applySourceChangeCap(applyConfidenceCaps(input()), ['C1']);
+
+    expect(RANK[result.confidence ?? 'low']).toBeLessThanOrEqual(RANK.medium);
+    expect(result.capsApplied.at(-1)?.code).toBe('source-changed');
   });
 });
