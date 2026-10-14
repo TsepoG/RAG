@@ -42,6 +42,8 @@ const runLine = z.looseObject({
   basePromptHash: z.string(),
   // Older results do not have it.
   models: z.array(z.string()).default([]),
+  // Older results were all asked one question at a time.
+  path: z.enum(['single', 'conversation']).default('single'),
   requests: z.looseObject({ used: z.number(), casesRun: z.number(), stoppedEarly: z.boolean() }),
   interrupted: z.boolean(),
 });
@@ -59,6 +61,7 @@ const caseLine = z.looseObject({
  * @typedef {import('./run.js').RunInfo & {
  *   startedAt: string,
  *   models: string[],
+ *   path: 'single' | 'conversation',
  *   requests: { limit?: number, used: number, casesRun: number, stoppedEarly: boolean },
  *   interrupted: boolean,
  * }} RunHeader

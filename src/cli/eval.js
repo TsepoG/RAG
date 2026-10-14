@@ -3,13 +3,20 @@ import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import { askQuestion } from '../answer/index.js';
 import { listSecrets } from '../config/index.js';
-import { AppError } from '../errors/index.js';
+import {
+  createConversationRunner,
+  createConversationStore,
+  createSessionCloser,
+} from '../conversation/index.js';
+import { AppError, EvalError } from '../errors/index.js';
 import {
   assertRunnable,
   collectRunInfo,
+  createConversationPath,
   createRequestGuard,
   estimateRequests,
   EVAL_FILE,
@@ -18,6 +25,7 @@ import {
   loadCases,
   modelsSeen,
   parseEvalArguments,
+  planRun,
   RESULTS_DIRECTORY,
   RESULTS_FILE,
   runEval,
@@ -93,9 +101,23 @@ async function main() {
       role: args.role,
     });
     assertRunnable(cases);
-    const estimate = estimateRequests(cases, roles);
+    const { runnable, skipped } = planRun(cases, {
+      path: args.path,
+      maxTurns: config.conversation.maxTurns,
+    });
+    if (runnable.length === 0) {
+      throw new EvalError(
+        'Every case chosen has several turns; run them with --path conversation.',
+      );
+    }
+    if (skipped.length > 0) {
+      process.stderr.write(
+        `Left out, because they have several turns (use --path conversation): ${skipped.join(', ')}.\n`,
+      );
+    }
+    const estimate = estimateRequests(runnable, roles);
     process.stderr.write(
-      `${cases.length} cases from ${EVAL_FILE}. Expected Copilot requests: about ${estimate.expected}, at most ${estimate.worstCase}.\n`,
+      `${runnable.length} cases from ${EVAL_FILE}, asked as ${args.path === 'conversation' ? 'conversations' : 'single questions'}. Expected Copilot requests: about ${estimate.expected}, at most ${estimate.worstCase}.\n`,
     );
     if (args.maxRequests !== undefined) {
       process.stderr.write(`It will stop starting new cases after ${args.maxRequests} requests.\n`);
@@ -109,22 +131,45 @@ async function main() {
     const startedAt = new Date();
     const result = await withCopilot(settings, async ({ client, workingDirectory }) => {
       const info = await collectRunInfo({ git: gitState, roles, config });
+      const clock = { now: () => Date.now() };
+      const store = createConversationStore({
+        clock,
+        limits: {
+          maxTurns: config.conversation.maxTurns,
+          maxSourceChars: config.conversation.maxSourceChars,
+          idleMinutes: config.conversation.idleMinutes,
+        },
+        closeSession: createSessionCloser(logger),
+        newId: randomUUID,
+      });
+      const runner = createConversationRunner({
+        client,
+        workingDirectory,
+        config,
+        logger,
+        clock,
+        endConversation: (conversation, reason) => store.end(conversation, reason),
+      });
       const outcome = await runEval({
-        cases,
+        cases: runnable,
         roles,
+        path: args.path,
+        startConversation: createConversationPath({ store, runner }),
         ask: (input) => askQuestion(input, { client, workingDirectory, config, logger }),
         guard: createRequestGuard(args.maxRequests),
-        clock: { now: () => Date.now() },
+        clock,
         maxToolCalls: config.mcp.maxToolCalls,
         secrets: listSecrets(config),
         signal: controller.signal,
         onCase: (entry, done, total) => process.stderr.write(progressLine(entry, done, total)),
       });
+      await store.close();
       return { info, outcome };
     });
     const header = {
       ...result.info,
       models: modelsSeen(result.outcome.entries),
+      path: args.path,
       startedAt: startedAt.toISOString(),
       requests: result.outcome.requests,
       interrupted: result.outcome.interrupted,

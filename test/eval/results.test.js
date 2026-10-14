@@ -21,6 +21,7 @@ const HEADER = {
   roles: { qa: 3, developer: 2 },
   basePromptHash: '0123456789ab',
   models: ['gpt-x'],
+  path: /** @type {const} */ ('single'),
   requests: { used: 14, casesRun: 8, stoppedEarly: false },
   interrupted: false,
 };
@@ -63,6 +64,21 @@ describe('formatResults and parseResults', () => {
 
     expect(text.trim().split('\n')).toHaveLength(2);
     expect(parseResults(text).entries[0].result?.answer).toBe(answer);
+  });
+
+  it('read a results file from before the path was recorded, as asked one question at a time', () => {
+    const { path, ...old } = HEADER;
+    const text = `${JSON.stringify({ type: 'run', ...old })}
+`;
+
+    expect(path).toBe('single');
+    expect(parseResults(text).header.path).toBe('single');
+  });
+
+  it('keep the path of a run asked as conversations', () => {
+    const text = formatResults({ ...HEADER, path: 'conversation' }, [entry('a')]);
+
+    expect(parseResults(text).header.path).toBe('conversation');
   });
 
   it('read a results file from before models were recorded, as having no models', () => {
@@ -180,6 +196,8 @@ describe('formatSummary', () => {
     const run = { ...HEADER, dirty: true, requests: { ...HEADER.requests, limit: 20 } };
 
     expect(formatRunInfo(run)).toContain('abc123def456 (uncommitted changes)');
+    expect(formatRunInfo(run)).toContain('single questions');
+    expect(formatRunInfo({ ...run, path: 'conversation' })).toContain('conversations');
     expect(formatRunInfo(run)).toContain('(limit 20)');
   });
 
@@ -247,6 +265,7 @@ describe('parseEvalArguments', () => {
       subset: 'full',
       caseId: undefined,
       role: undefined,
+      path: 'single',
       maxRequests: undefined,
       yes: false,
     });
@@ -261,11 +280,26 @@ describe('parseEvalArguments', () => {
         'dev-one',
         '--role',
         'qa',
+        '--path',
+        'conversation',
         '--max-requests',
         '12',
         '--yes',
       ]),
-    ).toEqual({ subset: 'smoke', caseId: 'dev-one', role: 'qa', maxRequests: 12, yes: true });
+    ).toEqual({
+      subset: 'smoke',
+      caseId: 'dev-one',
+      role: 'qa',
+      path: 'conversation',
+      maxRequests: 12,
+      yes: true,
+    });
+  });
+
+  it('refuses a path that is neither single nor conversation', () => {
+    expect(() => parseEvalArguments(['--path', 'both'])).toThrow(
+      '--path must be single or conversation, not "both"',
+    );
   });
 
   it('reads a list of ids, trimmed and without repeats, and then runs only those', () => {

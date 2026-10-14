@@ -370,3 +370,262 @@ describe('modelsSeen', () => {
     expect(modelsSeen([])).toEqual([]);
   });
 });
+
+describe('runEval as conversations', () => {
+  const answered = { status: /** @type {const} */ ('answered'), reference: 'r' };
+  const followUp = (/** @type {string} */ question, expectChanges = {}) => ({
+    question,
+    expect: { ...answered, ...expectChanges },
+  });
+
+  /**
+   * A conversation that answers each question in turn, and records what it was asked.
+   * @param {Array<Record<string, unknown> | Error>} answers - What each turn gets.
+   * @returns {{ start: import('vitest').Mock, ask: import('vitest').Mock }} The doubles.
+   */
+  function conversation(answers = []) {
+    let turn = 0;
+    const ask = vi.fn(async () => {
+      const next = answers[turn] ?? {};
+      turn += 1;
+      if (next instanceof Error) {
+        throw next;
+      }
+      return answer(next);
+    });
+    return { ask, start: vi.fn(async () => ({ ask })) };
+  }
+
+  const trio = makeCase({
+    id: 'dev-followup',
+    followUps: [
+      followUp('And for gift cards?', { reusesEarlier: true }),
+      followUp('Who signs off?'),
+    ],
+  });
+
+  it('asks every turn of a case in one conversation, as its role', async () => {
+    const played = conversation();
+
+    await runEval(deps({ cases: [trio], path: 'conversation', startConversation: played.start }));
+
+    expect(played.start).toHaveBeenCalledExactlyOnceWith(ROLES.get('developer'));
+    expect(played.ask.mock.calls.map(([call]) => call.question)).toEqual([
+      'Where is the refund window enforced?',
+      'And for gift cards?',
+      'Who signs off?',
+    ]);
+  });
+
+  it('records each turn as an entry of its own, scored on its own expectation', async () => {
+    const played = conversation([
+      {},
+      { reusedKeys: ['C1'] },
+      { status: 'not_found', confidence: null },
+    ]);
+
+    const { entries } = await runEval(
+      deps({ cases: [trio], path: 'conversation', startConversation: played.start }),
+    );
+
+    expect(entries.map(({ id }) => id)).toEqual([
+      'dev-followup',
+      'dev-followup-t2',
+      'dev-followup-t3',
+    ]);
+    expect(entries.map(({ question }) => question)).toEqual([
+      'Where is the refund window enforced?',
+      'And for gift cards?',
+      'Who signs off?',
+    ]);
+    expect(entries.map(({ conversation: of }) => of)).toEqual([
+      { caseId: 'dev-followup', turn: 1, turns: 3 },
+      { caseId: 'dev-followup', turn: 2, turns: 3 },
+      { caseId: 'dev-followup', turn: 3, turns: 3 },
+    ]);
+    expect(entries[1].score).toMatchObject({ id: 'dev-followup-t2', reusedEarlierSource: true });
+    expect(entries[2].score).toMatchObject({ status: 'not_found', statusMatch: false });
+  });
+
+  it('plays a case with one turn as a conversation of one, with no conversation marking on it', async () => {
+    const played = conversation();
+
+    const { entries } = await runEval(
+      deps({
+        cases: [makeCase({ id: 'a' })],
+        path: 'conversation',
+        startConversation: played.start,
+      }),
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).not.toHaveProperty('conversation');
+    expect(entries[0]?.id).toBe('a');
+  });
+
+  it('starts a new conversation for each case', async () => {
+    const played = conversation();
+
+    await runEval(
+      deps({
+        cases: [makeCase({ id: 'a' }), makeCase({ id: 'b' })],
+        path: 'conversation',
+        startConversation: played.start,
+      }),
+    );
+
+    expect(played.start).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells how far it is in turns, not cases', async () => {
+    const seen = /** @type {Array<[string, number, number]>} */ ([]);
+
+    await runEval(
+      deps({
+        cases: [trio, makeCase({ id: 'b' })],
+        path: 'conversation',
+        startConversation: conversation().start,
+        onCase: (entry, done, total) => seen.push([entry.id, done, total]),
+      }),
+    );
+
+    expect(seen.map(([, done, total]) => `${done}/${total}`)).toEqual(['1/4', '2/4', '3/4', '4/4']);
+  });
+
+  it('counts the requests of every turn', async () => {
+    const guard = createRequestGuard(undefined);
+
+    const { requests } = await runEval(
+      deps({
+        cases: [trio],
+        guard,
+        path: 'conversation',
+        startConversation: conversation([{ rewritten: true }, {}, {}]).start,
+      }),
+    );
+
+    expect(requests).toMatchObject({ used: 4, casesRun: 3 });
+  });
+
+  it('records a failed turn as an error and the turns after it as not asked', async () => {
+    const played = conversation([{}, new Error('timed out')]);
+
+    const { entries } = await runEval(
+      deps({ cases: [trio], path: 'conversation', startConversation: played.start }),
+    );
+
+    expect(entries.map(({ error }) => error?.kind)).toEqual([undefined, 'Error', 'SkippedTurn']);
+    expect(entries[2]?.error?.message).toContain('An earlier turn');
+    expect(entries[2]?.score).toMatchObject({ status: 'error', passed: false });
+    expect(played.ask).toHaveBeenCalledTimes(2);
+  });
+
+  it('records a conversation that could not be started as a failure of its first turn', async () => {
+    const start = vi.fn(async () => {
+      throw new Error('no session');
+    });
+
+    const { entries } = await runEval(
+      deps({ cases: [trio], path: 'conversation', startConversation: start }),
+    );
+
+    expect(entries.map(({ error }) => error?.kind)).toEqual([
+      'Error',
+      'SkippedTurn',
+      'SkippedTurn',
+    ]);
+  });
+
+  it('stops, keeping the turns it has, when the run is aborted in the middle of a conversation', async () => {
+    const controller = new AbortController();
+    const ask = vi.fn(async () => {
+      if (ask.mock.calls.length === 2) {
+        controller.abort();
+        throw new Error('stopped');
+      }
+      return answer();
+    });
+
+    const outcome = await runEval(
+      deps({
+        cases: [trio, makeCase({ id: 'b' })],
+        path: 'conversation',
+        startConversation: async () => ({ ask }),
+        signal: controller.signal,
+      }),
+    );
+
+    expect(outcome.interrupted).toBe(true);
+    expect(outcome.entries.map(({ id }) => id)).toEqual(['dev-followup']);
+  });
+
+  it('needs a way to start a conversation', async () => {
+    await expect(runEval(deps({ path: 'conversation' }))).rejects.toThrow(
+      'Running as conversations needs a way to start one.',
+    );
+  });
+
+  it('refuses a case whose role is not loaded, before it starts a conversation', async () => {
+    const played = conversation();
+
+    await expect(
+      runEval(
+        deps({
+          cases: [makeCase({ id: 'x', role: 'ghost' })],
+          path: 'conversation',
+          startConversation: played.start,
+        }),
+      ),
+    ).rejects.toThrow(EvalError);
+    expect(played.start).not.toHaveBeenCalled();
+  });
+});
+
+describe('runEval of a conversation case as single questions', () => {
+  it('leaves it out and says so, running the others', async () => {
+    const trio = makeCase({
+      id: 'dev-followup',
+      followUps: [{ question: 'Then?', expect: { status: 'answered', reference: 'r' } }],
+    });
+    const options = deps({ cases: [trio, makeCase({ id: 'b' })] });
+
+    const outcome = await runEval(options);
+
+    expect(outcome.skipped).toEqual(['dev-followup']);
+    expect(outcome.entries.map(({ id }) => id)).toEqual(['b']);
+    expect(options.ask).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports nothing skipped for ordinary cases', async () => {
+    expect((await runEval(deps())).skipped).toEqual([]);
+  });
+});
+
+describe('a one-turn conversation and a single question', () => {
+  it('score alike for the same answer, so the two paths can be compared', async () => {
+    const one = makeCase({
+      id: 'a',
+      expect: {
+        status: 'answered',
+        reference: 'r',
+        sources: [{ type: 'confluence', match: 'Refund' }],
+      },
+    });
+    const result = answer({
+      sources: [{ key: 'C1', type: 'confluence', title: 'Refund Policy', url: 'https://x' }],
+    });
+
+    const single = await runEval(deps({ cases: [one], ask: vi.fn(async () => result) }));
+    const asConversation = await runEval(
+      deps({
+        cases: [one],
+        path: 'conversation',
+        startConversation: async () => ({ ask: async () => ({ ...result, reusedKeys: [] }) }),
+      }),
+    );
+
+    expect(asConversation.entries[0]?.score).toEqual(single.entries[0]?.score);
+    expect(asConversation.entries[0]?.id).toBe(single.entries[0]?.id);
+    expect(asConversation.requests).toEqual(single.requests);
+  });
+});

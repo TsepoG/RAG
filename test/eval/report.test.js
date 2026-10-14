@@ -322,6 +322,14 @@ describe('summariseFeedback and parseFeedbackLines', () => {
   });
 });
 
+describe('diffRunInfo and how the run asked', () => {
+  it('says when one run asked single questions and the other conversations', () => {
+    expect(diffRunInfo(makeHeader(), makeHeader({ path: 'conversation' }))).toEqual([
+      'asked as: single → conversation',
+    ]);
+  });
+});
+
 describe('diffRunInfo', () => {
   it('finds nothing when the runs are tied to the same things', () => {
     expect(diffRunInfo(makeHeader(), makeHeader())).toEqual([]);

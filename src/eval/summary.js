@@ -38,6 +38,7 @@ export function formatRunInfo(run) {
       ['Models that answered', run.models.length === 0 ? 'none recorded' : run.models.join(', ')],
       ['Role versions', versions],
       ['Base prompt hash', run.basePromptHash],
+      ['Asked as', run.path === 'conversation' ? 'conversations' : 'single questions'],
       ['Requests used', requestsText(run.requests)],
     ],
   );
