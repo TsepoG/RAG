@@ -508,3 +508,34 @@ difference between them cannot be put down to any one of those.
 - **Tool catalog message.** A first manual question on this account logged `MCP tool catalog
   changed before tool "…" could be invoked` for its first two tool calls, which then worked on
   the retry. It was seen once in a single question and was not counted in this run.
+
+## Multi-turn cases (2026-10-14)
+
+Five conversation cases (14 turns), drafted by Claude Code from facts already checked in the
+single-question cases, reviewed by the owner, and run through the conversation path with the
+pinned model `gpt-6-luna`. They sit in the git-ignored `eval/questions.yaml` and are not part of
+the 38 cases of the regression.
+
+| Run | What | Result |
+| --- | --- | --- |
+| `20261014-182728` | all five, default `ASK_TIMEOUT_MS` (120 s) | 6 of 14 turns passed. Three conversations timed out on their first turn (`conv-dev-ticker-conflict`, `conv-ba-survivors`, `conv-po-built-then-plain`), so their later turns were not asked. A setup error: the baseline used 240 s. |
+| `20261014-183804` | those three again with `ASK_TIMEOUT_MS=240000` | 7 of 8 turns passed; no failed question. |
+
+Verdicts (drafted by Claude Code, accepted by the owner): 11 of the 14 turns pass, counting the two
+completed conversations of the first run and the rerun; all four turns that expected a source from an
+earlier turn reused one without fetching it again (`conv-dev-edgar-limits-t2`,
+`conv-dev-ticker-conflict-t2`, `conv-qa-tests-then-gap-t2`, `conv-ba-survivors-t3`).
+
+- **Real finding:** `conv-po-built-then-plain-t2` ("Can we trust the backtest results yet?") claims
+  `high` with no caps, where the case allows `medium`. The same question asked alone in the baseline
+  read the code and got `medium`; in the conversation the model answered from pages it already had and
+  checked no code. The answer is correct and the confidence is not earned. The case was left failing.
+- **Accepted miss:** `conv-po-built-then-plain-t3` misses the expected page `262425` and cites the
+  Design page, as `po-advice` did in the baseline. The answer is right.
+- **Questionable:** `conv-po-built-then-plain` (turn 1) says the product can build a time-aware
+  semiconductor universe, which the docs claim and the repository does not contain.
+- **Changed after the run:** the question of `conv-dev-ticker-conflict` turn 2 was reworded from
+  "Does the design document say the same?" to "Does the design document describe the same behaviour as
+  the code?" (the old answer opened with a confusing "Yes"). The reference clause "the backtest is not
+  built yet either" was removed from `conv-ba-survivors` turn 3, which the question does not need. The
+  reworded question was not run again (owner's decision); its verdict rests on the old wording.
