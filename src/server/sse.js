@@ -2,7 +2,7 @@
 import { AppError } from '../errors/index.js';
 
 /** The events the page understands. Anything else is a bug, so it is refused. */
-const EVENT_NAMES = Object.freeze(['progress', 'token', 'done', 'error']);
+const EVENT_NAMES = Object.freeze(['progress', 'token', 'done', 'error', 'recheck']);
 
 /** The events that end a stream. A stream has exactly one. */
 const TERMINAL_EVENTS = Object.freeze(['done', 'error']);
@@ -30,8 +30,11 @@ const STREAM_HEADERS = Object.freeze({
  * @typedef {object} EventStream
  * @property {(event: string, data: unknown) => boolean} send - Writes one event. Returns false,
  *   and writes nothing, once the stream has ended or the client has gone.
- * @property {(event: string, data: unknown) => boolean} finish - Writes the `done` or `error`
- *   event and ends the stream. Only the first call does anything; it returns whether it did.
+ * @property {(event: string, data: unknown, options?: { keepOpen?: boolean }) => boolean} finish -
+ *   Writes the `done` or `error` event and ends the stream, unless `keepOpen` is set, in which case
+ *   the stream stays open for later events (a conversation sends its re-check after the answer)
+ *   until `end` is called. Only the first call does anything; it returns whether it did.
+ * @property {() => void} end - Ends the stream. Does nothing if it has ended.
  * @property {() => boolean} isOpen - Whether events can still be written.
  * @property {(listener: () => void) => void} onDisconnect - Calls the listener if the client goes
  *   away before the stream has finished.
@@ -61,6 +64,7 @@ export function formatEvent(event, data) {
  */
 export function openEventStream(response, extraHeaders = {}) {
   let finished = false;
+  let outcomeSent = false;
   response.writeHead(OK, { ...extraHeaders, ...STREAM_HEADERS });
   response.flushHeaders();
 
@@ -73,15 +77,27 @@ export function openEventStream(response, extraHeaders = {}) {
     response.write(formatEvent(event, data));
     return true;
   };
-  const finish = (/** @type {string} */ event, /** @type {unknown} */ data) => {
+  const end = () => {
+    if (!finished) {
+      finished = true;
+      response.end();
+    }
+  };
+  const finish = (
+    /** @type {string} */ event,
+    /** @type {unknown} */ data,
+    /** @type {{ keepOpen?: boolean }} */ { keepOpen = false } = {},
+  ) => {
     if (!TERMINAL_EVENTS.includes(event)) {
       throw new AppError(`Not an event that ends a stream: ${event}`);
     }
-    if (!send(event, data)) {
+    if (outcomeSent || !send(event, data)) {
       return false;
     }
-    finished = true;
-    response.end();
+    outcomeSent = true;
+    if (!keepOpen) {
+      end();
+    }
     return true;
   };
   const onDisconnect = (/** @type {() => void} */ listener) => {
@@ -92,5 +108,5 @@ export function openEventStream(response, extraHeaders = {}) {
       }
     });
   };
-  return { send, finish, isOpen, onDisconnect };
+  return { send, finish, end, isOpen, onDisconnect };
 }

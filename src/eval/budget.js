@@ -23,11 +23,13 @@ const STYLE_TRAP_TAG = 'style-trap';
 
 /**
  * Estimates the requests a run will use, so the owner can decide before it starts.
- * @param {ReadonlyArray<import('./schema.js').EvalCase>} cases - The cases that will run.
+ * @param {ReadonlyArray<import('./schema.js').EvalCase>} cases - The cases that will run; a
+ *   conversation asks a question for each of its turns.
  * @param {ReadonlyMap<string, { depth: number }>} roles - The roles, to know which are plain-spoken.
  * @returns {Estimate} The estimate.
  */
 export function estimateRequests(cases, roles) {
+  const questions = cases.reduce((total, { followUps }) => total + 1 + (followUps?.length ?? 0), 0);
   const likelyRewrites = cases.filter(
     ({ role, tags, expect: expected }) =>
       expected.status === 'answered' &&
@@ -39,8 +41,8 @@ export function estimateRequests(cases, roles) {
   ).length;
   return {
     cases: cases.length,
-    expected: cases.length + likelyRewrites + likelyRepairs,
-    worstCase: cases.length * MAX_REQUESTS_PER_CASE,
+    expected: questions + likelyRewrites + likelyRepairs,
+    worstCase: questions * MAX_REQUESTS_PER_CASE,
   };
 }
 

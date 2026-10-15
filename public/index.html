@@ -20,7 +20,7 @@
     <noscript><p class="error">This page needs JavaScript to ask questions.</p></noscript>
 
     <main>
-      <form id="ask-form" class="ask" autocomplete="off">
+      <section class="controls" aria-label="Conversation settings">
         <div class="field">
           <label for="role">Role</label>
           <select id="role" name="role" disabled>
@@ -28,7 +28,26 @@
           </select>
           <p id="role-description" class="hint"></p>
         </div>
+        <div id="role-confirm" class="role-confirm" role="alert" hidden>
+          <p id="role-confirm-text"></p>
+          <button type="button" id="role-confirm-yes" class="primary">
+            Start a new conversation
+          </button>
+          <button type="button" id="role-confirm-no">Keep this conversation</button>
+        </div>
+        <div class="conversation-bar">
+          <p id="turn-counter" class="hint">No questions yet.</p>
+          <button type="button" id="new-conversation" hidden>New conversation</button>
+        </div>
+      </section>
 
+      <output id="notice" class="notice" hidden></output>
+
+      <ol id="messages" class="messages" aria-label="Conversation"></ol>
+      <div id="live" class="visually-hidden" role="status" aria-live="polite"></div>
+
+      <form id="ask-form" class="ask" autocomplete="off">
+        <p id="full-message" class="full-message" hidden></p>
         <div class="field">
           <label for="question">Your question</label>
           <textarea
@@ -41,88 +60,15 @@
             required
           ></textarea>
           <p id="question-hint" class="hint">
-            Enter sends, Shift+Enter adds a line, Esc stops. Each question is answered on its own.
+            Enter sends, Shift+Enter adds a line, Esc stops. Follow-up questions can use what was
+            already found.
           </p>
         </div>
-
         <div class="actions">
           <button type="submit" id="ask" class="primary">Ask</button>
           <button type="button" id="stop" hidden>Stop</button>
         </div>
       </form>
-
-      <section id="result" aria-labelledby="result-heading" hidden>
-        <h2 id="result-heading" class="visually-hidden">Answer</h2>
-
-        <output id="progress" class="progress"></output>
-        <output id="notice" class="notice" hidden></output>
-
-        <div id="error" class="error" role="alert" hidden>
-          <p id="error-message"></p>
-          <button type="button" id="retry">Try again</button>
-        </div>
-
-        <div id="banner" class="banner" tabindex="-1" hidden>
-          <p class="banner-line">
-            <span id="banner-badge" class="badge"></span>
-            <span id="banner-text"></span>
-          </p>
-          <p id="banner-reason" class="hint"></p>
-        </div>
-
-        <p id="draft-note" class="hint" hidden>Draft. The sources are still being checked…</p>
-        <div id="answer" class="answer"></div>
-
-        <section id="conflicts" class="conflicts" hidden>
-          <h3>The documentation and the code disagree</h3>
-          <ul id="conflicts-list"></ul>
-        </section>
-
-        <section id="gaps" hidden>
-          <h3>What I couldn't confirm</h3>
-          <ul id="gaps-list"></ul>
-        </section>
-
-        <section id="closest" hidden>
-          <h3>Closest pages I checked</h3>
-          <ul id="closest-list"></ul>
-        </section>
-
-        <div id="follow-up" class="follow-up" hidden>
-          <button type="button" id="more-detail" hidden>Show more detail</button>
-          <fieldset class="feedback">
-            <legend>Was this helpful?</legend>
-            <button type="button" id="thumbs-up" aria-pressed="false">
-              Yes<span class="visually-hidden">, this was helpful</span>
-            </button>
-            <button type="button" id="thumbs-down" aria-pressed="false">
-              No<span class="visually-hidden">, this was not helpful</span>
-            </button>
-          </fieldset>
-          <form id="feedback-form" class="feedback-form" hidden>
-            <label for="feedback-comment">What was wrong? (optional)</label>
-            <textarea id="feedback-comment" rows="2" maxlength="1000"></textarea>
-            <label for="feedback-source">A source that was wrong (optional)</label>
-            <select id="feedback-source"></select>
-            <button type="submit" id="feedback-send">Send feedback</button>
-          </form>
-          <output id="feedback-status" class="hint"></output>
-        </div>
-
-        <section id="sources" class="sources" hidden>
-          <h3>Sources</h3>
-          <ol id="sources-list"></ol>
-          <details id="consulted" hidden>
-            <summary id="consulted-summary"></summary>
-            <ul id="consulted-list"></ul>
-          </details>
-        </section>
-
-        <section id="who" hidden>
-          <h3>Who might know</h3>
-          <ul id="who-list"></ul>
-        </section>
-      </section>
     </main>
   </body>
 </html>

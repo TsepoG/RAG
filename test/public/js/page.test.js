@@ -3,7 +3,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SECTION_TITLES } from '../../../src/honesty/index.js';
 import { findRefs } from '../../../public/js/refs.js';
 import { loadPage, PAGE_HTML } from '../../helpers/page.js';
 
@@ -62,26 +61,35 @@ describe('public/index.html', () => {
     expect(unlabelled).toEqual([]);
   });
 
-  it('uses the same section headings as the terminal output', () => {
-    const refs = loadPage();
-    const heading = (/** @type {HTMLElement} */ section) =>
-      section.querySelector('h3')?.textContent;
-
-    expect(heading(refs.gaps)).toBe(SECTION_TITLES.gaps);
-    expect(heading(refs.closest)).toBe(SECTION_TITLES.closestPages);
-    expect(heading(refs.who)).toBe(SECTION_TITLES.whoToAsk);
-  });
-
-  it('starts with the result and every follow-up part hidden', () => {
+  it('starts with Stop, the full-conversation message and the notice hidden', () => {
     const refs = loadPage();
 
-    for (const part of [refs.result, refs.stop, refs.error, refs.banner, refs.sources, refs.who]) {
+    for (const part of [
+      refs.stop,
+      refs.fullMessage,
+      refs.notice,
+      refs.roleConfirm,
+      refs.newConversation,
+    ]) {
       expect(part.hidden).toBe(true);
     }
   });
 
-  it('can take focus on the banner, so focus can move there when an answer arrives', () => {
-    expect(loadPage().banner.getAttribute('tabindex')).toBe('-1');
+  it('announces each new answer politely, and lists the conversation as a list', () => {
+    const refs = loadPage();
+
+    expect(refs.live.getAttribute('aria-live')).toBe('polite');
+    expect(refs.live.getAttribute('role')).toBe('status');
+    expect(refs.messages.tagName).toBe('OL');
+    expect(refs.messages.getAttribute('aria-label')).toBe('Conversation');
+  });
+
+  it('puts the input after the conversation, so it can sit at the bottom of the page', () => {
+    const refs = loadPage();
+
+    expect(
+      refs.messages.compareDocumentPosition(refs.form) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('tells a visitor without JavaScript that it is needed', () => {

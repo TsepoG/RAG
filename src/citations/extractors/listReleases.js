@@ -1,4 +1,5 @@
 // @ts-check
+import { releaseListFingerprint } from '../fingerprints.js';
 import {
   asObject,
   asString,
@@ -42,6 +43,8 @@ export async function extractReleaseList({ args, text }, context) {
     return { sources: [], candidates, blocked: false };
   }
   const commitSha = (await lookUpHead(context, repo)) ?? '';
+  // The list comes newest first.
+  const newest = asString(asObject(items[0]).tag_name) || asString(asObject(items[0]).name);
   const url = `https://github.com/${repo}/releases`;
   return {
     sources: [
@@ -55,6 +58,7 @@ export async function extractReleaseList({ args, text }, context) {
         latestUrl: url,
         kind: 'releases',
         pinned: commitSha !== '',
+        ...(newest === '' ? {} : { fingerprint: releaseListFingerprint(newest) }),
       },
     ],
     candidates,

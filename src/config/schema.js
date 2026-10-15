@@ -10,6 +10,10 @@ const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'
 const PORT_LIMITS = { min: 1, max: 65_535, fallback: 3000 };
 const ASK_TIMEOUT_LIMITS = { min: 5000, max: 600_000, fallback: 120_000 };
 const MAX_TOOL_CALLS_LIMITS = { min: 1, max: 50, fallback: 12 };
+const CONVERSATION_MAX_TURNS_LIMITS = { min: 1, max: 10, fallback: 5 };
+const CONVERSATION_MAX_SOURCE_CHARS_LIMITS = { min: 10_000, max: 5_000_000, fallback: 250_000 };
+const CONVERSATION_IDLE_MINUTES_LIMITS = { min: 1, max: 1440, fallback: 30 };
+const RECHECK_AFTER_MINUTES_LIMITS = { min: 1, max: 1440, fallback: 15 };
 const MCP_TIMEOUT_LIMITS = { min: 1000, max: 120_000, fallback: 30_000 };
 const ATLASSIAN_AUTH_MODES = ['basic', 'bearer'];
 const DEFAULT_ATLASSIAN_AUTH_MODE = 'basic';
@@ -123,6 +127,10 @@ const envSchema = z.object({
   ASK_TIMEOUT_MS: integerInRange(ASK_TIMEOUT_LIMITS),
   MAX_TOOL_CALLS: integerInRange(MAX_TOOL_CALLS_LIMITS),
   MCP_TIMEOUT_MS: integerInRange(MCP_TIMEOUT_LIMITS),
+  CONVERSATION_MAX_TURNS: integerInRange(CONVERSATION_MAX_TURNS_LIMITS),
+  CONVERSATION_MAX_SOURCE_CHARS: integerInRange(CONVERSATION_MAX_SOURCE_CHARS_LIMITS),
+  CONVERSATION_IDLE_MINUTES: integerInRange(CONVERSATION_IDLE_MINUTES_LIMITS),
+  RECHECK_AFTER_MINUTES: integerInRange(RECHECK_AFTER_MINUTES_LIMITS),
   HOST: z
     .string()
     .trim()
@@ -210,4 +218,10 @@ export const configSchema = envSchemaWithHostRule.transform((env) => ({
     askTimeoutMs: env.ASK_TIMEOUT_MS,
   },
   mcp: { maxToolCalls: env.MAX_TOOL_CALLS, timeoutMs: env.MCP_TIMEOUT_MS },
+  conversation: {
+    maxTurns: env.CONVERSATION_MAX_TURNS,
+    maxSourceChars: env.CONVERSATION_MAX_SOURCE_CHARS,
+    idleMinutes: env.CONVERSATION_IDLE_MINUTES,
+    recheckAfterMinutes: env.RECHECK_AFTER_MINUTES,
+  },
 }));

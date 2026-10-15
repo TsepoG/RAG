@@ -432,3 +432,32 @@ describe('scoreFailure', () => {
     expect(scoreFailure(makeCase(), 1).declinedAppropriately).toBeUndefined();
   });
 });
+
+describe('scoreCase reuse of an earlier source', () => {
+  const wants = makeCase({ expect: { status: 'answered', reference: 'r', reusesEarlier: true } });
+  it('is not judged when the turn does not ask for it', () => {
+    const score = scoreCase(makeCase(), makeResult({ reusedKeys: ['C1'] }), CONTEXT);
+
+    expect(score.reusedEarlierSource).toBeUndefined();
+  });
+
+  it('passes when the answer cites a source an earlier turn fetched', () => {
+    const score = scoreCase(wants, makeResult({ reusedKeys: ['C1'] }), CONTEXT);
+
+    expect(score.reusedEarlierSource).toBe(true);
+    expect(score.passed).toBe(true);
+  });
+
+  it('fails when it cites only what this turn fetched, or the result says nothing about reuse', () => {
+    const none = scoreCase(wants, makeResult({ reusedKeys: [] }), CONTEXT);
+    const unknown = scoreCase(wants, makeResult(), CONTEXT);
+
+    expect(none).toMatchObject({ reusedEarlierSource: false, passed: false });
+    expect(unknown.reusedEarlierSource).toBe(false);
+  });
+
+  it('counts as not reused for a turn that failed, and is not judged for one that does not ask', () => {
+    expect(scoreFailure(wants, 5).reusedEarlierSource).toBe(false);
+    expect(scoreFailure(makeCase(), 5).reusedEarlierSource).toBeUndefined();
+  });
+});

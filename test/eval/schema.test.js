@@ -154,3 +154,113 @@ describe('caseSchema', () => {
     expect(problems(entry)).toContain(`expect.${field}: ${message}`);
   });
 });
+
+describe('caseSchema multi-turn cases', () => {
+  const answered = { status: 'answered', reference: 'Thirty days.' };
+
+  /**
+   * A conversation case with the given turns.
+   * @param {unknown[]} turns - The turns.
+   * @param {Record<string, unknown>} [changes] - Fields to replace.
+   * @returns {Record<string, unknown>} The case.
+   */
+  function conversation(turns, changes = {}) {
+    return { id: 'po-refund-followup', role: 'product_owner', tags: [], turns, ...changes };
+  }
+
+  const turns = [
+    { question: 'How long is the refund window?', expect: answered },
+    {
+      question: 'And for gift cards?',
+      expect: {
+        ...answered,
+        reusesEarlier: true,
+        sources: [{ type: 'confluence', match: 'Refund' }],
+      },
+    },
+    {
+      question: 'Who signs off exceptions?',
+      expect: { status: 'not_found', reference: 'Not found.' },
+    },
+  ];
+
+  it('is loaded as its first turn, with the others as follow-ups', () => {
+    const loaded = caseSchema.parse(conversation(turns));
+
+    expect(loaded).toMatchObject({
+      id: 'po-refund-followup',
+      question: 'How long is the refund window?',
+      expect: answered,
+      followUps: [turns[1], turns[2]],
+    });
+    expect(loaded).not.toHaveProperty('turns');
+  });
+
+  it('has no follow-ups when it is an ordinary case', () => {
+    expect(caseSchema.parse(aCase())).not.toHaveProperty('followUps');
+  });
+
+  it('accepts a conversation of two turns up to ten', () => {
+    const many = Array.from({ length: 10 }, (_, index) => ({
+      question: `Question ${index}?`,
+      expect: answered,
+    }));
+
+    expect(caseSchema.safeParse(conversation(many)).success).toBe(true);
+    expect(caseSchema.safeParse(conversation(many.slice(0, 2))).success).toBe(true);
+  });
+
+  it('refuses one turn, which is an ordinary case, and more than ten', () => {
+    const many = Array.from({ length: 11 }, () => turns[0]);
+
+    expect(problems(conversation([turns[0]]))).toEqual([
+      'turns: must have at least 2 turns; write one question as an ordinary case',
+    ]);
+    expect(problems(conversation(many))).toEqual(['turns: must have at most 10 turns']);
+  });
+
+  it('refuses both forms at once, and neither', () => {
+    expect(problems(conversation(turns, { question: 'Q?', expect: answered }))).toContain(
+      'turns: a case has either question and expect, or turns, not both',
+    );
+    expect(problems({ id: 'a', role: 'qa' })).toContain(
+      'question: a case needs a question and expect, or turns',
+    );
+  });
+
+  it('needs a question and an expectation together for the single form', () => {
+    expect(problems({ id: 'a', role: 'qa', question: 'Q?' })).toContain('expect: is required');
+    expect(problems({ id: 'a', role: 'qa', expect: answered })).toContain('question: is required');
+  });
+
+  it('checks each turn the way it checks an ordinary case, and says which turn is wrong', () => {
+    const bad = [
+      turns[0],
+      { question: '  ', expect: answered },
+      { question: 'Fine?', expect: { status: 'not_found', reference: 'r', maxConfidence: 'low' } },
+    ];
+
+    expect(problems(conversation(bad))).toEqual([
+      'turns.1.question: must not be empty',
+      'turns.2.expect.maxConfidence: only an answered case has a confidence',
+    ]);
+  });
+
+  it('only lets an answered turn require an earlier source to be reused', () => {
+    const bad = [
+      turns[0],
+      { question: 'Q?', expect: { status: 'clarify', reference: 'r', reusesEarlier: true } },
+    ];
+
+    expect(problems(conversation(bad))).toEqual([
+      'turns.1.expect.reusesEarlier: only an answered case cites anything',
+    ]);
+    expect(
+      problems(aCase({}, { status: 'not_found', sources: undefined, reusesEarlier: true })),
+    ).toEqual(['expect.reusesEarlier: only an answered case cites anything']);
+  });
+
+  it('refuses a field it does not know in a turn', () => {
+    expect(problems(conversation([turns[0], { ...turns[1], extra: 1 }])).length).toBeGreaterThan(0);
+  });
+});

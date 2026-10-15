@@ -44,6 +44,8 @@ export function buildFeedbackLine(answer, input, when) {
     comment: input.comment ?? null,
     wrongSourceKey: input.wrongSourceKey ?? null,
     model: answer.model ?? null,
+    turn: answer.turn ?? null,
+    conversationTurns: answer.conversationTurns ?? null,
   });
 }
 

@@ -24,6 +24,7 @@ export const JSON_HEADERS = Object.freeze({
  * @param {import('../../src/server/app.js').AppDeps['saveFeedback']} [options.saveFeedback] - The fake store.
  * @param {import('../../src/server/answers.js').AnswerMemory} [options.answers] - The answer memory.
  * @param {import('../../src/server/app.js').AppDeps['staticFiles']} [options.staticFiles] - Files to serve.
+ * @param {import('../../src/server/app.js').AppDeps['conversations']} [options.conversations] - The conversation routes' dependencies.
  * @returns {{ app: import('fastify').FastifyInstance, lines: () => Array<Record<string, unknown>>, answers: import('../../src/server/answers.js').AnswerMemory }}
  *   The app, the log lines written, and the memory.
  */
@@ -34,6 +35,7 @@ export function buildTestApp({
   saveFeedback = vi.fn(async () => undefined),
   answers = createAnswerMemory(),
   staticFiles = new Map(),
+  conversations,
 } = {}) {
   const { stream, lines } = createMemoryStream();
   const roles = new Map([
@@ -46,6 +48,7 @@ export function buildTestApp({
     ask,
     answers,
     saveFeedback,
+    conversations,
     staticFiles,
     logger: createLogger({ level: 'debug', destination: stream }),
   });

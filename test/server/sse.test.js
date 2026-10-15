@@ -111,6 +111,25 @@ describe('openEventStream', () => {
     expect(response.end).toHaveBeenCalledOnce();
   });
 
+  it('keeps the stream open after done when asked, for later events, until it is ended', () => {
+    const response = fakeResponse();
+    const stream = openEventStream(response);
+
+    expect(stream.finish('done', { answerId: '1' }, { keepOpen: true })).toBe(true);
+    expect(response.end).not.toHaveBeenCalled();
+    expect(stream.send('recheck', { checks: [] })).toBe(true);
+    expect(stream.finish('error', {})).toBe(false);
+    stream.end();
+    stream.end();
+
+    expect(response.chunks.map((/** @type {string} */ chunk) => chunk.split('\n')[0])).toEqual([
+      'event: done',
+      'event: recheck',
+    ]);
+    expect(response.end).toHaveBeenCalledOnce();
+    expect(stream.send('recheck', {})).toBe(false);
+  });
+
   it('ends the stream with the error event when that comes first', () => {
     const response = fakeResponse();
     const stream = openEventStream(response);

@@ -4,6 +4,6 @@
 /** @typedef {import('./codeowners.js').CodeownersLookup} CodeownersLookup */
 /** @typedef {import('./codeowners.js').CodeownersRule} CodeownersRule */
 
-export { createGithubApi } from './api.js';
+export { createGithubApi, describeFailure, isNotFound } from './api.js';
 export { createCodeownersLookup, matchOwners, parseCodeowners } from './codeowners.js';
 export { createCommitResolver } from './commits.js';

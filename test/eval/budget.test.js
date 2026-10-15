@@ -17,6 +17,16 @@ describe('estimateRequests', () => {
     expect(estimateRequests(cases, ROLES)).toEqual({ cases: 2, expected: 2, worstCase: 6 });
   });
 
+  it('counts a request for each turn of a conversation', () => {
+    const turn = {
+      question: 'And then?',
+      expect: { status: /** @type {const} */ ('answered'), reference: 'r' },
+    };
+    const cases = [makeCase({ id: 'a', followUps: [turn, turn] }), makeCase({ id: 'b' })];
+
+    expect(estimateRequests(cases, ROLES)).toEqual({ cases: 2, expected: 4, worstCase: 12 });
+  });
+
   it('adds one request for an answered case for a plain-spoken role', () => {
     const cases = [makeCase({ id: 'a', role: 'product_owner' }), makeCase({ id: 'b' })];
 

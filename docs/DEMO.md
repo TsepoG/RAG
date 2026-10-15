@@ -1,4 +1,4 @@
-# Demo script (10 minutes)
+# Demo script (13 minutes)
 
 A walkthrough for showing the assistant to someone who has not seen it. It assumes the setup in
 the README is done, `npm start` is running and the page is open at `http://127.0.0.1:3000`.
@@ -70,12 +70,36 @@ talk about the last.
     - Point out: one short clarifying question. Say honestly that this is the weakest behaviour: in
       the evaluation it often picked one reading instead of asking (see `docs/EVAL_LOG.md`).
 
-## 7. Close (1 minute)
+## 7. Follow-ups and changed sources (3 minutes)
+
+Use the same conversation as the questions above, or start a new one (**New conversation**).
+
+12. **Ask** a follow-up that builds on an answer, such as "And what happens when that fails?"
+    - Point out: the follow-up cites a source by the key it had in the earlier answer, and the
+      turn counter ("Turn 2 of 5") under the role picker. Each answer has its own **Sources (n)**
+      list, and each source says which turn fetched it.
+    - Try changing the role in the middle: the page asks first, because a conversation is for one
+      role.
+13. Press **Re-check sources** under an answer.
+    - Point out: each source gets "✓ checked 1 min ago". The app compared a version number or a
+      commit SHA directly; it did not ask the model again.
+14. *Optional, needs a second window.* Edit a cited Confluence page (or push a small change to a
+    cited file), then press **Re-check sources** again.
+    - Point out: the source says **changed since this answer**, the answer shows a warning and its
+      confidence drops to medium, and **Re-ask with the latest version** appears. Press it: a new
+      answer cites the page under a new key, and the old key stays marked changed.
+    - Say that the check also runs by itself for a source reused in a later turn and for every
+      source after the last allowed turn, and that "couldn't check" is shown, never "changed", when
+      a source cannot be reached.
+    - Say that a conversation holds at most five questions (`CONVERSATION_MAX_TURNS`); after that
+      the page asks for a new one.
+
+## 8. Close (1 minute)
 
 - Press **Esc** while a question runs, to show that it can be stopped.
 - Give a thumbs-down with a comment, and say that it goes to a local file without the answer, and
   can become a test case with `npm run eval:from-feedback`.
-- Say the limits: one person, no memory, answers take tens of seconds, the assistant's status and
+- Say the limits: one person, memory for one conversation only, answers take tens of seconds, the assistant's status and
   confidence are partly the model's call. The evaluation behind that is in `docs/EVAL_LOG.md`.
 
 ## If something goes wrong

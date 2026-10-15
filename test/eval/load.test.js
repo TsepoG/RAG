@@ -185,8 +185,9 @@ cases:
 
     const cases = await loadCases({ file: EXAMPLE_FILE, readFile, roles });
 
-    expect(cases).toHaveLength(5);
+    expect(cases).toHaveLength(6);
     expect(cases.every(({ draft }) => !draft)).toBe(true);
+    expect(cases.find(({ id }) => id === 'po-refund-followup')?.followUps).toHaveLength(1);
     expect(new Set(cases.map(({ expect: { status } }) => status))).toEqual(
       new Set(['answered', 'not_found', 'out_of_scope']),
     );

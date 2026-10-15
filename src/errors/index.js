@@ -131,3 +131,47 @@ function formatIssues(issues) {
  * or cases that are still drafts.
  */
 export class EvalError extends AppError {}
+
+/**
+ * Thrown when a message or a request names a conversation that is closed, expired or unknown. The
+ * web layer answers it with a 404 and the code `conversation_ended`.
+ */
+export class ConversationEndedError extends AppError {
+  /**
+   * Creates the error.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(options) {
+    super('That conversation has ended. Start a new one to keep going.', options);
+  }
+}
+
+/**
+ * Thrown when a question is asked while the conversation is still working on the last one.
+ */
+export class ConversationBusyError extends AppError {
+  /**
+   * Creates the error.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(options) {
+    super('The conversation is still answering the last question', options);
+  }
+}
+
+/**
+ * Thrown when a conversation cannot take another question because it has used its turns or its
+ * allowance of source text.
+ */
+export class ConversationFullError extends AppError {
+  /**
+   * Creates the error and records which limit was reached.
+   * @param {'turns' | 'budget'} limit - The limit that was reached.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(limit, options) {
+    super('This conversation is full — start a new one to keep going.', options);
+    /** @type {'turns' | 'budget'} */
+    this.limit = limit;
+  }
+}

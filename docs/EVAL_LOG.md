@@ -453,3 +453,142 @@ status is `not_found` and not `out_of_scope`, and the changes to the prompt did 
 - **Clarifying questions.** The assistant almost never asks; a question that fits two things is
   answered with one reading. This is the clearest remaining weakness.
 - **Request cost.** About 0.4 to 0.6 AI credits a question on the Free plan, measured at the start.
+
+# Phase 7
+
+## Baseline for the conversation work (2026-10-13)
+
+The regression of Phase 7 (the full set through the conversation path) is compared with this run,
+not with the Phase 6 baseline above: Phase 6 never had a final full run, and this one is on a
+different account with one pinned model.
+
+| | |
+| --- | --- |
+| Run | `20261013-163928` |
+| Path | single question (`askQuestion`), the 38 cases of the eval set |
+| Account | Copilot Pro+ |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `f42ddca0cc85`, base prompt hash `81ddc08c88b9` (unchanged since Phase 6) |
+| Requests | 44 for 38 cases (limit 70) |
+| Verdicts | drafted by Claude Code for the 27 answered cases (22 correct, 5 partial, 0 wrong); the owner reviewed each one and agreed with all of them, so they are the owner's verdicts, written by Claude Code |
+
+### Against the MVP targets
+
+| Target | Should be | Phase 6 baseline (Free plan, two models) | Phase 7 baseline (Pro+, `gpt-6-luna`) | Result |
+| --- | --- | --- | --- | --- |
+| Status exactly as expected | at least 85% | 76% | 82% (31 of 38) | not met |
+| Citation recall | at least 70% | 75% | 83% | met |
+| Answered cases that are correct | at least 80% | 81% | 91% (22 correct, 5 partial of 27) | met |
+| `high` answers that are correct | at least 90% | 3 of 3 | 92% (6 judged: 5 correct, 1 partial) | met |
+| Declines handled honestly | at least 80% | 90% | 100% (9 of 9) | met |
+| Style problems at depth 1 | none | 0 | 1 (`pm-ci-checks`, inline code left after the rewrite) | not met |
+| Answers with no confidence report | at most 10% | 13% | 3% (1 of 38) after asking again; 11% (4 of 38) in the first reply | met with the repair |
+
+Other numbers: 30 of 38 cases passed every check that applies (79%); declined when it should 9 of
+10; sentences without a citation 3 of 38; questions that used every tool call 10; 2 questions timed
+out at 240 s (`po-built-vs-planned`, `nf-pm-hosting-cost`); median time to an answer 57.2 s, 95th
+percentile 241.5 s.
+
+The two runs differ in account, model routing, the tuning of Phase 6 and the timeout, so the
+difference between them cannot be put down to any one of those.
+
+### What still misses
+
+- **Status (7 cases).** The two clarify cases are answered (`dev-rate-limit-clarify`,
+  `qa-backfill-clarify`); `oos-dev-bloomberg-scores` and `oos-pm-next-year-releases` are
+  `not_found` where `out_of_scope` was expected; `oos-qa-python-gc` is `not_found` and its report
+  was asked for and still not usable; the two timeouts have no status.
+- **Calibration.** `high` 92%, `medium` 88%, `low` 100% on 4 answers (too few to read). The
+  inversion seen at baseline is gone, but one `high` answer is a partial (`dev-rate-limit-clarify`).
+- **Release list.** `pm-release-history` is answered and correct; it was `not_found` in Phase 6.
+- **Source cut notice.** Several questions use all their tool calls (10 of 38) and a long page
+  can still be cut; `ba-derived-values`, `ba-trailing-high-basis`, `po-what-it-does`,
+  `po-built-vs-planned`, `po-advice` and `pm-ci-checks` each miss an expected source.
+- **Tool catalog message.** A first manual question on this account logged `MCP tool catalog
+  changed before tool "…" could be invoked` for its first two tool calls, which then worked on
+  the retry. It was seen once in a single question and was not counted in this run.
+
+## Multi-turn cases (2026-10-14)
+
+Five conversation cases (14 turns), drafted by Claude Code from facts already checked in the
+single-question cases, reviewed by the owner, and run through the conversation path with the
+pinned model `gpt-6-luna`. They sit in the git-ignored `eval/questions.yaml` and are not part of
+the 38 cases of the regression.
+
+| Run | What | Result |
+| --- | --- | --- |
+| `20261014-182728` | all five, default `ASK_TIMEOUT_MS` (120 s) | 6 of 14 turns passed. Three conversations timed out on their first turn (`conv-dev-ticker-conflict`, `conv-ba-survivors`, `conv-po-built-then-plain`), so their later turns were not asked. A setup error: the baseline used 240 s. |
+| `20261014-183804` | those three again with `ASK_TIMEOUT_MS=240000` | 7 of 8 turns passed; no failed question. |
+
+Verdicts (drafted by Claude Code, accepted by the owner): 11 of the 14 turns pass, counting the two
+completed conversations of the first run and the rerun; all four turns that expected a source from an
+earlier turn reused one without fetching it again (`conv-dev-edgar-limits-t2`,
+`conv-dev-ticker-conflict-t2`, `conv-qa-tests-then-gap-t2`, `conv-ba-survivors-t3`).
+
+- **Real finding:** `conv-po-built-then-plain-t2` ("Can we trust the backtest results yet?") claims
+  `high` with no caps, where the case allows `medium`. The same question asked alone in the baseline
+  read the code and got `medium`; in the conversation the model answered from pages it already had and
+  checked no code. The answer is correct and the confidence is not earned. The case was left failing.
+- **Accepted miss:** `conv-po-built-then-plain-t3` misses the expected page `262425` and cites the
+  Design page, as `po-advice` did in the baseline. The answer is right.
+- **Questionable:** `conv-po-built-then-plain` (turn 1) says the product can build a time-aware
+  semiconductor universe, which the docs claim and the repository does not contain.
+- **Changed after the run:** the question of `conv-dev-ticker-conflict` turn 2 was reworded from
+  "Does the design document say the same?" to "Does the design document describe the same behaviour as
+  the code?" (the old answer opened with a confusing "Yes"). The reference clause "the backtest is not
+  built yet either" was removed from `conv-ba-survivors` turn 3, which the question does not need. The
+  reworded question was not run again (owner's decision); its verdict rests on the old wording.
+
+## Regression through the conversation path (2026-10-14)
+
+The 38 single-question cases, each asked as a conversation of one turn, compared with the baseline
+`20261013-163928`. The five multi-turn cases were left out with `--ids`.
+
+| | |
+| --- | --- |
+| Run | `20261014-190623` |
+| Path | conversation (`createConversationRunner`), the 38 cases |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `9af552abe162`, base prompt hash `81ddc08c88b9` (same as the baseline) |
+| Requests | 45 for 38 cases; no question failed |
+| Verdicts | drafted by Claude Code for the cases whose status, confidence or expected source changed; the owner reviewed and accepted them. Unchanged cases keep their baseline verdict. |
+
+### Against the noise rule
+
+| Measure | Baseline | Conversation path | Rule | Result |
+| --- | --- | --- | --- | --- |
+| Cases that lost a pass | | 1 (`dev-append-only-trigger`) | net loss of more than 5 is a regression | none |
+| Cases that gained a pass | | 7 | | net +6 |
+| Status exactly as expected | 82% (31 of 38) | 95% (36 of 38) | no drop of more than 13 points | met |
+| Declined when it should | 9 of 10 | 10 of 10 | no drop of more than 13 points | met |
+| Answered cases that are correct | 91% (22 correct, 5 partial of 27) | 88% (20 correct, 6 partial of 26) | no drop of more than 13 points | met (down 2.5) |
+| Questions that timed out | 2 | 0 | | |
+
+**No regression beyond noise.** Gained passes: `oos-dev-bloomberg-scores`, `oos-qa-python-gc` and
+`oos-pm-next-year-releases` (now `out_of_scope`), `qa-backfill-clarify` (now `clarify`),
+`pm-ci-checks`, `nf-pm-hosting-cost` and `po-built-vs-planned` (the last two timed out in the baseline).
+
+### Cases with a new verdict
+
+| Case | Change | Verdict |
+| --- | --- | --- |
+| `dev-append-only-trigger` | answered `high` → `not_found`, no sources | wrong: declines a question the baseline answered correctly |
+| `pm-phase-status` | `medium` → `low` | partial (was correct): does not say scoring is next |
+| `po-built-vs-planned` | timeout → `medium` | partial: lists sector membership as built from the docs and does not note it is missing from the repository |
+| `qa-jump-threshold` | `medium` → `low` | partial, as in the baseline |
+| `pm-ci-checks` | now passes | partial, as in the baseline; Postgres 16 and strict types are now given, the PR-title rule is not |
+| `dev-edgar-client-limits`, `ba-derived-values`, `ba-trailing-high-basis`, `ba-survivor-universe`, `po-backtest-trust`, `pm-release-history` | confidence changed | correct |
+| `qa-backfill-clarify` | answered → `clarify` | correct on status |
+
+Cases whose cited sources changed but whose status and confidence did not (29 cases showed some
+difference in sources) kept their baseline verdict.
+
+### Other differences
+
+- Median time to an answer 79.8 s (baseline 57.2 s); 95th percentile 229.3 s (baseline 241.5 s).
+- 12 questions used every tool call (baseline 10).
+- The confidence report was got by asking again on 5 cases (baseline 1).
+- 2 answers were rewritten for style; no style problems were left at depth 1.
+- `dev-append-only-trigger` is the one real loss. It was not run again; it may be search noise.

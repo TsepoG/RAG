@@ -8,6 +8,8 @@ describe('github public entry point', () => {
       'createCodeownersLookup',
       'createCommitResolver',
       'createGithubApi',
+      'describeFailure',
+      'isNotFound',
       'matchOwners',
       'parseCodeowners',
     ]);

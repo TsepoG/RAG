@@ -8,7 +8,7 @@
 export { compareRuns } from './compare.js';
 export { assertRunnable, EVAL_FILE, EXAMPLE_FILE, loadCases, selectCases } from './load.js';
 export { sourceMatches } from './match.js';
-export { CASE_TAGS, caseSchema, SOURCE_TYPES } from './schema.js';
+export { CASE_TAGS, caseSchema, MAX_CASE_TURNS, SOURCE_TYPES } from './schema.js';
 export { ERROR_STATUS, scoreCase, scoreFailure } from './score.js';
 export { percentile, summarise } from './summarise.js';
 export { createRequestGuard, estimateRequests } from './budget.js';
@@ -43,3 +43,5 @@ export {
 } from './feedback.js';
 export { buildReport, diffRunInfo } from './report.js';
 export { evaluateTargets } from './targets.js';
+export { createConversationPath } from './conversationPath.js';
+export { planRun } from './plan.js';

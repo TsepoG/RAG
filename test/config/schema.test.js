@@ -25,6 +25,10 @@ describe('configSchema parsing', () => {
         ASK_TIMEOUT_MS: '60000',
         MAX_TOOL_CALLS: '8',
         MCP_TIMEOUT_MS: '15000',
+        CONVERSATION_MAX_TURNS: '3',
+        CONVERSATION_MAX_SOURCE_CHARS: '50000',
+        CONVERSATION_IDLE_MINUTES: '10',
+        RECHECK_AFTER_MINUTES: '5',
       }),
     );
 
@@ -46,6 +50,12 @@ describe('configSchema parsing', () => {
       },
       mcp: { maxToolCalls: 8, timeoutMs: 15_000 },
       server: { host: '127.0.0.1', allowRemote: false },
+      conversation: {
+        maxTurns: 3,
+        maxSourceChars: 50_000,
+        idleMinutes: 10,
+        recheckAfterMinutes: 5,
+      },
     });
   });
 
@@ -55,6 +65,12 @@ describe('configSchema parsing', () => {
     expect(result).toMatchObject({ nodeEnv: 'development', logLevel: 'info', port: 3000 });
     expect(result.copilot).toEqual({ askTimeoutMs: 120_000 });
     expect(result.mcp).toEqual({ maxToolCalls: 12, timeoutMs: 30_000 });
+    expect(result.conversation).toEqual({
+      maxTurns: 5,
+      maxSourceChars: 250_000,
+      idleMinutes: 30,
+      recheckAfterMinutes: 15,
+    });
   });
 
   it('ignores variables it does not know about', () => {
@@ -353,6 +369,10 @@ describe('configSchema numeric settings', () => {
     { name: 'ASK_TIMEOUT_MS', min: 5000, max: 600_000 },
     { name: 'MAX_TOOL_CALLS', min: 1, max: 50 },
     { name: 'MCP_TIMEOUT_MS', min: 1000, max: 120_000 },
+    { name: 'CONVERSATION_MAX_TURNS', min: 1, max: 10 },
+    { name: 'CONVERSATION_MAX_SOURCE_CHARS', min: 10_000, max: 5_000_000 },
+    { name: 'CONVERSATION_IDLE_MINUTES', min: 1, max: 1440 },
+    { name: 'RECHECK_AFTER_MINUTES', min: 1, max: 1440 },
   ];
   const rejections = settings.flatMap(({ name, min, max }) =>
     [String(min - 1), String(max + 1), 'abc', '1.5', '', '-1', '1 2'].map((value) => ({
@@ -401,6 +421,10 @@ describe('ENV_VARIABLE_NAMES', () => {
         'ASK_TIMEOUT_MS',
         'MAX_TOOL_CALLS',
         'MCP_TIMEOUT_MS',
+        'CONVERSATION_MAX_TURNS',
+        'CONVERSATION_MAX_SOURCE_CHARS',
+        'CONVERSATION_IDLE_MINUTES',
+        'RECHECK_AFTER_MINUTES',
       ]),
     );
   });

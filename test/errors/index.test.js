@@ -7,6 +7,9 @@ import {
   CopilotError,
   McpError,
   QuestionCancelledError,
+  ConversationBusyError,
+  ConversationEndedError,
+  ConversationFullError,
   EvalError,
   RoleNotFoundError,
   ToolNotAllowedError,
@@ -225,5 +228,37 @@ describe('EvalError', () => {
     expect(error.name).toBe('EvalError');
     expect(error.message).toBe('The eval set could not be read');
     expect(error.cause).toBe(cause);
+  });
+});
+
+describe('ConversationEndedError', () => {
+  it('is an app error that tells the person to start a new conversation', () => {
+    const cause = new Error('gone');
+    const error = new ConversationEndedError({ cause });
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('ConversationEndedError');
+    expect(error.message).toContain('Start a new one');
+    expect(error.cause).toBe(cause);
+  });
+});
+
+describe('ConversationBusyError', () => {
+  it('is an app error that says the last question is still being answered', () => {
+    const error = new ConversationBusyError();
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.name).toBe('ConversationBusyError');
+    expect(error.message).toContain('still answering');
+  });
+});
+
+describe('ConversationFullError', () => {
+  it.each(['turns', 'budget'])('records that the %s limit was reached', (limit) => {
+    const error = new ConversationFullError(/** @type {'turns' | 'budget'} */ (limit));
+
+    expect(error).toBeInstanceOf(AppError);
+    expect(error.limit).toBe(limit);
+    expect(error.message).toBe('This conversation is full — start a new one to keep going.');
   });
 });

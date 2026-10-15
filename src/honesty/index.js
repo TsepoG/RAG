@@ -18,7 +18,16 @@ export {
   MAX_UNCITED_SENTENCES,
   sentencesCitingOnly,
 } from './sentences.js';
-export { applyConfidenceCaps, NO_META_REASON } from './caps.js';
+export {
+  applyConfidenceCaps,
+  applyMemoryDroppedCap,
+  applySourceChangeCap,
+  NO_META_REASON,
+  MEMORY_DROPPED_CODE,
+  MEMORY_DROPPED_REASON,
+  SOURCE_CHANGED_CODE,
+  SOURCE_CHANGED_REASON,
+} from './caps.js';
 export { findCitationBrackets } from './prose.js';
 export { buildWhoToAsk, MAX_PEOPLE } from './whoToAsk.js';
 export { DEFAULT_PHRASES, MAX_CLOSEST_PAGES, renderFinalAnswer, SECTION_TITLES } from './render.js';

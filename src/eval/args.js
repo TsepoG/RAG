@@ -4,9 +4,10 @@ import { EvalError } from '../errors/index.js';
 
 /** Shown when the arguments are not understood. */
 export const EVAL_USAGE =
-  'Usage: npm run eval -- [--subset smoke|full] [--case <id>] [--ids <id,id,...>] [--role <id>] [--max-requests <n>] [--yes]';
+  'Usage: npm run eval -- [--subset smoke|full] [--case <id>] [--ids <id,id,...>] [--role <id>] [--path single|conversation] [--max-requests <n>] [--yes]';
 
 const SUBSETS = new Set(['smoke', 'full']);
+const PATHS = new Set(['single', 'conversation']);
 
 /**
  * What the command line asked for.
@@ -16,6 +17,8 @@ const SUBSETS = new Set(['smoke', 'full']);
  * @property {string[] | undefined} ids - Only these cases (with `--subset smoke`, these and the smoke ones).
  * @property {string | undefined} caseId - Only this case.
  * @property {string | undefined} role - Only this role's cases.
+ * @property {'single' | 'conversation'} path - How each case is asked: as a question on its own
+ *   (the default; a conversation case is skipped), or as a conversation, one turn after another.
  * @property {number | undefined} maxRequests - The most Copilot requests to use.
  * @property {boolean} yes - Whether to start without asking.
  */
@@ -62,6 +65,7 @@ export function parseEvalArguments(argv) {
         case: { type: 'string' },
         ids: { type: 'string' },
         role: { type: 'string' },
+        path: { type: 'string' },
         'max-requests': { type: 'string' },
         yes: { type: 'boolean' },
       },
@@ -76,6 +80,10 @@ export function parseEvalArguments(argv) {
   if (subset !== '' && !SUBSETS.has(subset)) {
     throw new EvalError(`--subset must be smoke or full, not "${subset}". ${EVAL_USAGE}`);
   }
+  const path = String(values.path ?? 'single');
+  if (!PATHS.has(path)) {
+    throw new EvalError(`--path must be single or conversation, not "${path}". ${EVAL_USAGE}`);
+  }
   const rawMax = values['max-requests'];
   const maxRequests = rawMax === undefined ? undefined : Number(rawMax);
   if (maxRequests !== undefined && (!Number.isInteger(maxRequests) || maxRequests < 1)) {
@@ -86,6 +94,7 @@ export function parseEvalArguments(argv) {
     ids,
     caseId: typeof values.case === 'string' ? values.case : undefined,
     role: typeof values.role === 'string' ? values.role : undefined,
+    path: /** @type {'single' | 'conversation'} */ (path),
     maxRequests,
     yes: values.yes === true,
   };

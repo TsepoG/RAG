@@ -15,6 +15,12 @@
 #               mustNotCite  sources it must not cite
 #               maxConfidence  the highest confidence the answer may honestly claim
 #             and always a short reference answer for the person who reviews the result.
+#
+# A conversation (several questions in a row, each a follow-up to the last) has `turns` instead of
+# `question` and `expect`: a list of at least two, each with its own question and expect. Each turn is
+# scored on its own, as <id>, <id>-t2, <id>-t3 and so on. In `expect`, `reusesEarlier: true` means the
+# answer must cite a source that an earlier turn fetched. A conversation is only asked with
+# `npm run eval -- --path conversation`; a plain run leaves it out.
 cases:
   - id: dev-refund-window
     role: developer
@@ -65,3 +71,19 @@ cases:
         - { type: github, match: src/delivery/fee.js }
       maxConfidence: low
       reference: The page says free over 50; the code uses 60. Both are stated and the answer is low confidence.
+
+  - id: po-refund-followup
+    role: product_owner
+    tags: [both-sources]
+    turns:
+      - question: How long do customers have to ask for a refund?
+        expect:
+          status: answered
+          sources:
+            - { type: confluence, match: Refund Policy }
+          reference: Thirty days from the order date.
+      - question: Does that include gift cards?
+        expect:
+          status: answered
+          reusesEarlier: true
+          reference: Gift cards are covered by the same page, so it reuses it and says what it says.

@@ -18,6 +18,7 @@ repo when that phase starts.
 | 4 | Honesty and answer quality | Confidence levels with hard caps, gaps and conflicts, inferred vs stated, style check with one rewrite, "not found" and clarify behaviour | 1 day |
 | 5 | Local web UI | HTTP server with SSE streaming, role picker, chat, Sources panel, confidence banner, "show more detail" | 1 day |
 | 6 | Evaluation and polish | 15–20 real questions per role in an eval set, eval runner and report, prompt tuning, README and demo script | 1 day |
+| 7 | Conversations | A chat: follow-up questions in one Copilot session per conversation, citation keys that last the whole conversation, per-answer Sources panels, manual and automatic re-checks of cited sources, multi-turn eval cases and a regression run | 1–2 days |
 
 ## Out of scope for the MVP
 

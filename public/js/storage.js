@@ -47,3 +47,65 @@ export function saveRole(roleId, storage = browserStorage()) {
     return false;
   }
 }
+
+/** The key the open conversation is remembered under, for the length of the tab. */
+const CONVERSATION_KEY = 'role-aware-assistant.conversation';
+
+/**
+ * The part of `sessionStorage` this module uses.
+ * @typedef {Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>} ConversationStorage
+ */
+
+/**
+ * Finds the tab's storage. Reading it can throw, for example when site data is blocked.
+ * @returns {ConversationStorage | undefined} The storage, or undefined when it is not available.
+ */
+function tabStorage() {
+  try {
+    return globalThis.sessionStorage;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Reads the conversation this tab had open. The page works without it, so any failure gives undefined.
+ * @param {ConversationStorage | undefined} [storage] - Where to read; defaults to the tab's.
+ * @returns {string | undefined} The conversation id, or undefined when none was saved or storage failed.
+ */
+export function loadConversationId(storage = tabStorage()) {
+  try {
+    return storage?.getItem(CONVERSATION_KEY) ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Remembers the open conversation, so a reload of the tab can show it again.
+ * @param {string} conversationId - The conversation id.
+ * @param {ConversationStorage | undefined} [storage] - Where to write; defaults to the tab's.
+ * @returns {boolean} Whether it was saved; false when storage is blocked or full.
+ */
+export function saveConversationId(conversationId, storage = tabStorage()) {
+  try {
+    storage?.setItem(CONVERSATION_KEY, conversationId);
+    return storage !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Forgets the open conversation.
+ * @param {ConversationStorage | undefined} [storage] - Where to remove it; defaults to the tab's.
+ * @returns {boolean} Whether it was removed; false when storage is blocked.
+ */
+export function clearConversationId(storage = tabStorage()) {
+  try {
+    storage?.removeItem(CONVERSATION_KEY);
+    return storage !== undefined;
+  } catch {
+    return false;
+  }
+}

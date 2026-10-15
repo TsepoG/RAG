@@ -29,6 +29,8 @@ export const ERROR_STATUS = 'error';
  *   left out of results from before it was recorded.
  * @property {boolean} [metaRepairRejected] - Whether it was asked for again and not got; also left
  *   out of older results.
+ * @property {ReadonlyArray<string>} [reusedKeys] - The cited keys that an earlier turn of the
+ *   conversation fetched; only a conversation records it.
  * @property {ReadonlyArray<unknown>} toolCalls - The tool calls made.
  * @property {number} durationMs - How long the question took.
  */
@@ -58,6 +60,8 @@ export const ERROR_STATUS = 'error';
  * @property {number} missedSources - How many expected sources were not cited.
  * @property {number} mustNotCiteHits - How many forbidden sources were cited.
  * @property {boolean | undefined} maxConfidenceRespected - For a case with a highest confidence.
+ * @property {boolean | undefined} reusedEarlierSource - For a turn that must reuse a source an
+ *   earlier turn fetched: whether it cited one.
  * @property {number} styleViolations - Style problems left after any rewrite.
  * @property {number} plainStyleViolations - The same, counted only for the most plain-spoken roles.
  * @property {boolean} metaError - Whether the assistant failed to report its confidence, even when asked again.
@@ -116,6 +120,7 @@ function allPassed(score) {
     score.honest !== false &&
     score.mustNotCiteHits === 0 &&
     score.maxConfidenceRespected !== false &&
+    score.reusedEarlierSource !== false &&
     score.plainStyleViolations === 0
   );
 }
@@ -149,6 +154,8 @@ export function scoreCase(one, result, { depth, maxToolCalls }) {
       expected.maxConfidence === undefined
         ? undefined
         : withinConfidence(result.confidence, expected.maxConfidence),
+    reusedEarlierSource:
+      expected.reusesEarlier === undefined ? undefined : (result.reusedKeys?.length ?? 0) > 0,
     styleViolations: style,
     plainStyleViolations: depth === PLAIN_DEPTH ? style : 0,
     metaError: result.capsApplied.some(({ code }) => code === 'no-meta'),
@@ -187,6 +194,7 @@ export function scoreFailure(one, latencyMs) {
     missedSources: wanted.length,
     mustNotCiteHits: 0,
     maxConfidenceRespected: undefined,
+    reusedEarlierSource: one.expect.reusesEarlier === undefined ? undefined : false,
     styleViolations: 0,
     plainStyleViolations: 0,
     metaError: false,

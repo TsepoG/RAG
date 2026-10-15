@@ -21,6 +21,8 @@ import { asRecord } from './scopeCommon.js';
  * @property {ReadonlyArray<string>} spaceKeys - Allowed Confluence space keys.
  * @property {string} siteUrl - Atlassian site URL, so page URLs on other sites are refused.
  * @property {number} maxToolCalls - Most tool calls one question may attempt.
+ * @property {CallBudget} [budget] - Counts the calls and code searches of a question. A new one is
+ *   used when omitted; a conversation passes its own and resets it at the start of each turn.
  * @property {import('./toolGate.js').ToolGate} [gate] - When locked, every call is refused. A new
  *   open gate is used when omitted.
  * @property {string} [cloudId] - The Atlassian cloudId. When set, it replaces the one the model
@@ -28,12 +30,46 @@ import { asRecord } from './scopeCommon.js';
  * @property {ReadonlyArray<string>} [secrets] - Secret values to mask in logged error text.
  * @property {import('../citations/index.js').CitationRegistry} [registry] - Where fetched sources
  *   are recorded; a fresh one when omitted.
+ * @property {(chars: number) => void} [onSourceText] - Told how many characters of each source
+ *   were given to the model; a conversation adds them up.
  * @property {(repo: string) => Promise<string | undefined>} [resolveHead] - Looks up a repository's
  *   head commit, for pinning file links.
  * @property {HookLogger} logger - Where denials, completions and failures are logged.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
  * @property {typeof checkToolScope} [checkScope] - The scope check; defaults to the real one.
  */
+
+/**
+ * How many tool calls and code searches the current question has used.
+ * @typedef {object} CallBudget
+ * @property {() => number} attempt - Counts one more attempted call and returns how many there are.
+ * @property {() => number} searches - How many code searches have been run.
+ * @property {() => void} addSearch - Counts one more code search.
+ * @property {() => void} reset - Starts counting again, for the next turn of a conversation.
+ */
+
+/**
+ * Creates the counters for one question, or for one turn at a time in a conversation.
+ * @returns {CallBudget} The counters, at zero.
+ */
+export function createCallBudget() {
+  let attempts = 0;
+  let codeSearches = 0;
+  return {
+    attempt() {
+      attempts += 1;
+      return attempts;
+    },
+    searches: () => codeSearches,
+    addSearch() {
+      codeSearches += 1;
+    },
+    reset() {
+      attempts = 0;
+      codeSearches = 0;
+    },
+  };
+}
 
 /** Real time, used unless a test injects its own clock. */
 const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
@@ -102,14 +138,12 @@ function createPreToolHook({
   maxToolCalls,
   cloudId,
   gate = createToolGate(),
+  budget = createCallBudget(),
   logger,
   timer,
   checkScope = checkToolScope,
 }) {
   const scope = buildScope({ repos, spaceKeys, siteUrl });
-  let attempts = 0;
-  // Only searches that passed the scope check count, so a badly formed query does not use one up.
-  let codeSearches = 0;
 
   /**
    * Refuses a call and logs it. Only the tool name and a reason code are logged, never arguments.
@@ -135,8 +169,7 @@ function createPreToolHook({
       return refuse(toolName, 'tools-locked', TOOLS_LOCKED_REASON);
     }
     // Every attempt counts, allowed or not, so a model stuck retrying a denied call still stops.
-    attempts += 1;
-    if (attempts > maxToolCalls) {
+    if (budget.attempt() > maxToolCalls) {
       return refuse(
         toolName,
         'call-limit',
@@ -151,11 +184,12 @@ function createPreToolHook({
     if (!scoped.ok) {
       return refuse(toolName, scoped.code, scoped.reason);
     }
+    // Only searches that passed the scope check count, so a badly formed query does not use one up.
     if (target.tool === CODE_SEARCH_TOOL) {
-      if (codeSearches >= MAX_CODE_SEARCHES) {
+      if (budget.searches() >= MAX_CODE_SEARCHES) {
         return refuse(toolName, 'search-limit', CODE_SEARCH_HINT);
       }
-      codeSearches += 1;
+      budget.addSearch();
     }
     timer.start(toolName, toolArgs);
     if (

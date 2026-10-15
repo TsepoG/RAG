@@ -8,7 +8,9 @@ used and states how confident it is.
 It runs on one machine, for one person, and everything it does against Confluence and GitHub is
 read-only. The project was built in phases (see [docs/ROADMAP.md](docs/ROADMAP.md)): quality gates
 and config, the Copilot and MCP connection, roles and citations, the honesty checks, the local web
-page, and last an evaluation (see [Evaluation](#evaluation)). The change history is in
+page, an evaluation (see [Evaluation](#evaluation)), and last conversations: follow-up questions in
+one chat, with checks that cited sources have not changed since they were read (see
+[Conversations](#conversations)). The change history is in
 [CHANGELOG.md](CHANGELOG.md) and a ten-minute walkthrough is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
@@ -26,8 +28,11 @@ page, and last an evaluation (see [Evaluation](#evaluation)). The change history
   Browser (public/)             Command line (npm run ask / npm run eval)
         |  SSE stream                         |
         v                                     v
-  Fastify server (src/server) ------> askQuestion (src/answer)
-  local-only guards, CSP                      |
+  Fastify server (src/server) ------> askQuestion (src/answer)        one question, one session
+  local-only guards, CSP        \---> conversation runner (src/conversation)
+                                      one session per chat, keys last the whole chat
+                                              |        re-checks (src/recheck): has a cited
+                                              |        page or file changed since it was read?
                                               v
                       Copilot SDK session (src/copilot) + role block (roles/*.yaml)
                                               |
@@ -101,26 +106,30 @@ Run `npm run verify` before every commit and PR.
 Only `src/config` reads the environment. Everything else receives the validated config object.
 Invalid values are reported by variable name, never by value.
 
-| Variable                | Required | Default       | Rule                                                                      |
-| ----------------------- | -------- | ------------- | ------------------------------------------------------------------------- |
-| `NODE_ENV`              | no       | `development` | `development`, `test` or `production`                                     |
-| `LOG_LEVEL`             | no       | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`              |
-| `PORT`                  | no       | `3000`        | Integer from 1 to 65535                                                   |
-| `HOST`                  | no       | `127.0.0.1`   | Address the web server listens on; non-loopback needs `ALLOW_REMOTE=true` |
-| `ALLOW_REMOTE`          | no       | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login     |
-| `GITHUB_TOKEN`          | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos |
-| `GITHUB_REPOS`          | yes      |               | Comma-separated `owner/repo` list, at least one                           |
-| `ATLASSIAN_SITE_URL`    | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed               |
-| `ATLASSIAN_CLOUD_ID`    | no       |               | Site cloudId (UUID); when set it is used on every Confluence call         |
-| `ATLASSIAN_AUTH_MODE`   | no       | `basic`       | `basic` (personal API token) or `bearer` (service-account API key)        |
-| `ATLASSIAN_EMAIL`       | basic    |               | Email of the account that owns the API token; not used in `bearer` mode   |
-| `ATLASSIAN_API_TOKEN`   | yes      |               | Atlassian API token or service-account API key (see Atlassian access)     |
-| `CONFLUENCE_SPACE_KEYS` | yes      |               | Comma-separated space keys, at least one                                  |
-| `COPILOT_MODEL`         | no       | none          | Non-empty model name when set; unset uses your account's default          |
-| `COPILOT_GITHUB_TOKEN`  | no       | none          | Credential for Copilot only; unset uses your logged-in user (see below)   |
-| `ASK_TIMEOUT_MS`        | no       | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)   |
-| `MAX_TOOL_CALLS`        | no       | `12`          | Integer from 1 to 50; further tool calls in one question are denied       |
-| `MCP_TIMEOUT_MS`        | no       | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server          |
+| Variable                        | Required | Default       | Rule                                                                           |
+| ------------------------------- | -------- | ------------- | ------------------------------------------------------------------------------ |
+| `NODE_ENV`                      | no       | `development` | `development`, `test` or `production`                                          |
+| `LOG_LEVEL`                     | no       | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                   |
+| `PORT`                          | no       | `3000`        | Integer from 1 to 65535                                                        |
+| `HOST`                          | no       | `127.0.0.1`   | Address the web server listens on; non-loopback needs `ALLOW_REMOTE=true`      |
+| `ALLOW_REMOTE`                  | no       | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login          |
+| `GITHUB_TOKEN`                  | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos      |
+| `GITHUB_REPOS`                  | yes      |               | Comma-separated `owner/repo` list, at least one                                |
+| `ATLASSIAN_SITE_URL`            | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed                    |
+| `ATLASSIAN_CLOUD_ID`            | no       |               | Site cloudId (UUID); when set it is used on every Confluence call              |
+| `ATLASSIAN_AUTH_MODE`           | no       | `basic`       | `basic` (personal API token) or `bearer` (service-account API key)             |
+| `ATLASSIAN_EMAIL`               | basic    |               | Email of the account that owns the API token; not used in `bearer` mode        |
+| `ATLASSIAN_API_TOKEN`           | yes      |               | Atlassian API token or service-account API key (see Atlassian access)          |
+| `CONFLUENCE_SPACE_KEYS`         | yes      |               | Comma-separated space keys, at least one                                       |
+| `COPILOT_MODEL`                 | no       | none          | Non-empty model name when set; unset uses your account's default               |
+| `COPILOT_GITHUB_TOKEN`          | no       | none          | Credential for Copilot only; unset uses your logged-in user (see below)        |
+| `ASK_TIMEOUT_MS`                | no       | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)        |
+| `MAX_TOOL_CALLS`                | no       | `12`          | Integer from 1 to 50; further tool calls in one question are denied            |
+| `MCP_TIMEOUT_MS`                | no       | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server               |
+| `CONVERSATION_MAX_TURNS`        | no       | `5`           | Integer from 1 to 10; questions one conversation may hold                      |
+| `CONVERSATION_MAX_SOURCE_CHARS` | no       | `250000`      | Integer from 10000 to 5000000; source text one conversation may give the model |
+| `CONVERSATION_IDLE_MINUTES`     | no       | `30`          | Integer from 1 to 1440; minutes without activity before a conversation closes  |
+| `RECHECK_AFTER_MINUTES`         | no       | `15`          | Integer from 1 to 1440; age after which a cited source is checked again        |
 
 ### Atlassian access
 
@@ -178,11 +187,18 @@ the answer has been checked it replaces the draft with:
   Sources list; a chip with `*` is the assistant's own reading of the code;
 - where the documentation and the code disagree, **What I couldn't confirm**, and **Who might
   know**;
-- a **Sources** list with links (Confluence pages, files pinned to a commit), tags such as "may be
-  out of date", and a collapsed **Also consulted** list;
-- **Show more detail**, which asks the same question again one step more technically (not offered
-  to the Developer role, or when the answer was not found);
+- a **Sources (n)** list for that answer, with links (Confluence pages, files pinned to a commit),
+  tags such as "may be out of date" and "fetched in turn 2", a check badge ("✓ checked 3 min ago"
+  or "changed since this answer"), and a collapsed **Also consulted** list;
+- **Re-check sources**, and when a source has changed, **Re-ask with the latest version** (see
+  [Conversations](#conversations));
+- **Show more detail**, which asks for the same answer one step more technically, as a follow-up
+  in the conversation (not offered to the Developer role, or when the answer was not found);
 - **Yes / No** feedback. A No opens a box for a comment and the source that was wrong.
+
+The page is a chat: your question and its answer stay on screen and the next question goes
+underneath. A follow-up can use what was already found, and a citation key such as `C1` means the
+same source for the whole conversation.
 
 ![The answer page in dark mode: role picker, question, a medium-confidence banner and the answer with citation chips](docs/screenshots/answer-dark.png)
 
@@ -201,13 +217,14 @@ found, the role's own wording is shown instead of an answer:
 
 ![The page on a 375 pixel wide screen](docs/screenshots/mobile.png)
 
-**Stop** cancels the question: the server aborts the Copilot session, and the log shows
-`the question was cancelled; aborting the session`. One question is answered at a time; a second
-one gets a "please wait" message.
+**Stop** (or Esc) cancels the question that is running; the server aborts that turn, the
+conversation stays open and you can ask the next question. A stopped question still counts toward
+the turn limit. One question is answered at a time; a second one gets a "please wait" message.
 
 Feedback is appended, one JSON line each, to `data/feedback.jsonl` (git-ignored, created on first
 use): the time, question, role, detail level, status, confidence, cited keys, rating, comment,
-wrong-source key and model. It never holds the answer text or a token.
+wrong-source key, model, the turn the answer was and how many turns the conversation had then. It
+never holds the answer text or a token.
 
 #### Security model of the web server
 
@@ -238,12 +255,67 @@ nosniff`, `Referrer-Policy: no-referrer`; API responses are `no-store`. The page
 
 #### API
 
-| Route                | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`    | `{ "status": "ok" }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `GET /api/roles`     | `[{ id, displayName, description, depth }]`                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `POST /api/ask`      | Body `{ question, role, detailLevel }` (`detailLevel` is `default` or `more`). Answers with a `text/event-stream` of `progress` `{ kind, message }`, `token` `{ text }` (the `answer-meta` block is never in it), then exactly one `done` or `error`. `done` holds `{ answerId, result, rendered, html: { answer, conflicts } }`; `error` holds `{ kind, message }` with kind `timeout`, `cancelled`, `copilot` or `internal`. 429 while another question runs. |
-| `POST /api/feedback` | Body `{ answerId, rating: "up" or "down", comment?, wrongSourceKey? }`; 404 for an unknown id, 400 for a source the answer did not cite.                                                                                                                                                                                                                                                                                                                        |
+| Route                                  | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                      | `{ "status": "ok" }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/roles`                       | `[{ id, displayName, description, depth }]`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `POST /api/ask`                        | Body `{ question, role, detailLevel }` (`detailLevel` is `default` or `more`). Answers with a `text/event-stream` of `progress` `{ kind, message }`, `token` `{ text }` (the `answer-meta` block is never in it), then exactly one `done` or `error`. `done` holds `{ answerId, result, rendered, html: { answer, conflicts } }`; `error` holds `{ kind, message }` with kind `timeout`, `cancelled`, `copilot` or `internal`. 429 while another question runs. |
+| `POST /api/feedback`                   | Body `{ answerId, rating: "up" or "down", comment?, wrongSourceKey? }`; 404 for an unknown id, 400 for a source the answer did not cite.                                                                                                                                                                                                                                                                                                                        |
+| `POST /api/conversations`              | Body `{ role }`. Starts a conversation and ends any other. Answers `{ conversationId, maxTurns }`.                                                                                                                                                                                                                                                                                                                                                              |
+| `POST /api/conversations/:id/messages` | Body `{ question, detailLevel?, reaskAnswerId? }`. A `text/event-stream`: `progress`, `token`, then `done` (the answer, its sources and the conversation's state), then a separate `recheck` event once the sources that were due have been checked, then the stream closes; or `error`. 404 `conversation_ended`, 409 `conversation_full`, 429 `conversation_busy`.                                                                                            |
+| `GET /api/conversations/:id`           | The transcript: every turn with its answer, sources and check state. 404 `conversation_ended`.                                                                                                                                                                                                                                                                                                                                                                  |
+| `POST /api/conversations/:id/recheck`  | Body `{ answerId }`. Checks that answer's sources now and answers with the new check state; `ignored` when the last manual check was under 30 seconds ago. 404 `conversation_ended` or `answer_not_found`, 429 `recheck_busy`.                                                                                                                                                                                                                                  |
+| `DELETE /api/conversations/:id`        | Body `{}`. Ends the conversation. 404 `conversation_ended`.                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+`POST /api/ask` still answers one question on its own, as before; the page uses the conversation
+routes. Conversation and answer ids are random UUIDs, and the conversation routes pass through the
+same guards as every other route.
+
+### Conversations
+
+A conversation is one Copilot session that stays open for several questions, for one role.
+
+- **Keys last.** The citation keys (`C1`, `G2`) are numbered across the whole conversation, so a
+  later answer can cite `C1` for a page fetched in turn 1. Every answer is still checked on its
+  own: its confidence, caps, citations, style and sources are worked out from that turn alone, and
+  an answer's Sources list shows only what that answer cites ("fetched in turn N" says where each
+  came from).
+- **One at a time.** There is one active conversation. Starting a new one (the **New
+  conversation** button, or changing the role after the page asks you to confirm) ends the old one.
+  A conversation is for one role, so the role cannot change in the middle of it.
+- **Limits.** A conversation holds at most `CONVERSATION_MAX_TURNS` questions and at most
+  `CONVERSATION_MAX_SOURCE_CHARS` characters of source text; past either it is full and the page
+  says so and asks for a new one. One that has had no activity for `CONVERSATION_IDLE_MINUTES` is
+  closed. If the model's history is cut because it ran out of room, that answer is capped at
+  `medium` ("Some earlier sources were dropped from the assistant's memory.") and the conversation
+  ends, so an earlier key is never cited for text the model can no longer see.
+- **Reload and restart.** Reloading the page restores the conversation from the server. After the
+  server restarts, or after the conversation closed, the page starts fresh and says so.
+
+**Re-checking sources.** A source is read once, at the moment the model fetched it. The app can ask
+again whether it has changed, directly (no Copilot request, read-only, only your listed spaces and
+repositories):
+
+- A Confluence page is compared by version number.
+- A GitHub file is compared by its blob SHA at the commit the answer used, a folder by a hash of
+  its entries, and the release list by its newest tag. Commits do not change, so they are skipped.
+- A source that cannot be checked shows "couldn't check", never "changed".
+
+A re-check runs by itself when a source is reused in a later turn, when a source was read more than
+`RECHECK_AFTER_MINUTES` ago, and for every cited source after the last turn the conversation allows
+(sources checked in the last 2 minutes are skipped). The result arrives after the answer, as the
+`recheck` event, so it never delays an answer. **Re-check sources** does it on demand for one
+answer (a second request within 30 seconds is ignored; at most 4 checks run at once).
+
+When a cited source has changed, the badge says "changed since this answer", the answer shows "A
+source this answer cites has changed since it was written.", and its confidence is capped at
+`medium` (code `source-changed`). **Re-ask with the latest version** asks the question again as a
+new turn that tells the model which keys changed; it fetches them again under new keys, and the
+old keys stay marked `changed`.
+
+![A changed source: the banner, the changed badge on the source, and the Re-check and Re-ask buttons](docs/screenshots/changed-source.png)
+
+![After Re-ask with the latest version: a new answer that cites the page under a new key](docs/screenshots/after-reask.png)
 
 ### Asking a question
 
@@ -351,17 +423,23 @@ valid citation at all becomes `not_found`, whatever the model said.
 application can only lower it, and each rule that holds adds a sentence to `confidenceReason` and an
 entry to `capsApplied` in the JSON:
 
-| Code                | When                                                      | Limit     |
-| ------------------- | --------------------------------------------------------- | --------- |
-| `no-citations`      | No citation in the answer is a real, fetched source       | not found |
-| `invalid-keys`      | The model used a citation key it was never given          | medium    |
-| `uncited-sentences` | A sentence makes a claim without a citation (a heuristic) | medium    |
-| `stale-page`        | A cited Confluence page was last updated over a year ago  | medium    |
-| `inferred`          | A citation carries an asterisk (see below)                | medium    |
-| `folder-only`       | A sentence rests only on a folder listing                 | medium    |
-| `gaps`              | The model listed things it could not confirm              | medium    |
-| `conflicts`         | The documentation and the code disagree                   | low       |
-| `no-meta`           | The model's report is missing or invalid                  | low       |
+| Code                | When                                                        | Limit     |
+| ------------------- | ----------------------------------------------------------- | --------- |
+| `no-citations`      | No citation in the answer is a real, fetched source         | not found |
+| `invalid-keys`      | The model used a citation key it was never given            | medium    |
+| `uncited-sentences` | A sentence makes a claim without a citation (a heuristic)   | medium    |
+| `stale-page`        | A cited Confluence page was last updated over a year ago    | medium    |
+| `inferred`          | A citation carries an asterisk (see below)                  | medium    |
+| `folder-only`       | A sentence rests only on a folder listing                   | medium    |
+| `gaps`              | The model listed things it could not confirm                | medium    |
+| `conflicts`         | The documentation and the code disagree                     | low       |
+| `no-meta`           | The model's report is missing or invalid                    | low       |
+| `source-changed`    | A cited source changed after it was read (conversations)    | medium    |
+| `memory-dropped`    | The model's history was cut during the turn (conversations) | medium    |
+
+The last two apply only in a conversation. They are worked out again from the stored answer each
+time, so a re-check can add or lift `source-changed` without stacking it, and they never raise a
+confidence.
 
 **Stated and inferred.** A sentence that repeats a source gets a normal citation, `[C1]`. A sentence
 that is the model's interpretation, usually of code, starts "Based on the code, it looks like…" and
@@ -469,6 +547,8 @@ src/
   citations/ source registry, wrapping, labels, citation checking, extractors for each tool result
   cli/       ask, roles, models, mcp:tools, mcp:sample, fixtures:sanitise and eval commands (wiring only)
   config/    validated config loader (loadConfig, redactConfig, buildRuntimeEnv)
+  conversation/ a conversation (turns, limits, registry), the store, turn notes and the runner that asks a turn
+  recheck/   has a cited source changed? GitHub and Confluence checks, and when to run them
   copilot/   Copilot client, session config and system message (shared base plus role block)
   errors/    AppError and its subclasses
   eval/      the evaluation: case loading, scoring, request budget, runner, review sheet, report
@@ -500,6 +580,7 @@ git-ignored; `eval/questions.example.yaml` shows the format with an invented pro
 npm run eval -- --subset smoke                 # the cases tagged smoke
 npm run eval -- --ids case-a,case-b            # chosen cases (add --subset smoke to include the smoke ones)
 npm run eval -- --subset full --max-requests 60
+npm run eval -- --path conversation            # ask every case as a conversation (multi-turn cases run only this way)
 npm run eval:review -- <run-folder>            # writes review.csv: fill in verdict (correct, partial, wrong)
 npm run eval:report -- <run-folder> --compare <earlier-run-folder>
 npm run eval:from-feedback                     # thumbs-down answers become draft cases
@@ -507,6 +588,11 @@ npm run eval:from-feedback                     # thumbs-down answers become draf
 
 - A case names a role, a question, the expected status and sources, and a short reference answer.
   The runner refuses a case still marked `draft: true`.
+- A case can instead have `turns`: a conversation of 2 to 10 questions, each with its own expectation.
+  Each turn is scored as its own entry (`<id>`, `<id>-t2`, …), and `reusesEarlier: true` requires the
+  answer to cite a source an earlier turn fetched. `--path single` (the default) leaves such a case
+  out and names it; `--path conversation` asks every case through the same code as the web page, one
+  new conversation per case, and a one-question case scores the same either way.
 - `eval` prints the number of cases and the Copilot requests it expects, and asks before it starts
   (`--yes` skips the question). `--max-requests` stops cleanly when reached. It stops on Ctrl+C
   and keeps what finished.
@@ -525,12 +611,21 @@ questions, two tuning rounds with their before and after, and what each change d
 the last numbers are for the 20-question subset that the tuning rounds used, and the MVP targets
 are judged against the baseline in the log, with that stated.
 
+The conversation work was measured against a second baseline (the 38 questions again, on one pinned
+model): asked as conversations they showed no regression beyond the noise, and five multi-turn cases
+showed that follow-ups reuse earlier sources, with one case where a follow-up claimed more
+confidence than it had earned. See the Phase 7 sections of the log.
+
 ## Limitations
 
 - **One person, one machine.** The web server has no login and listens only on the local machine
   unless you set `ALLOW_REMOTE=true`, which is not advised. Credentials come from `.env`.
-- **No memory.** Each question is answered on its own; nothing is kept between questions except
-  the thumbs-up and thumbs-down you record (`data/feedback.jsonl`, no answer text).
+- **Memory lasts one conversation.** Follow-ups can use what was found earlier in the same
+  conversation (at most `CONVERSATION_MAX_TURNS` questions), and nothing is kept after it ends or
+  the server restarts, except the thumbs-up and thumbs-down you record (`data/feedback.jsonl`, no
+  answer text). One conversation is active at a time.
+- **A re-check is a comparison, not a re-read.** It says a source changed, not what changed; an
+  answer is only re-asked when you ask for it.
 - **Code search depends on GitHub's index.** `search_code` may return nothing for a repository;
   the assistant then browses folders instead, and a repository with a large tree costs tool calls.
 - **Rovo search is not used** (it can surface Jira results and cannot be limited to a space), and
@@ -556,6 +651,8 @@ are judged against the baseline in the log, with that stated.
 | A question stops with exit code 2 or a `timeout` error              | It exceeded `ASK_TIMEOUT_MS` (default 120000). Raise it, up to 600000. Slow answers are common when a question reads several long pages.                                                                                                                                                                                                                                                                                                                     |
 | The model is not the one in `COPILOT_MODEL`                         | Copilot picks the model for each question and may not honour the setting; the result and the eval summary show which model answered.                                                                                                                                                                                                                                                                                                                         |
 | The assistant cannot find something you know is documented          | The page may be outside `CONFLUENCE_SPACE_KEYS`, or too long: when a page is cut, the model is asked to list the sections it could not read under "What I couldn't confirm", so ask about one of them directly.                                                                                                                                                                                                                                              |
+| "That conversation has ended" or "This conversation is full"        | The conversation was closed (idle for `CONVERSATION_IDLE_MINUTES`, the server restarted, a new one was started elsewhere, or its history was cut) or reached `CONVERSATION_MAX_TURNS` or `CONVERSATION_MAX_SOURCE_CHARS`. Press **New conversation**.                                                                                                                                                                                                        |
+| A source shows "couldn't check"                                     | The re-check could not reach the source, the page or repository is outside `CONFLUENCE_SPACE_KEYS` or `GITHUB_REPOS`, or `ATLASSIAN_CLOUD_ID` is not set. It never means the source changed; use **Re-check sources** to try again.                                                                                                                                                                                                                          |
 | The page will not start                                             | The message names the variable that is missing or invalid; nothing is printed about its value.                                                                                                                                                                                                                                                                                                                                                               |
 
 ## Quality gates

@@ -15,6 +15,8 @@ const DEFAULT_LIMIT = 50;
  * @property {string | null} confidence - The final confidence, or null.
  * @property {string[]} citedKeys - Keys of the sources it cited.
  * @property {string | undefined} model - The model that wrote it.
+ * @property {number} [turn] - Which turn of a conversation it answered; absent for a single question.
+ * @property {number} [conversationTurns] - How many turns the conversation had when it was given.
  */
 
 /**

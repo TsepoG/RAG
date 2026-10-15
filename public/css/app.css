@@ -175,12 +175,6 @@ button[aria-pressed='true'] {
   gap: 8px;
 }
 
-#result {
-  margin-top: 32px;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-}
-
 output {
   display: block;
 }
@@ -285,14 +279,6 @@ output {
   padding-left: 12px;
 }
 
-.follow-up {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  align-items: center;
-  margin: 24px 0;
-}
-
 .feedback {
   border: 0;
   margin: 0;
@@ -308,26 +294,8 @@ output {
   margin-right: 8px;
 }
 
-.feedback-form {
-  flex-basis: 100%;
-}
-
 .feedback-form button {
   margin-top: 8px;
-}
-
-.sources ol {
-  padding-left: 0;
-  list-style: none;
-}
-
-.sources li {
-  padding: 6px 8px;
-  border-radius: 6px;
-}
-
-.sources li.highlight {
-  background: var(--highlight);
 }
 
 .source-key {
@@ -354,4 +322,172 @@ a {
   * {
     scroll-behavior: auto !important;
   }
+}
+
+/* The conversation: the reader's questions and the answers, one turn after another, with the
+   question box staying in view at the bottom of the page. */
+.controls {
+  margin-top: 8px;
+}
+
+.conversation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.role-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 16px;
+  border: 1px solid var(--medium);
+  border-radius: 6px;
+}
+
+.role-confirm p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.messages {
+  list-style: none;
+  margin: 24px 0;
+  padding: 0;
+}
+
+.turn {
+  margin: 0 0 32px;
+}
+
+.bubble.user {
+  margin-left: auto;
+  max-width: 85%;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.bubble .who {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.bubble .text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.card,
+.turn > .reply {
+  margin-top: 16px;
+  padding-top: 8px;
+}
+
+.card h4 {
+  font-size: 0.95rem;
+  margin: 16px 0 4px;
+}
+
+.card-actions,
+.feedback-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin: 16px 0 0;
+}
+
+.feedback-area .feedback-form {
+  flex-basis: 100%;
+}
+
+.feedback-area .feedback-form button {
+  margin-top: 8px;
+}
+
+button[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.full-message {
+  margin: 0 0 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--medium);
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.ask {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0 16px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.ask .field {
+  margin: 8px 0;
+}
+
+.changed-note {
+  margin: 4px 0;
+  font-weight: 600;
+  color: var(--medium);
+}
+
+details.sources,
+details.consulted {
+  margin: 16px 0 0;
+}
+
+details.sources > summary,
+details.consulted > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+details.sources ol {
+  padding-left: 0;
+  list-style: none;
+}
+
+details.sources li {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+details.sources li.highlight {
+  background: var(--highlight);
+}
+
+.check {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid currentcolor;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.check-unchanged {
+  color: var(--high);
+}
+
+.check-changed {
+  color: var(--medium);
+}
+
+.check-unavailable {
+  color: var(--muted);
 }

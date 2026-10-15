@@ -1,19 +1,19 @@
 // @ts-check
 import { createCitationRegistry } from '../citations/index.js';
-import { listSecrets } from '../config/index.js';
 import { buildSessionConfig } from '../copilot/index.js';
-import {
-  AppError,
-  AskTimeoutError,
-  CopilotError,
-  QuestionCancelledError,
-} from '../errors/index.js';
-import { createCodeownersLookup, createCommitResolver, createGithubApi } from '../github/index.js';
-import { createPermissionHandler, createToolGate, createToolHooks } from '../mcp/index.js';
+import { AppError, QuestionCancelledError } from '../errors/index.js';
+import { createPermissionHandler, createToolGate } from '../mcp/index.js';
 import { withDetailLevel } from '../roles/index.js';
-import { bestEffort, createCancellation, createDeadline } from './deadline.js';
 import { createEventRecorder } from './events.js';
-import { finishAnswer } from './finish.js';
+import {
+  buildQuestionHooks,
+  completeTurn,
+  createLookups,
+  createNotifier,
+  disconnectSession,
+  startInterrupt,
+  toTurnError,
+} from './stages.js';
 
 /**
  * What to ask, and where to send the answer as it streams.
@@ -93,55 +93,25 @@ export async function askQuestion(
   // rewrite cannot undo the extra detail that was asked for.
   const role = withDetailLevel(usualRole, detailLevel);
   const startedAt = clock.now();
-  /**
-   * Tells the caller what is happening. A progress display failing must not fail the question.
-   * @param {Activity} activity - What the question is doing.
-   */
-  const notify = (activity) => {
-    try {
-      onActivity?.(activity);
-    } catch (error) {
-      logger.warn({ err: error }, 'could not report progress');
-    }
-  };
+  const notify = createNotifier(onActivity, logger);
   const events = createEventRecorder({
     clock,
     onDelta,
     onToolStart: (tool) => notify({ kind: 'tool', ...tool }),
   });
-  const deadline = createDeadline(config.copilot.askTimeoutMs);
-  const cancellation = createCancellation(signal);
-  // Whichever comes first: the time limit or the person stopping the question.
-  const interrupt = Promise.race([deadline.promise, cancellation.promise]);
-  interrupt.catch(() => undefined);
+  const { interrupt, cancellation, stop } = startInterrupt({
+    askTimeoutMs: config.copilot.askTimeoutMs,
+    signal,
+  });
   // Per question, so one question's sources, keys and lookups never leak into another's.
   const registry = createCitationRegistry();
   const gate = createToolGate();
-  const api = createGithubApi({ token: config.github.token, fetch });
-  const commits = createCommitResolver({
-    token: config.github.token,
-    repos: config.github.repos,
-    api,
-    logger,
-  });
-  const owners = createCodeownersLookup({ api, repos: config.github.repos, logger });
+  const { commits, owners } = createLookups({ config, fetch, logger });
   // Held in an object because the session is created inside the closure below.
   const open = /** @type {{ session?: AskSession }} */ ({});
 
   const run = async () => {
-    const hooks = createToolHooks({
-      repos: config.github.repos,
-      spaceKeys: config.atlassian.spaceKeys,
-      siteUrl: config.atlassian.siteUrl,
-      cloudId: config.atlassian.cloudId,
-      maxToolCalls: config.mcp.maxToolCalls,
-      secrets: listSecrets(config),
-      registry,
-      resolveHead: commits.resolveHead,
-      gate,
-      logger,
-      clock,
-    });
+    const hooks = buildQuestionHooks({ config, registry, gate, commits, logger, clock });
     const onPermissionRequest = createPermissionHandler({ logger });
     open.session = await client.createSession(
       buildSessionConfig({ config, role, workingDirectory, hooks, onPermissionRequest }),
@@ -156,48 +126,26 @@ export async function askQuestion(
     if (!outcome.ok) {
       throw outcome.error;
     }
-    const { answer: reply, toolCalls, model, modelChanges, modelCalls } = events.result();
-    const composed = await finishAnswer({
-      reply,
+    return await completeTurn({
+      events,
+      startedAt,
+      detailLevel,
       role,
       registry,
       session: open.session,
       gate,
       clock,
       interrupt,
-      cancellation: cancellation.promise,
+      cancellation,
       owners,
       logger,
       notify,
     });
-    return {
-      ...composed,
-      detailLevel,
-      toolCalls,
-      model,
-      modelChanges,
-      modelCalls,
-      durationMs: clock.now() - startedAt,
-    };
   } catch (error) {
-    if (error instanceof QuestionCancelledError) {
-      logger.info({}, 'the question was cancelled; aborting the session');
-    }
-    const interrupted = error instanceof AskTimeoutError || error instanceof QuestionCancelledError;
-    if (interrupted && open.session !== undefined) {
-      const { session } = open;
-      await bestEffort('abort the interrupted question', () => session.abort(), logger);
-    }
-    throw error instanceof AppError
-      ? error
-      : new CopilotError('Copilot could not answer the question', { cause: error });
+    throw await toTurnError(error, { session: open.session, logger });
   } finally {
-    deadline.cancel();
-    cancellation.cancel();
+    stop();
     events.detach();
-    const { session } = open;
-    if (session !== undefined) {
-      await bestEffort('disconnect the session', () => session.disconnect(), logger);
-    }
+    await disconnectSession(open.session, logger);
   }
 }

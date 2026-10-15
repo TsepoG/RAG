@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it, vi } from 'vitest';
 import { extractFileContents } from '../../../src/citations/extractors/getFileContents.js';
+import { blobFingerprint, entriesFingerprint } from '../../../src/citations/index.js';
 import { BLOB_SHA, fixtureInput, HEAD_SHA, makeContext } from '../../helpers/extraction.js';
 
 const COMMIT_SHA = 'ebf99bea1fdf70b3a206c622a5134068c73eb607';
@@ -68,6 +69,7 @@ describe('extractFileContents folder listings', () => {
         latestUrl: 'https://github.com/acme/app/tree/HEAD',
         kind: 'directory',
         pinned: true,
+        fingerprint: expect.stringMatching(/^entries:[0-9a-f]{16}$/),
       },
     ]);
     expect(result).toMatchObject({ blocked: false, candidates: [] });
@@ -335,4 +337,110 @@ describe('extractFileContents paths and repositories', () => {
 
     expect(result.sources[0]).toMatchObject({ kind: 'directory', path: 'docs/Guide.md' });
   });
+});
+
+describe('extractFileContents fingerprints', () => {
+  const ROOT_ARGS = { owner: 'acme', repo: 'app', path: '/' };
+
+  it('fingerprints a file by its blob, from the first line of the result', async () => {
+    const { sources } = await extractFileContents({ args: ARGS, text: FILE_TEXT }, makeContext());
+
+    expect(sources[0].fingerprint).toBe(blobFingerprint(BLOB_SHA));
+  });
+
+  it('gives the same fingerprint for the same blob read at another commit', async () => {
+    const first = await extractFileContents({ args: ARGS, text: FILE_TEXT }, makeContext());
+    const later = await extractFileContents(
+      { args: ARGS, text: FILE_TEXT },
+      makeContext({ resolveHead: async () => 'c'.repeat(40) }),
+    );
+
+    expect(first.sources[0]).toMatchObject({ commitSha: HEAD_SHA });
+    expect(later.sources[0]).toMatchObject({ commitSha: 'c'.repeat(40) });
+    expect(later.sources[0].fingerprint).toBe(first.sources[0].fingerprint);
+  });
+
+  it('reads the blob of a binary file the same way', async () => {
+    const text = FILE_TEXT.replace('text file', 'binary file');
+
+    const { sources } = await extractFileContents({ args: ARGS, text }, makeContext());
+
+    expect(sources[0].fingerprint).toBe(blobFingerprint(BLOB_SHA));
+  });
+
+  it('gives no fingerprint when the result does not name its blob', async () => {
+    const { sources } = await extractFileContents(
+      { args: ARGS, text: '# Guide, with no download line' },
+      makeContext(),
+    );
+
+    expect(sources[0]).not.toHaveProperty('fingerprint');
+  });
+
+  it('fingerprints a folder by its entries, whatever order they came in', async () => {
+    const entries = [
+      { name: 'a.py', sha: BLOB_SHA },
+      { name: 'b.py', sha: 'd'.repeat(40) },
+    ];
+    const read = async (/** @type {unknown[]} */ listing) =>
+      (await extractFileContents({ args: ROOT_ARGS, text: JSON.stringify(listing) }, makeContext()))
+        .sources[0];
+
+    const forward = await read(entries);
+    const backward = await read([...entries].reverse());
+
+    expect(forward.fingerprint).toBe(entriesFingerprint(entries));
+    expect(backward.fingerprint).toBe(forward.fingerprint);
+  });
+
+  it.each([
+    ['has no name', [{ sha: BLOB_SHA }]],
+    ['has no SHA', [{ name: 'a.py' }]],
+    ['is not an object', ['a.py']],
+  ])('gives a folder no fingerprint when an entry %s', async (_what, listing) => {
+    const { sources } = await extractFileContents(
+      { args: ROOT_ARGS, text: JSON.stringify(listing) },
+      makeContext(),
+    );
+
+    expect(sources[0]).not.toHaveProperty('fingerprint');
+  });
+
+  it('fingerprints an empty folder', async () => {
+    const { sources } = await extractFileContents({ args: ROOT_ARGS, text: '[]' }, makeContext());
+
+    expect(sources[0].fingerprint).toBe(entriesFingerprint([]));
+  });
+});
+
+describe('extractFileContents refs', () => {
+  it('records the ref the model asked to read a file at, so a re-check looks at the same one', async () => {
+    const { sources } = await extractFileContents(
+      { args: { ...ARGS, ref: 'refs/heads/release' }, text: FILE_TEXT },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({ ref: 'refs/heads/release' });
+  });
+
+  it('records the ref of a folder too', async () => {
+    const { sources } = await extractFileContents(
+      { args: { owner: 'acme', repo: 'app', path: 'src', ref: 'v1.2.0' }, text: '[]' },
+      makeContext(),
+    );
+
+    expect(sources[0]).toMatchObject({ kind: 'directory', ref: 'v1.2.0' });
+  });
+
+  it.each([[{}], [{ ref: '' }], [{ ref: '   ' }], [{ ref: 7 }]])(
+    'records no ref when the model named none (%j)',
+    async (extra) => {
+      const { sources } = await extractFileContents(
+        { args: { ...ARGS, ...extra }, text: FILE_TEXT },
+        makeContext(),
+      );
+
+      expect(sources[0]).not.toHaveProperty('ref');
+    },
+  );
 });
