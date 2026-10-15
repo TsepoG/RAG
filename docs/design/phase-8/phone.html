@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Phase 8 design reference (A · Clarity). Owner-approved mockup: reference only, not production code. -->
+<meta charset="utf-8">
+<title>Clarity: phone</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2446F5}a:hover{color:#1530C4}
+</style>
+<div style="width: 390px; height: 844px; box-sizing: border-box; font-family: 'Geist', system-ui, sans-serif; color: #0F1729; background: #F4F6FA; display: flex; flex-direction: column; overflow: hidden">
+
+  <header style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; background: #FFFFFF; border-bottom: 1px solid #E2E6EE">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <div style="width: 30px; height: 30px; border-radius: 9px; background: #2446F5; display: flex; align-items: center; justify-content: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"></path></svg>
+      </div>
+      <span style="font-weight: 600; font-size: 15px">Knowledge Assistant</span>
+    </div>
+    <button type="button" aria-label="Conversation menu" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid #E2E6EE; background: #FFFFFF; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F1729" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg></button>
+  </header>
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: #FFFFFF; border-bottom: 1px solid #E2E6EE; font-size: 13px">
+    <span style="font-weight: 600; color: #1530C4">Product Owner</span>
+    <span style="color: #556070">Turn 2 of 5</span>
+  </div>
+
+  <div style="flex-grow: 1; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <div style="align-self: flex-end; max-width: 85%; padding: 12px 14px; border-radius: 14px 14px 4px 14px; background: #0F1729; color: #FFFFFF; font-size: 15px; line-height: 1.45">Does the refund go back to the original card?</div>
+
+    <article style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E6EE">
+      <span style="align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; background: #FFF1E0; color: #8A3D00; font-size: 13px; font-weight: 600">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16.5v.5"></path></svg>Medium confidence</span>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px; background: #FFF7EE; border: 1px solid #F5D4AE; font-size: 14px; line-height: 1.45; color: #5C2A00">
+        <span><strong>A source changed</strong> after this answer was written.</span>
+        <button type="button" style="font: inherit; font-weight: 600; min-height: 44px; border-radius: 8px; border: none; background: #8A3D00; color: #FFFFFF; cursor: pointer">Re-ask with the latest version</button>
+      </div>
+      <p style="margin: 0; font-size: 15px; line-height: 1.6">Yes. Refunds go back to the payment method used for the order <button type="button" style="font: 500 12px 'Geist Mono', monospace; padding: 2px 7px; border-radius: 6px; border: 1px solid #C9D2FF; background: #EEF1FF; color: #1530C4; cursor: pointer">C1</button>. If that card has expired, the code falls back to store credit <button type="button" style="font: 500 12px 'Geist Mono', monospace; padding: 2px 7px; border-radius: 6px; border: 1px solid #D3D9E4; background: #F4F6FA; color: #0F1729; cursor: pointer">G2</button>.</p>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+        <button type="button" aria-expanded="false" style="font: inherit; font-size: 13px; font-weight: 500; min-height: 44px; padding: 8px 12px; border-radius: 8px; border: 1px solid #D3D9E4; background: #FFFFFF; color: #0F1729; cursor: pointer">Sources (3) ▾</button>
+        <span style="font-size: 13px; font-weight: 600; color: #8A3D00">1 changed</span>
+      </div>
+    </article>
+  </div>
+
+  <form style="display: flex; align-items: flex-end; gap: 8px; padding: 12px 16px 24px; background: #FFFFFF; border-top: 1px solid #E2E6EE">
+    <label for="phone-q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Ask a follow-up</label>
+    <textarea id="phone-q" rows="1" placeholder="Ask a follow-up…" style="font: inherit; font-size: 16px; flex-grow: 1; min-width: 0; resize: none; padding: 12px 14px; border-radius: 12px; border: 1px solid #D3D9E4; outline: none; color: #0F1729; background: #F4F6FA"></textarea>
+    <button type="submit" aria-label="Send" style="width: 48px; height: 48px; flex-shrink: 0; border-radius: 12px; border: none; background: #2446F5; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+  </form>
+</div>
+</body>
+</html>
