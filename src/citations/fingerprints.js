@@ -17,6 +17,9 @@ const HASH_LENGTH = 16;
 /** Separates the parts that are hashed, so `a`, `bc` and `ab`, `c` do not hash alike. */
 const SEPARATOR = '\u0000';
 
+/** The locale entries are ordered in, so a fingerprint does not depend on the machine's own. */
+const SORT_LOCALE = 'en';
+
 /**
  * Hashes parts into a short fingerprint.
  * @param {string} kind - What is being fingerprinted, so a file and a folder never match.
@@ -49,13 +52,23 @@ export function blobFingerprint(blobSha) {
 }
 
 /**
+ * Orders two lines the same way on every machine, whatever its locale.
+ * @param {string} left - One line.
+ * @param {string} right - The other.
+ * @returns {number} Negative when `left` comes first, positive when `right` does, otherwise 0.
+ */
+function compareLines(left, right) {
+  return left.localeCompare(right, SORT_LOCALE);
+}
+
+/**
  * Fingerprints a folder by what is in it: the name and blob or tree SHA of each entry, whatever
  * order they were listed in.
  * @param {ReadonlyArray<{ name: string, sha: string }>} entries - The entries.
  * @returns {string} The fingerprint.
  */
 export function entriesFingerprint(entries) {
-  const lines = entries.map(({ name, sha }) => `${name}${SEPARATOR}${sha}`).sort();
+  const lines = entries.map(({ name, sha }) => `${name}${SEPARATOR}${sha}`).sort(compareLines);
   return hashed('entries', lines);
 }
 
