@@ -30,6 +30,11 @@ describe('icon', () => {
     expect(svg.getAttribute('stroke-width')).toBe('2');
   });
 
+  it('can be filled in, for a shape such as the stop square', () => {
+    expect(icon('stop', { filled: true }).getAttribute('fill')).toBe('currentColor');
+    expect(icon('stop').getAttribute('fill')).toBe('none');
+  });
+
   it('takes a size and a line thickness', () => {
     const svg = icon('check', { size: 12, strokeWidth: 3 });
 
@@ -43,11 +48,20 @@ describe('every icon', () => {
     expect([...ICON_NAMES].sort()).toEqual([
       'alert-circle',
       'alert-triangle',
+      'bar-chart',
+      'brand',
       'check',
+      'close',
       'help-circle',
+      'link',
+      'lock',
+      'menu',
       'no-entry',
       'refresh',
+      'search',
       'search-minus',
+      'send',
+      'stop',
       'thumbs-down',
       'thumbs-up',
     ]);

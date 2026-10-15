@@ -12,6 +12,21 @@ const DEFAULT_STROKE_WIDTH = 2;
  */
 const PATHS = Object.freeze({
   check: ['M5 12l5 5 9-10'],
+  brand: ['M4 6h16M4 12h10M4 18h7'],
+  menu: ['M4 7h16M4 12h16M4 17h16'],
+  close: ['M6 6l12 12M18 6L6 18'],
+  lock: [
+    'M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2z',
+    'M8 11V8a4 4 0 0 1 8 0v3',
+  ],
+  link: [
+    'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1',
+    'M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1',
+  ],
+  'bar-chart': ['M4 20V10M10 20V4M16 20v-7M22 20H2'],
+  search: ['M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0', 'M21 21l-4.3-4.3'],
+  send: ['M5 12h14M13 6l6 6-6 6'],
+  stop: ['M7 7h10v10H7z'],
   'alert-circle': ['M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0', 'M12 8v5M12 16.5v.5'],
   'alert-triangle': [
     'M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
@@ -40,16 +55,19 @@ export const ICON_NAMES = Object.freeze(Object.keys(PATHS));
  * Draws an icon. It is always hidden from screen readers: whatever it stands for is also said in
  * words next to it. The shapes are made with DOM calls, never from a string of markup.
  * @param {keyof typeof PATHS} name - Which icon.
- * @param {{ size?: number, strokeWidth?: number }} [options] - Its size in pixels and the thickness of its lines.
+ * @param {{ size?: number, strokeWidth?: number, filled?: boolean }} [options] - Its size in pixels, the thickness of its lines, and whether its shape is filled in.
  * @returns {SVGElement} The icon.
  */
-export function icon(name, { size = DEFAULT_SIZE, strokeWidth = DEFAULT_STROKE_WIDTH } = {}) {
+export function icon(
+  name,
+  { size = DEFAULT_SIZE, strokeWidth = DEFAULT_STROKE_WIDTH, filled = false } = {},
+) {
   const svg = document.createElementNS(SVG_NAMESPACE, 'svg');
   const attributes = {
     width: String(size),
     height: String(size),
     viewBox: VIEW_BOX,
-    fill: 'none',
+    fill: filled ? 'currentColor' : 'none',
     stroke: 'currentColor',
     'stroke-width': String(strokeWidth),
     'stroke-linecap': 'round',
