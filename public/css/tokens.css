@@ -1,0 +1,99 @@
+/*
+ * The one source of truth for the page's design: every colour, size and radius is defined here
+ * and used through var(). Components never hard-code them. Design direction: Clarity (Phase 8).
+ */
+:root {
+  /* Surfaces */
+  --color-page: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-subtle: #f4f6fa;
+  --color-border: #e2e6ee;
+  --color-border-strong: #d3d9e4;
+
+  /* Ink. Never use a lighter grey for text: muted is the lightest that keeps 4.5:1 on white. */
+  --color-ink: #0f1729;
+  --color-body: #3b4556;
+  --color-muted: #556070;
+  --color-on-accent: #ffffff;
+
+  /* Accent */
+  --color-accent: #2446f5;
+  --color-accent-strong: #1530c4;
+  --color-accent-soft: #eef1ff;
+  --color-accent-border: #c9d2ff;
+
+  /* Confidence: high */
+  --color-high-bg: #e3f4ec;
+  --color-high-text: #0e5e46;
+  --color-high-check: #13795b;
+
+  /* Confidence: medium, and a changed source */
+  --color-medium-bg: #fff1e0;
+  --color-medium-panel: #fff7ee;
+  --color-medium-border: #f5d4ae;
+  --color-medium-text: #8a3d00;
+  --color-medium-deep: #5c2a00;
+
+  /* Confidence: low, and errors */
+  --color-low-bg: #fdecec;
+  --color-low-text: #9b1c1c;
+
+  /* Neutral: not found, out of scope, clarify */
+  --color-neutral-bg: #eef0f4;
+  --color-neutral-text: #2b3444;
+
+  /* Citation chips: Confluence (C#) and GitHub (G#) */
+  --chip-confluence-bg: var(--color-accent-soft);
+  --chip-confluence-border: var(--color-accent-border);
+  --chip-confluence-text: var(--color-accent-strong);
+  --chip-github-bg: var(--color-subtle);
+  --chip-github-border: var(--color-border-strong);
+  --chip-github-text: var(--color-ink);
+
+  /* Type */
+  --font-ui: 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-size-12: 12px;
+  --font-size-13: 13px;
+  --font-size-14: 14px;
+  --font-size-15: 15px;
+  --font-size-16: 16px;
+  --font-size-17: 17px;
+  --font-size-40: 40px;
+  --line-height-ui: 1.5;
+  --line-height-answer: 1.65;
+
+  /* Radii */
+  --radius-chip: 6px;
+  --radius-button: 10px;
+  --radius-button-small: 8px;
+  --radius-panel: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --radius-bubble: 16px 16px 4px 16px;
+
+  /* Spacing, on a 4px scale */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-14: 14px;
+  --space-16: 16px;
+  --space-22: 22px;
+  --space-24: 24px;
+  --space-28: 28px;
+  --space-32: 32px;
+
+  /* Shadow: the composer and the end card only */
+  --shadow-raised: 0 8px 24px rgba(15, 23, 41, 0.06);
+
+  /* Focus: shown on keyboard focus, on every interactive element */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-color: var(--color-accent);
+
+  /* Layout */
+  --sidebar-width: 280px;
+  --column-width: 820px;
+  --touch-target: 44px;
+}
