@@ -539,3 +539,56 @@ earlier turn reused one without fetching it again (`conv-dev-edgar-limits-t2`,
   the code?" (the old answer opened with a confusing "Yes"). The reference clause "the backtest is not
   built yet either" was removed from `conv-ba-survivors` turn 3, which the question does not need. The
   reworded question was not run again (owner's decision); its verdict rests on the old wording.
+
+## Regression through the conversation path (2026-10-14)
+
+The 38 single-question cases, each asked as a conversation of one turn, compared with the baseline
+`20261013-163928`. The five multi-turn cases were left out with `--ids`.
+
+| | |
+| --- | --- |
+| Run | `20261014-190623` |
+| Path | conversation (`createConversationRunner`), the 38 cases |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `9af552abe162`, base prompt hash `81ddc08c88b9` (same as the baseline) |
+| Requests | 45 for 38 cases; no question failed |
+| Verdicts | drafted by Claude Code for the cases whose status, confidence or expected source changed; the owner reviewed and accepted them. Unchanged cases keep their baseline verdict. |
+
+### Against the noise rule
+
+| Measure | Baseline | Conversation path | Rule | Result |
+| --- | --- | --- | --- | --- |
+| Cases that lost a pass | | 1 (`dev-append-only-trigger`) | net loss of more than 5 is a regression | none |
+| Cases that gained a pass | | 7 | | net +6 |
+| Status exactly as expected | 82% (31 of 38) | 95% (36 of 38) | no drop of more than 13 points | met |
+| Declined when it should | 9 of 10 | 10 of 10 | no drop of more than 13 points | met |
+| Answered cases that are correct | 91% (22 correct, 5 partial of 27) | 88% (20 correct, 6 partial of 26) | no drop of more than 13 points | met (down 2.5) |
+| Questions that timed out | 2 | 0 | | |
+
+**No regression beyond noise.** Gained passes: `oos-dev-bloomberg-scores`, `oos-qa-python-gc` and
+`oos-pm-next-year-releases` (now `out_of_scope`), `qa-backfill-clarify` (now `clarify`),
+`pm-ci-checks`, `nf-pm-hosting-cost` and `po-built-vs-planned` (the last two timed out in the baseline).
+
+### Cases with a new verdict
+
+| Case | Change | Verdict |
+| --- | --- | --- |
+| `dev-append-only-trigger` | answered `high` → `not_found`, no sources | wrong: declines a question the baseline answered correctly |
+| `pm-phase-status` | `medium` → `low` | partial (was correct): does not say scoring is next |
+| `po-built-vs-planned` | timeout → `medium` | partial: lists sector membership as built from the docs and does not note it is missing from the repository |
+| `qa-jump-threshold` | `medium` → `low` | partial, as in the baseline |
+| `pm-ci-checks` | now passes | partial, as in the baseline; Postgres 16 and strict types are now given, the PR-title rule is not |
+| `dev-edgar-client-limits`, `ba-derived-values`, `ba-trailing-high-basis`, `ba-survivor-universe`, `po-backtest-trust`, `pm-release-history` | confidence changed | correct |
+| `qa-backfill-clarify` | answered → `clarify` | correct on status |
+
+Cases whose cited sources changed but whose status and confidence did not (29 cases showed some
+difference in sources) kept their baseline verdict.
+
+### Other differences
+
+- Median time to an answer 79.8 s (baseline 57.2 s); 95th percentile 229.3 s (baseline 241.5 s).
+- 12 questions used every tool call (baseline 10).
+- The confidence report was got by asking again on 5 cases (baseline 1).
+- 2 answers were rewritten for style; no style problems were left at depth 1.
+- `dev-append-only-trigger` is the one real loss. It was not run again; it may be search noise.
