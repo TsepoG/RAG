@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { icon } from '../../../../public/js/ui/icons.js';
+import { ICON_NAMES, icon } from '../../../../public/js/ui/icons.js';
 
 describe('icon', () => {
   it('draws the check as an svg that is hidden from screen readers', () => {
@@ -35,5 +35,32 @@ describe('icon', () => {
 
     expect(svg.getAttribute('width')).toBe('12');
     expect(svg.getAttribute('stroke-width')).toBe('3');
+  });
+});
+
+describe('every icon', () => {
+  it('has the names the cards use', () => {
+    expect([...ICON_NAMES].sort()).toEqual([
+      'alert-circle',
+      'alert-triangle',
+      'check',
+      'help-circle',
+      'no-entry',
+      'refresh',
+      'search-minus',
+      'thumbs-down',
+      'thumbs-up',
+    ]);
+  });
+
+  it.each(ICON_NAMES)('draws %s as a hidden svg with at least one path', (name) => {
+    const svg = icon(name);
+
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(svg.getAttribute('class')).toBe(`icon icon--${name}`);
+    expect(svg.querySelectorAll('path').length).toBeGreaterThan(0);
+    for (const path of svg.querySelectorAll('path')) {
+      expect(path.getAttribute('d')).toMatch(/^M/);
+    }
   });
 });
