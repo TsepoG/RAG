@@ -1,7 +1,35 @@
 # Changelog
 
 One entry per phase. Dates are those of the merge or, for Phase 6, of the last change on its
-branch. The version is `0.1.0` for the whole MVP, to be tagged after Phase 6 is merged.
+branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`, to be tagged after it is merged.
+
+## Phase 7: Conversations (2026-10-15)
+
+- The page is now a chat. Follow-up questions go to one Copilot session per conversation, citation
+  keys last the whole conversation, and every turn goes through the full honesty checks on its own.
+  Each answer has its own Sources list with "fetched in turn N". One conversation is active at a
+  time, for one role; a turn counter, a stop that keeps the conversation going, a full state, and a
+  restore after a reload or a fresh start with a notice after a restart.
+- Re-checks: a cited Confluence page (by version), GitHub file (by blob SHA at the commit that was
+  read), folder and release list can be compared with the live source without the model, by hand
+  (**Re-check sources**) or automatically (a reused source, an old source, every source after the
+  last allowed turn). A changed source is shown on the source and the answer, caps that answer at
+  `medium` (rule `source-changed`) and offers **Re-ask with the latest version**, which fetches it
+  again under a new key.
+- If the model's history is cut during a turn, that answer is capped at `medium` and the
+  conversation ends (rule `memory-dropped`).
+- New settings: `CONVERSATION_MAX_TURNS`, `CONVERSATION_MAX_SOURCE_CHARS`,
+  `CONVERSATION_IDLE_MINUTES`, `RECHECK_AFTER_MINUTES`. New routes under `/api/conversations`
+  (create, messages, transcript, recheck, delete); `POST /api/ask` is unchanged. Feedback lines
+  record the turn.
+- Evaluation: multi-turn cases (`turns`, `reusesEarlier`), `--path conversation`, per-turn scoring.
+  Results are in [docs/EVAL_LOG.md](docs/EVAL_LOG.md): no regression beyond the noise when the 38
+  cases are asked as conversations, and five multi-turn cases.
+- Deviations from the brief, both agreed: the GitHub check compares the stored fingerprint at the
+  ref the model read (two requests, or "couldn't check", when none was stored; never "changed"
+  without a baseline), and the sweep after the last turn skips only sources checked in the last 2
+  minutes, with badges that say when each was checked.
+- Not changed: the single-question command line (`npm run ask`) and the eval default path.
 
 ## Phase 6: Evaluation and polish (2026-10-12)
 

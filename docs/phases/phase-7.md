@@ -140,27 +140,29 @@ public/js/                  # chat list, answer card, sources panel, re-check, t
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] A real follow-up conversation of 3+ turns works in the browser; a
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+- [x] A real follow-up conversation of 3+ turns works in the browser; a
       follow-up cites a source fetched in an earlier turn by its key.
-- [ ] Each answer has its own collapsible Sources (n) with "fetched in turn N".
-- [ ] Manual re-check shows "✓ checked"; editing a cited Confluence page or
+- [x] Each answer has its own collapsible Sources (n) with "fetched in turn N".
+- [x] Manual re-check shows "✓ checked"; editing a cited Confluence page or
       pushing a change to a cited file, then re-checking, shows "changed
       since this answer", caps that answer at `medium`, and offers "Re-ask
       with the latest version" (owner does the edit; paste screenshots).
-- [ ] Auto re-check runs for a reused source and for one older than the
+- [x] Auto re-check runs for a reused source and for one older than the
       threshold (unit tests; live where practical).
-- [ ] Turn cap and source budget end the conversation gracefully.
-- [ ] Stop cancels a turn and the conversation continues.
-- [ ] Reload restores the conversation; after a server restart the page starts
+- [x] Turn cap and source budget end the conversation gracefully.
+- [x] Stop cancels a turn and the conversation continues.
+- [x] Reload restores the conversation; after a server restart the page starts
       fresh with a notice.
-- [ ] Multi-turn eval cases added and verified by the owner; the full existing
+- [x] Multi-turn eval cases added and verified by the owner; the full existing
       set run through the conversation path shows no regression beyond the
       Phase 6 noise level against the Phase 6 final run (logged in `EVAL_LOG.md`).
+      The Phase 6 final run was never done, so the comparison is with a new single-question
+      baseline on one pinned model (`20261013-163928`); see the Phase 7 sections of `EVAL_LOG.md`.
 - [ ] CI green; SonarQube quality gate passes with zero new issues.
-- [ ] README and `docs/DEMO.md` updated for conversations, re-checks and the
+- [x] README and `docs/DEMO.md` updated for conversations, re-checks and the
       new settings; `CHANGELOG.md` entry; `docs/ROADMAP.md` gains Phase 7.
-- [ ] Phase 6 acceptance criteria ticked in `docs/phases/phase-6.md`, and
+- [x] Phase 6 acceptance criteria ticked in `docs/phases/phase-6.md`, and
       this file plus `docs/phase-7-conversation-decisions.md` committed, in the
       first commit of the branch.
 
