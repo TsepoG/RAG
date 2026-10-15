@@ -12,7 +12,7 @@ describe('buildWelcome', () => {
   it('asks what the reader would like to know, and says how it will answer', () => {
     const welcome = buildWelcome({}, vi.fn());
 
-    expect(welcome.querySelector('h1')?.textContent).toBe(WELCOME_HEADING);
+    expect(welcome.querySelector('h2')?.textContent).toBe(WELCOME_HEADING);
     expect(WELCOME_HEADING).toBe('What would you like to know?');
     expect(welcome.querySelector('.welcome__text')?.textContent).toContain(
       'Confluence pages and GitHub code',

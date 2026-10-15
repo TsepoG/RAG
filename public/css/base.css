@@ -96,6 +96,11 @@ samp {
   font-family: var(--font-mono);
 }
 
+/* A class that sets display must not show an element that is hidden. */
+[hidden] {
+  display: none !important;
+}
+
 /* One focus ring for everything a keyboard can reach. */
 :focus-visible {
   outline: var(--focus-width) solid var(--focus-color);

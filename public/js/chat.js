@@ -8,9 +8,9 @@ import {
   isBusy,
   next,
 } from './chatState.js';
-import { showRoleConfirm, showRoles, showShell } from './shell.js';
-import { focusSource, refreshAges } from './sourcesPanel.js';
-import { drawTurns } from './turnList.js';
+import { conversationToMarkdown, copyConversation } from './ui/copyConversation.js';
+import { focusSource, setSourcesOpen } from './ui/sources.js';
+import { createView } from './view.js';
 
 /** How often the "checked N min ago" text is brought up to date, in ms. */
 export const AGE_REFRESH_MS = 30_000;
@@ -24,6 +24,9 @@ const RECHECK_TOO_SOON = 'Those sources were checked a moment ago. Try again in 
 
 /** Said when the sources could not be checked at all. */
 const RECHECK_FAILED = 'The sources could not be checked just now.';
+
+/** Said when the list of roles could not be loaded. */
+const ROLES_FAILED = 'The roles could not be loaded.';
 
 /**
  * What the chat needs from the server, so tests can use fakes.
@@ -67,37 +70,40 @@ function attribute(element, name) {
 }
 
 /**
- * Creates the chat: it connects the page's elements, the server and the state. All the logic that
+ * Creates the chat: it connects the page's view, the server and the state. All the logic that
  * decides what happens lives in the modules it uses; this holds the order of things.
  * @param {object} deps - What it works with.
- * @param {import('./refs.js').PageRefs} deps.refs - The page's elements.
+ * @param {import('./refs.js').PageRefs} deps.refs - The page's places.
  * @param {ChatApi} deps.api - The server.
  * @param {ChatStorage} deps.storage - What is remembered.
  * @param {{ now: () => number }} deps.clock - The time source.
+ * @param {{ writeText: (text: string) => Promise<void> } | undefined} [deps.clipboard] - The clipboard; the browser's by default.
  * @returns {{
  *   start: () => Promise<void>,
  *   tick: () => void,
  *   state: () => import('./chatState.js').ChatState,
  * }} The chat.
  */
-export function createChat({ refs, api, storage, clock }) {
+export function createChat({
+  refs,
+  api,
+  storage,
+  clock,
+  clipboard = globalThis.navigator?.clipboard,
+}) {
+  const view = createView({ refs });
   let state = /** @type {import('./chatState.js').ChatState} */ (INITIAL_CHAT);
-  /** @type {import('./shell.js').RoleSummary[]} */
+  /** @type {import('./ui/sidebar.js').RoleSummary[]} */
   let roles = [];
+  /** @type {string | undefined} */
+  let roleId;
   /** @type {AbortController | undefined} */
   let controller;
-  /** @type {string | undefined} */
-  let pendingRole;
-  const memory = new WeakMap();
   const openSources = new Set();
 
   /** Draws the page for the state. */
   function render() {
-    showShell(refs, state);
-    drawTurns(/** @type {HTMLOListElement} */ (refs.messages), memory, state, {
-      now: clock.now(),
-      openSources,
-    });
+    view.render({ state, roles, roleId, openSources, now: clock.now() });
   }
 
   /**
@@ -113,11 +119,10 @@ export function createChat({ refs, api, storage, clock }) {
   }
 
   /**
-   * The role chosen in the picker.
-   * @returns {import("./shell.js").RoleSummary | undefined} The role, if the roles are loaded.
+   * The role chosen before the first question, or the first the server offers.
+   * @returns {import('./ui/sidebar.js').RoleSummary | undefined} The role, if the roles are loaded.
    */
-  const chosenRole = () =>
-    roles.find(({ id }) => id === /** @type {HTMLSelectElement} */ (refs.role).value);
+  const chosenRole = () => roles.find(({ id }) => id === roleId) ?? roles[0];
 
   /**
    * Reads where the conversation stands from the server, after a turn ended without an answer.
@@ -131,7 +136,6 @@ export function createChat({ refs, api, storage, clock }) {
     try {
       const transcript = await api.fetchConversation(id);
       dispatch({ type: 'conversationState', conversation: conversationFromTranscript(transcript) });
-      return;
     } catch (error) {
       if (error instanceof ApiError && error.code === 'conversation_ended') {
         dispatch({ type: 'gone' });
@@ -178,12 +182,25 @@ export function createChat({ refs, api, storage, clock }) {
   }
 
   /**
-   * Tells screen readers an answer has arrived, and puts the cursor back in the question box.
+   * Tells screen readers an answer has arrived, and puts the cursor where the reader goes next.
    * @param {import('./chatState.js').AnswerView} answer - The answer.
    */
-  function announce(answer) {
-    refs.live.textContent = `Answer ready. ${answer.rendered.banner}`.trim();
-    refs.question.focus();
+  function announceAnswer(answer) {
+    view.announce(`Answer ready. ${answer.rendered.banner}`.trim());
+    view.focusAfterAnswer();
+  }
+
+  /**
+   * Shows why a question could not be asked.
+   * @param {unknown} error - What was thrown.
+   * @returns {void}
+   */
+  function failAsk(error) {
+    const message = error instanceof ApiError ? error.message : 'Something went wrong.';
+    dispatch({ type: 'error', kind: 'request', message });
+    if (error instanceof ApiError && error.code === 'conversation_ended') {
+      dispatch({ type: 'gone' });
+    }
   }
 
   /**
@@ -211,31 +228,18 @@ export function createChat({ refs, api, storage, clock }) {
             dispatch(action);
           }
           if (action?.type === 'done') {
-            announce(action.payload);
+            announceAnswer(action.payload);
           }
         },
       });
       dispatch({ type: 'ended' });
     } catch (error) {
       if (!isAbort(error)) {
-        await failAsk(error);
+        failAsk(error);
       }
     }
     if (state.turns.at(-1)?.phase !== 'answered') {
       await refreshConversation();
-    }
-  }
-
-  /**
-   * Shows why a question could not be asked.
-   * @param {unknown} error - What was thrown.
-   * @returns {Promise<void>} Resolves once shown.
-   */
-  async function failAsk(error) {
-    const message = error instanceof ApiError ? error.message : 'Something went wrong.';
-    dispatch({ type: 'error', kind: 'request', message });
-    if (error instanceof ApiError && error.code === 'conversation_ended') {
-      dispatch({ type: 'gone' });
     }
   }
 
@@ -278,35 +282,23 @@ export function createChat({ refs, api, storage, clock }) {
   }
 
   /**
+   * Asks the same question again as a new turn.
+   * @param {import('./chatState.js').TurnView | undefined} turn - The turn whose question to ask.
+   * @param {{ detailLevel: 'default' | 'more', reaskAnswerId?: string }} how - The level, and the answer being asked again.
+   * @returns {Promise<void>} Resolves when the turn has ended.
+   */
+  async function askAgain(turn, { detailLevel, reaskAnswerId }) {
+    if (turn !== undefined) {
+      await ask({ question: turn.question, detailLevel, reaskAnswerId });
+    }
+  }
+
+  /**
    * Finds the turn that gave an answer.
    * @param {string} answerId - The answer.
    * @returns {import('./chatState.js').TurnView | undefined} The turn.
    */
   const turnOf = (answerId) => state.turns.find(({ answer }) => answer?.answerId === answerId);
-
-  /**
-   * Asks the same question again as a new turn, for the latest versions of the sources.
-   * @param {string} answerId - The answer to ask again.
-   * @returns {Promise<void>} Resolves when the turn has ended.
-   */
-  async function reask(answerId) {
-    const turn = turnOf(answerId);
-    if (turn !== undefined) {
-      await ask({ question: turn.question, detailLevel: 'default', reaskAnswerId: answerId });
-    }
-  }
-
-  /**
-   * Asks for more detail on the newest answer, as a follow-up one step more technical.
-   * @param {string} answerId - The answer.
-   * @returns {Promise<void>} Resolves when the turn has ended.
-   */
-  async function moreDetail(answerId) {
-    const turn = turnOf(answerId);
-    if (turn !== undefined) {
-      await ask({ question: turn.question, detailLevel: 'more' });
-    }
-  }
 
   /**
    * Sends feedback and says whether it was saved.
@@ -352,8 +344,9 @@ export function createChat({ refs, api, storage, clock }) {
     const id = state.conversation?.conversationId;
     storage.clearConversationId();
     dispatch({ type: 'reset' });
-    refs.live.textContent = '';
-    refs.question.focus();
+    view.announce('');
+    view.closeDrawer();
+    view.focusQuestion();
     if (id !== undefined) {
       try {
         await api.deleteConversation(id);
@@ -364,49 +357,37 @@ export function createChat({ refs, api, storage, clock }) {
   }
 
   /**
-   * Handles a change of role. While a conversation has questions in it, the role cannot change
-   * under it, so the reader is asked first.
+   * Chooses the role to ask as. Once a question is asked the role is locked, so this does nothing.
+   * @param {string} id - The role.
    */
-  function changeRole() {
-    const select = /** @type {HTMLSelectElement} */ (refs.role);
-    const role = chosenRole();
-    if (role === undefined) {
-      return;
-    }
-    if (
-      state.turns.length > 0 &&
-      state.conversation !== undefined &&
-      state.conversation.role !== role.id
-    ) {
-      pendingRole = role.id;
-      refs.roleDescription.textContent = role.description;
-      showRoleConfirm(refs, role.displayName);
-      return;
-    }
-    storage.saveRole(role.id);
-    showRoles(refs, roles, select.value);
-  }
-
-  /**
-   * Answers the question "Start a new conversation as this role?".
-   * @param {boolean} yes - Whether the reader said yes.
-   * @returns {Promise<void>} Resolves once done.
-   */
-  async function answerRoleConfirm(yes) {
-    showRoleConfirm(refs, undefined);
-    const chosen = pendingRole;
-    pendingRole = undefined;
-    if (yes && chosen !== undefined) {
-      storage.saveRole(chosen);
-      await newConversation();
-      showRoles(refs, roles, chosen);
-    } else {
-      showRoles(refs, roles, state.conversation?.role);
+  function selectRole(id) {
+    if (state.turns.length === 0 && roles.some((role) => role.id === id)) {
+      roleId = id;
+      storage.saveRole(id);
+      render();
     }
   }
 
   /**
-   * Shows the conversation this tab had open, or says it is gone.
+   * Puts the whole conversation on the clipboard, or shows it to copy by hand.
+   * @returns {Promise<void>} Resolves once it is done.
+   */
+  async function copy() {
+    const role = roles.find(({ id }) => id === state.conversation?.role);
+    await copyConversation({
+      markdown: conversationToMarkdown({
+        roleName: role?.displayName ?? 'Unknown role',
+        date: new Date(clock.now()),
+        turns: state.turns,
+      }),
+      clipboard,
+      announce: view.announce,
+      showFallback: view.showCopyDialog,
+    });
+  }
+
+  /**
+   * Shows the conversation the tab had open, or says it is gone.
    * @returns {Promise<void>} Resolves once shown.
    */
   async function restore() {
@@ -418,7 +399,6 @@ export function createChat({ refs, api, storage, clock }) {
       const transcript = await api.fetchConversation(id);
       const role = roles.find((candidate) => candidate.id === transcript.role);
       dispatch({ type: 'restored', transcript, roleDepth: role?.depth ?? 0 });
-      showRoles(refs, roles, transcript.role);
     } catch (error) {
       if (error instanceof ApiError && error.code === 'conversation_ended') {
         storage.clearConversationId();
@@ -437,23 +417,83 @@ export function createChat({ refs, api, storage, clock }) {
     const card = target?.closest('.card');
     if (chip !== null && card instanceof HTMLElement) {
       // The page wrote these attributes itself, so they are there.
-      focusSource(card, attribute(card, 'data-answer-id'), attribute(chip, 'data-key'));
+      const answerId = attribute(card, 'data-answer-id');
+      if (focusSource(card, answerId, attribute(chip, 'data-key'))) {
+        openSources.add(answerId);
+      }
       return;
     }
     const button = target?.closest('[data-action]') ?? null;
-    if (button === null) {
+    if (button !== null) {
+      onAnswerAction(button);
+    }
+  }
+
+  /**
+   * Acts on a button of an answer or of a failed turn.
+   * @param {Element} button - The button.
+   */
+  function onAnswerAction(button) {
+    const action = attribute(button, 'data-action');
+    if (action === 'retry') {
+      const turn = state.turns.find(
+        (candidate) => candidate.turn === Number(attribute(button, 'data-turn')),
+      );
+      void askAgain(turn, { detailLevel: turn?.detailLevel ?? 'default' });
       return;
     }
     const answerId = attribute(button, 'data-answer-id');
+    if (action === 'sources') {
+      toggleSources(button, answerId);
+      return;
+    }
     const actions = {
       recheck: () => recheck(answerId),
-      reask: () => reask(answerId),
-      more: () => moreDetail(answerId),
+      reask: () => askAgain(turnOf(answerId), { detailLevel: 'default', reaskAnswerId: answerId }),
+      more: () => askAgain(turnOf(answerId), { detailLevel: 'more' }),
       up: () => rate(answerId, 'up'),
       down: () => rate(answerId, 'down'),
     };
-    const action = actions[/** @type {keyof typeof actions} */ (attribute(button, 'data-action'))];
-    void action?.();
+    void actions[/** @type {keyof typeof actions} */ (action)]?.();
+  }
+
+  /**
+   * Opens or closes the Sources of an answer, and remembers it so a redraw keeps it so.
+   * @param {Element} button - The toggle.
+   * @param {string} answerId - The answer.
+   */
+  function toggleSources(button, answerId) {
+    const section = /** @type {HTMLElement} */ (button.closest('.sources'));
+    const open = button.getAttribute('aria-expanded') !== 'true';
+    setSourcesOpen(section, open);
+    if (open) {
+      openSources.add(answerId);
+    } else {
+      openSources.delete(answerId);
+    }
+  }
+
+  /**
+   * Acts on a click on a role, or on a button of the sidebar, the end card or the question box.
+   * @param {MouseEvent} event - The click.
+   */
+  function onPageClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const role = target?.closest('[data-role]') ?? null;
+    if (role !== null) {
+      selectRole(attribute(role, 'data-role'));
+      view.closeDrawer();
+      return;
+    }
+    const action = target?.closest('[data-action]')?.getAttribute('data-action');
+    if (action === 'new-conversation') {
+      void newConversation();
+    } else if (action === 'copy-conversation') {
+      view.closeDrawer();
+      void copy();
+    } else if (action === 'stop') {
+      stop();
+    }
   }
 
   /**
@@ -478,19 +518,18 @@ export function createChat({ refs, api, storage, clock }) {
 
   /** Connects the page's events. */
   function attach() {
-    refs.form.addEventListener('submit', (event) => {
+    view.form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const field = /** @type {HTMLTextAreaElement} */ (refs.question);
-      const question = field.value.trim();
+      const question = view.field.value.trim();
       if (question !== '' && canAsk(state)) {
-        field.value = '';
+        view.field.value = '';
         void ask({ question, detailLevel: 'default' });
       }
     });
-    refs.question.addEventListener('keydown', (event) => {
+    view.field.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
         event.preventDefault();
-        /** @type {HTMLFormElement} */ (refs.form).requestSubmit();
+        view.form.requestSubmit();
       }
     });
     document.addEventListener('keydown', (event) => {
@@ -498,30 +537,12 @@ export function createChat({ refs, api, storage, clock }) {
         stop();
       }
     });
-    refs.role.addEventListener('change', changeRole);
-    refs.stop.addEventListener('click', stop);
-    refs.newConversation.addEventListener('click', () => void newConversation());
-    refs.roleConfirmYes.addEventListener('click', () => void answerRoleConfirm(true));
-    refs.roleConfirmNo.addEventListener('click', () => void answerRoleConfirm(false));
+    for (const place of [refs.sidebar, refs.end, view.form]) {
+      place.addEventListener('click', onPageClick);
+    }
     refs.messages.addEventListener('click', onMessagesClick);
     refs.messages.addEventListener('submit', (event) =>
       onFeedbackSubmit(/** @type {SubmitEvent} */ (event)),
-    );
-    // `toggle` does not bubble, so it is caught on the way down.
-    refs.messages.addEventListener(
-      'toggle',
-      (event) => {
-        const panel = event.target;
-        if (panel instanceof HTMLDetailsElement && panel.classList.contains('sources')) {
-          const id = attribute(panel, 'data-answer-id');
-          if (panel.open) {
-            openSources.add(id);
-          } else {
-            openSources.delete(id);
-          }
-        }
-      },
-      true,
     );
   }
 
@@ -531,15 +552,19 @@ export function createChat({ refs, api, storage, clock }) {
       render();
       try {
         roles = await api.fetchRoles();
-        showRoles(refs, roles, storage.loadRole());
+        const remembered = storage.loadRole();
+        roleId = roles.some(({ id }) => id === remembered) ? remembered : roles[0]?.id;
+        render();
       } catch (error) {
-        refs.roleDescription.textContent =
-          error instanceof ApiError ? error.message : 'The roles could not be loaded.';
+        dispatch({
+          type: 'notice',
+          text: error instanceof ApiError ? error.message : ROLES_FAILED,
+        });
       }
       await restore();
     },
     tick() {
-      refreshAges(refs.messages, clock.now());
+      view.tick(clock.now());
     },
     state: () => state,
   };

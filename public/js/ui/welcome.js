@@ -87,7 +87,7 @@ function buildSuggestions(questions, onPick) {
 export function buildWelcome({ suggestedQuestions = [] }, onPick) {
   return el('section', { className: 'welcome', attributes: { 'aria-label': 'Welcome' } }, [
     el('div', { className: 'welcome__intro' }, [
-      el('h1', { className: 'welcome__heading', text: WELCOME_HEADING }),
+      el('h2', { className: 'welcome__heading', text: WELCOME_HEADING }),
       el('p', { className: 'welcome__text', text: WELCOME_INTRO }),
     ]),
     buildPromises(),

@@ -1,23 +1,20 @@
 // @ts-check
 
-/** The ids of the elements the page draws into, by the name used in the code. */
+/**
+ * The ids of the elements the page draws into, by the name used in the code. Each is a place in
+ * `index.html` that the page code fills; the question box itself is built by the code and is not
+ * listed here.
+ */
 const IDS = Object.freeze({
-  form: 'ask-form',
-  role: 'role',
-  roleDescription: 'role-description',
-  roleConfirm: 'role-confirm',
-  roleConfirmText: 'role-confirm-text',
-  roleConfirmYes: 'role-confirm-yes',
-  roleConfirmNo: 'role-confirm-no',
-  turnCounter: 'turn-counter',
-  newConversation: 'new-conversation',
+  mobileBar: 'mobile-bar',
+  backdrop: 'backdrop',
+  sidebar: 'sidebar',
   notice: 'notice',
+  welcome: 'welcome',
   messages: 'messages',
   live: 'live',
-  fullMessage: 'full-message',
-  question: 'question',
-  ask: 'ask',
-  stop: 'stop',
+  end: 'end',
+  composer: 'composer',
 });
 
 /**

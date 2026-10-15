@@ -70,9 +70,12 @@ describe('the page', () => {
   it('loads the tokens and the base styles before the page styles', () => {
     const html = read('public/index.html');
 
-    const order = ['/css/tokens.css', '/css/base.css', '/css/app.css'].map((href) =>
-      html.indexOf(href),
-    );
+    const order = [
+      '/css/tokens.css',
+      '/css/base.css',
+      '/css/layout.css',
+      '/css/components.css',
+    ].map((href) => html.indexOf(href));
 
     expect(order.every((position) => position > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
@@ -83,5 +86,49 @@ describe('the page', () => {
 
     expect(policy).toContain('"default-src \'self\'"');
     expect(policy).not.toContain('font-src');
+  });
+});
+
+describe('the page styles', () => {
+  const layout = read('public/css/layout.css');
+  const components = read('public/css/components.css');
+  const defined = new Set(
+    tokens
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('--'))
+      .map((line) => line.slice(0, line.indexOf(':'))),
+  );
+
+  it.each([
+    ['layout.css', layout],
+    ['components.css', components],
+  ])('%s uses only values that tokens.css defines', (_name, css) => {
+    const used = [...css.matchAll(/var\((--[\w-]+)/g)].map(([, name]) => name);
+
+    expect(used.length).toBeGreaterThan(0);
+    expect(used.filter((name) => !defined.has(name))).toEqual([]);
+  });
+
+  it.each([
+    ['layout.css', layout],
+    ['components.css', components],
+  ])('%s has no colour of its own', (_name, css) => {
+    expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(css).not.toMatch(/\brgba?\(/);
+  });
+
+  it('shows the sidebar as a drawer, with the phone bar, at 720 pixels and below', () => {
+    expect(layout).toMatch(/@media \(max-width: 720px\)[\s\S]*\.sidebar\.is-open/);
+    expect(layout).toMatch(/\.mobilebar \{\s*display: none;/);
+  });
+
+  it('keeps the question box at the bottom of the screen', () => {
+    expect(layout).toMatch(/\.composer-slot \{[^}]*position: sticky;[^}]*bottom: 0;/);
+  });
+
+  it('gives every interactive element a size a thumb can hit', () => {
+    expect(tokens).toContain('--touch-target: 44px;');
+    expect(components).toMatch(/\.button \{[^}]*min-height: var\(--touch-target\)/);
   });
 });
