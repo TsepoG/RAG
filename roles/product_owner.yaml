@@ -37,4 +37,9 @@ phrases:
   low: "I'm not sure. Here's what I found and what's still unclear."
   notFound: "I couldn't find anything about this in our documentation or the product."
   outOfScope: "I don't have that information. I can only answer from the team's documentation and the product as built."
+# Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
+suggestedQuestions:
+  - In plain terms, what does Shortlist do?
+  - Can we trust the backtest results yet?
+  - How does the product choose short-term picks?
 version: 2

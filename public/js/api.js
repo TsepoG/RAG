@@ -100,7 +100,7 @@ function postJson(body, signal) {
 /**
  * Loads the roles the picker offers.
  * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
- * @returns {Promise<Array<{ id: string, displayName: string, description: string, depth: number }>>} The roles.
+ * @returns {Promise<Array<{ id: string, displayName: string, description: string, depth: number, suggestedQuestions?: string[] }>>} The roles; `suggestedQuestions` is there only when the role has some.
  * @throws {ApiError} When the server cannot be reached or answers with an error.
  */
 export async function fetchRoles(fetchFunction = (...args) => fetch(...args)) {

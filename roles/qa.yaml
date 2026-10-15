@@ -26,4 +26,9 @@ examples:
       refused [C1]. A second refund on the same order is refused [C1]. A refund of 5001 waits for
       manager approval [C1][G1]. Edge cases to check are an order exactly 30 days old and an
       amount of exactly 5000.
+# Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
+suggestedQuestions:
+  - Which known stock splits must the price tests cover?
+  - What kinds of companies must the golden-file fixture set include?
+  - At what coverage level should the team be alerted for a concept in a given year?
 version: 1

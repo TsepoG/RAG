@@ -62,6 +62,20 @@ describe('fetchRoles', () => {
     expect(fetchFunction).toHaveBeenCalledWith('/api/roles', expect.any(Object));
   });
 
+  it('passes on the suggested questions of a role that has them', async () => {
+    const roles = [
+      {
+        id: 'qa',
+        displayName: 'QA',
+        description: 'd',
+        depth: 2,
+        suggestedQuestions: ['What now?'],
+      },
+    ];
+
+    expect(await fetchRoles(fakeFetch(Response.json(roles)))).toEqual(roles);
+  });
+
   it('throws the server message when it refuses', async () => {
     const fetchFunction = fakeFetch(Response.json({ message: 'Not allowed.' }, { status: 403 }));
 
