@@ -321,26 +321,32 @@ animation and the streaming caret.
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+      _3834 tests, coverage 100% on all four measures._
 - [ ] The UI matches the reference at 1440px and 390px for: welcome, active
       conversation (turn 2 with a changed source), answer in progress, not
       found / out of scope, and conversation ended. The owner compares
       screenshots side by side with the mockups.
-- [ ] All honesty features from Phases 3–7 are still visible and working:
+- [x] All honesty features from Phases 3–7 are still visible and working:
       chips, confidence and reason, gaps, conflicts, Sources (n), re-check,
       Re-ask, Stop, Show more detail, feedback, role lock, turn cap,
       reload restore.
-- [ ] Example questions per role, Copy this conversation, and the time hint
+      _Checked by the owner in the browser, and by the ported tests._
+- [x] Example questions per role, Copy this conversation, and the time hint
       work as specified.
-- [ ] Geist fonts are served locally with the licence; the CSP is unchanged or
+      _The role field is `suggestedQuestions`, because `examples` was already taken. The hint reads "Most answers take 1–3 minutes" (p25–p75 of run 20261014-190623), not p50–p95 as drafted. Copy also shows a message on screen._
+- [x] Geist fonts are served locally with the licence; the CSP is unchanged or
       only tightened.
-- [ ] axe-core finds zero violations in the tested states. In Chrome
+      _The CSP is unchanged; `.woff2` was added to the static server._
+- [x] axe-core finds zero violations in the tested states. In Chrome
       DevTools, Lighthouse accessibility scores ≥ 95 on the conversation
       screen, and keyboard-only use works end to end, including the phone
       drawer (owner checks).
-- [ ] No answer-pipeline behaviour change: the existing server and answer
+      _axe runs in jsdom (the other UI tests use happy-dom). Lighthouse accessibility: 96 on desktop and on a phone; one best practice, touch target size, is left. The skip link was removed at the owner's request, so the keyboard pass starts at the roles._
+- [x] No answer-pipeline behaviour change: the existing server and answer
       tests pass without being modified, and one smoke conversation in the
       browser behaves as in Phase 7.
+      _The server and answer tests are unmodified; the smoke conversation behaved as in Phase 7._
 - [ ] README screenshots are updated. `docs/DEMO.md` is rewritten as a
       10-minute manager demo on the new UI. `CHANGELOG.md` has an entry.
       `docs/ROADMAP.md` gains Phase 8.

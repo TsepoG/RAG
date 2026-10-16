@@ -163,6 +163,21 @@ describe('the page has no accessibility violations that axe can find', () => {
     expect(await violations()).toEqual([]);
   });
 
+  it('lets a keyboard user bypass the repeated blocks with landmarks, since there is no skip link', async () => {
+    await start([[done()]]);
+    await ask('How?');
+
+    const results = await axe.run(document, {
+      runOnly: ['bypass', 'region', 'landmark-one-main', 'landmark-unique', 'page-has-heading-one'],
+      resultTypes: ['violations', 'passes'],
+    });
+
+    expect(results.violations.map(({ id }) => id)).toEqual([]);
+    expect(results.passes.map(({ id }) => id)).toContain('bypass');
+    expect(document.querySelector('header.mobilebar')).not.toBeNull();
+    expect(document.querySelector('main')).not.toBeNull();
+  });
+
   it('on a conversation at turn 2, with a changed source and its Sources open', async () => {
     await start([
       [done({ answerId: 'a1', turn: 1 }, { turnCount: 1 })],

@@ -9,6 +9,8 @@ import globals from 'globals';
 
 const SRC_FILES = ['src/**/*.js'];
 const TEST_FILES = ['test/**/*.js'];
+// Tooling run by hand (npm run screenshots): documented like the source, but it is a command, not part of the product.
+const SCRIPT_FILES = ['scripts/**/*.js'];
 // The page's scripts run in the browser, not in Node.
 const PAGE_FILES = ['public/**/*.js'];
 
@@ -35,10 +37,10 @@ export default [
   },
   {
     ...jsdoc.configs['flat/recommended-typescript-flavor-error'],
-    files: [...SRC_FILES, ...PAGE_FILES],
+    files: [...SRC_FILES, ...PAGE_FILES, ...SCRIPT_FILES],
   },
   {
-    files: [...SRC_FILES, ...PAGE_FILES],
+    files: [...SRC_FILES, ...PAGE_FILES, ...SCRIPT_FILES],
     rules: {
       'jsdoc/require-jsdoc': [
         'error',

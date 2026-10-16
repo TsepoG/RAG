@@ -13,3 +13,5 @@ test/fixtures/raw/
 eval/questions.yaml
 eval/questions.from-feedback.yaml
 eval/results/
+# Screenshots from `npm run screenshots`, next to the design mockups; regenerated on demand.
+.screenshots/

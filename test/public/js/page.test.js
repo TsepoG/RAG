@@ -72,6 +72,15 @@ describe('public/index.html', () => {
     expect(refs.composer.classList.contains('composer-slot')).toBe(true);
   });
 
+  it('has the landmarks that let a keyboard or screen reader user skip around without a skip link', () => {
+    const page = inertPage();
+
+    expect(page.querySelectorAll('main')).toHaveLength(1);
+    expect(page.querySelector('[role="complementary"][aria-label]')).not.toBeNull();
+    expect(page.querySelector('main h1')).not.toBeNull();
+    expect(page.querySelector('a.skip, .skip-nav')).toBeNull();
+  });
+
   it('starts with the notice and the drawer cover hidden, and nothing drawn yet', () => {
     const refs = loadPage();
 

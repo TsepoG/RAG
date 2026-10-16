@@ -1446,12 +1446,26 @@ describe('Copy this conversation', () => {
 
     expect(toast().hidden).toBe(false);
     expect(toast().textContent).toBe('Conversation copied');
+    expect(toast().textContent).toBe(refs.live.textContent);
+    expect(toast().getAttribute('aria-hidden')).toBe('true');
     const [hide] = /** @type {[() => void, number]} */ (
       timers.mock.calls.find(([, delay]) => delay === 3000)
     );
     hide();
     expect(toast().hidden).toBe(true);
     timers.mockRestore();
+  });
+
+  it('leaves the focus where it was when the message is shown', async () => {
+    await setup({ clipboard: working() });
+    await ask('How?');
+    const button = inSidebar('[data-action="copy-conversation"]');
+    button.focus();
+
+    button.click();
+    await settle();
+
+    expect(document.activeElement).toBe(button);
   });
 
   it('shows no message that it was copied when it could not be, because the box is shown instead', async () => {

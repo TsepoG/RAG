@@ -8,9 +8,9 @@ used and states how confident it is.
 It runs on one machine, for one person, and everything it does against Confluence and GitHub is
 read-only. The project was built in phases (see [docs/ROADMAP.md](docs/ROADMAP.md)): quality gates
 and config, the Copilot and MCP connection, roles and citations, the honesty checks, the local web
-page, an evaluation (see [Evaluation](#evaluation)), and last conversations: follow-up questions in
-one chat, with checks that cited sources have not changed since they were read (see
-[Conversations](#conversations)). The change history is in
+page, an evaluation (see [Evaluation](#evaluation)), conversations (follow-up questions in one
+chat, with checks that cited sources have not changed since they were read; see
+[Conversations](#conversations)), and last a redesigned page. The change history is in
 [CHANGELOG.md](CHANGELOG.md) and a ten-minute walkthrough is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
@@ -177,45 +177,71 @@ Open `http://127.0.0.1:3000`. `npm start` loads `.env`, starts Copilot, checks y
 and then listens; a bad setting or a missing Copilot login prints one message and exits with
 code 1. Ctrl+C stops the server, any question that is running, and Copilot.
 
-On the page you pick a role (your choice is remembered in the browser) and type a question. Enter
-sends, Shift+Enter adds a line and Esc stops. While it works you see progress lines such as
-"Searching Confluence…" and the draft answer as plain grey text; the draft is not checked yet. When
-the answer has been checked it replaces the draft with:
+The page has a sidebar and a chat column. In the sidebar you pick a role under **Answering as**
+(your choice is remembered in the browser). Before the first question the page shows what the
+assistant promises (sourced, says how sure it is, admits what it can't find) and **Try asking**: a
+few questions for the chosen role. Clicking one puts it in the question box and does not send it.
+Type a question; Enter sends, Shift+Enter adds a line and Esc stops.
 
-- a **banner** with the confidence level in words ("Medium confidence") and why;
+![The welcome screen: roles on the left, three promises, questions to try and the question box](docs/screenshots/welcome.png)
+
+While it works you see a list of steps ("Searched Confluence", "Read 2 Confluence pages",
+"Reading a file from GitHub", then "Writing and checking the answer"): finished steps have a tick
+and the current one a spinner. The question box shows **Stop** and a typical time ("Most answers
+take 1–3 minutes"). A draft of the answer may appear in grey under the label "Draft: sources still
+being checked"; it is not checked yet.
+
+![An answer in progress: the step list and the Stop button](docs/screenshots/in-progress.png)
+
+When the answer has been checked it replaces the draft with:
+
+- a **confidence pill** with an icon and words ("Medium confidence") and, when the level was
+  lowered, why;
 - the answer, with **citation chips** (`C1`, `G2*`). Click a chip to jump to its source in the
   Sources list; a chip with `*` is the assistant's own reading of the code;
-- where the documentation and the code disagree, **What I couldn't confirm**, and **Who might
-  know**;
-- a **Sources (n)** list for that answer, with links (Confluence pages, files pinned to a commit),
-  tags such as "may be out of date" and "fetched in turn 2", a check badge ("✓ checked 3 min ago"
-  or "changed since this answer"), and a collapsed **Also consulted** list;
+- **What I'm not sure about**, and where the documentation and the code disagree, **Where sources
+  disagree**;
+- a **Sources (n)** list for that answer, closed until you open it, with links (Confluence pages,
+  files pinned to a commit), tags such as "fetched in turn 2", a check badge ("✓ checked 3 min ago"
+  or "changed since this answer"), and the sources it only **also consulted**;
 - **Re-check sources**, and when a source has changed, **Re-ask with the latest version** (see
   [Conversations](#conversations));
 - **Show more detail**, which asks for the same answer one step more technically, as a follow-up
   in the conversation (not offered to the Developer role, or when the answer was not found);
-- **Yes / No** feedback. A No opens a box for a comment and the source that was wrong.
+- **thumbs up and down** feedback. A thumbs-down opens a box for a comment and the source that was
+  wrong.
 
 The page is a chat: your question and its answer stay on screen and the next question goes
 underneath. A follow-up can use what was already found, and a citation key such as `C1` means the
-same source for the whole conversation.
+same source for the whole conversation. After the first question the role is locked and shown with
+a lock; **New conversation** is how to change it.
 
-![The answer page in dark mode: role picker, question, a medium-confidence banner and the answer with citation chips](docs/screenshots/answer-dark.png)
+![A conversation at turn 2: a medium-confidence answer, its citations and the Sources list with a changed source](docs/screenshots/conversation.png)
 
-![The Sources list with commit tags, the feedback buttons and the collapsed Also consulted list](docs/screenshots/sources-dark.png)
+Clicking a chip highlights its source. When nothing is found, or the question is outside what the
+assistant can answer, the role's own wording is shown instead of an answer, with where it looked
+and who might know:
 
-Clicking a chip highlights its source:
+![A not-found answer: where it looked, and no sources](docs/screenshots/not-found.png)
 
-![A source highlighted in the Sources list after its chip was clicked](docs/screenshots/source-highlight.png)
+**Copy this conversation** (in the sidebar and on the end card) puts the whole conversation on the
+clipboard as Markdown: each question, the answer with its citation keys, the confidence and why,
+and a list of sources with links. A message says when it has been copied. If the browser does not
+allow the clipboard, the text is shown in a box to copy by hand.
 
-The page follows the browser's light or dark setting and works on a narrow screen. When nothing is
-found, the role's own wording is shown instead of an answer:
+When a conversation is full or has ended, a card replaces the question box. It says why, gives the
+result of the final check of the sources, and offers **Start a new conversation**:
 
-![The answer page in light mode](docs/screenshots/answer-light.png)
+![A conversation that has reached its turn limit: the end card with the final source check](docs/screenshots/ended.png)
 
-![A not-found answer: one line, with no sources](docs/screenshots/not-found.png)
+On a screen 720 pixels wide or less the sidebar becomes a menu button in a top bar, with the role
+and the turn shown under it; the menu opens as a drawer that keeps the keyboard inside it and
+closes with Esc. The page has one light theme, uses the Geist fonts from the app itself, and can be
+used with the keyboard alone.
 
-![The page on a 375 pixel wide screen](docs/screenshots/mobile.png)
+![The page on a 390 pixel wide screen](docs/screenshots/phone.png)
+
+![The phone menu drawer](docs/screenshots/phone-drawer.png)
 
 **Stop** (or Esc) cancels the question that is running; the server aborts that turn, the
 conversation stays open and you can ask the next question. A stopped question still counts toward
@@ -258,7 +284,7 @@ nosniff`, `Referrer-Policy: no-referrer`; API responses are `no-store`. The page
 | Route                                  | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/health`                      | `{ "status": "ok" }`                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `GET /api/roles`                       | `[{ id, displayName, description, depth }]`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `GET /api/roles`                       | `[{ id, displayName, description, depth, suggestedQuestions? }]`                                                                                                                                                                                                                                                                                                                                                                                                |
 | `POST /api/ask`                        | Body `{ question, role, detailLevel }` (`detailLevel` is `default` or `more`). Answers with a `text/event-stream` of `progress` `{ kind, message }`, `token` `{ text }` (the `answer-meta` block is never in it), then exactly one `done` or `error`. `done` holds `{ answerId, result, rendered, html: { answer, conflicts } }`; `error` holds `{ kind, message }` with kind `timeout`, `cancelled`, `copilot` or `internal`. 429 while another question runs. |
 | `POST /api/feedback`                   | Body `{ answerId, rating: "up" or "down", comment?, wrongSourceKey? }`; 404 for an unknown id, 400 for a source the answer did not cite.                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/conversations`              | Body `{ role }`. Starts a conversation and ends any other. Answers `{ conversationId, maxTurns }`.                                                                                                                                                                                                                                                                                                                                                              |
@@ -281,8 +307,8 @@ A conversation is one Copilot session that stays open for several questions, for
   an answer's Sources list shows only what that answer cites ("fetched in turn N" says where each
   came from).
 - **One at a time.** There is one active conversation. Starting a new one (the **New
-  conversation** button, or changing the role after the page asks you to confirm) ends the old one.
-  A conversation is for one role, so the role cannot change in the middle of it.
+  conversation** button) ends the old one. A conversation is for one role, so the role is locked after
+  the first question and cannot change in the middle of it.
 - **Limits.** A conversation holds at most `CONVERSATION_MAX_TURNS` questions and at most
   `CONVERSATION_MAX_SOURCE_CHARS` characters of source text; past either it is full and the page
   says so and asks for a new one. One that has had no activity for `CONVERSATION_IDLE_MINUTES` is
@@ -344,8 +370,8 @@ error (one line on stderr); `2` when the question exceeds `ASK_TIMEOUT_MS`.
 `npm run roles` lists the profiles in [roles/](roles). There are five: `developer`,
 `business_analyst`, `qa`, `product_owner` and `project_manager`. Each is a YAML file checked at
 startup (a bad file names the file and field). A profile sets the audience, a depth from 1 to 3,
-the vocabulary to use and the words to avoid, which source to search first, the shape of the answer
-and examples. All roles are grounded the same way: the part of the system message about grounding,
+the vocabulary to use and the words to avoid, which source to search first, the shape of the answer,
+examples, and up to four **suggested questions** the page offers on its welcome screen. All roles are grounded the same way: the part of the system message about grounding,
 safety and citations is identical for every role, and only the role block changes how the answer
 is written. Depth 1 roles (product owner, project manager) get plain business language, with no
 code or file paths in the answer or the Sources list.
@@ -562,7 +588,7 @@ src/
   server/    the web server: Fastify app, guards, security headers, SSE, feedback; index.js starts it
   render/    answer markdown to safe HTML with citation chips; removes answer-meta from the stream
 eval/        questions.example.yaml (committed); your real questions.yaml and the results/ are git-ignored
-public/      the web page: index.html, css/ and vanilla JavaScript modules in js/ (no build step)
+public/      the web page: index.html, css/ (tokens, base, layout, components), fonts/ and vanilla JavaScript in js/ (state, controller, ui/ render modules); no build step
 test/        mirrors src/ and public/js/; test/helpers holds shared test utilities; test/live runs on demand
 docs/        roadmap, system design, coding principles and one file per phase
 ```
