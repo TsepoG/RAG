@@ -8,6 +8,7 @@ import { buildDrawerClose, buildMobileBar, createDrawer } from './ui/drawer.js';
 import { buildEndCard, summariseChecks } from './ui/endCard.js';
 import { buildSidebarContent, countSourcesUsed } from './ui/sidebar.js';
 import { refreshAges } from './ui/sources.js';
+import { createToast } from './ui/toast.js';
 import { buildWelcome } from './ui/welcome.js';
 
 /**
@@ -71,6 +72,7 @@ function restoreFocus(container, before) {
  *   render: (input: ViewInput) => void,
  *   tick: (now: number) => void,
  *   announce: (text: string) => void,
+ *   showToast: (text: string) => void,
  *   focusAfterAnswer: () => void,
  *   focusQuestion: () => void,
  *   showCopyDialog: (markdown: string) => void,
@@ -89,6 +91,7 @@ export function createView({ refs }) {
   const bar = buildMobileBar({ roleName: '', turnText: '' });
   refs.mobileBar.replaceChildren(bar.element);
   const drawer = createDrawer({ panel: refs.sidebar, toggle: bar.toggle, backdrop: refs.backdrop });
+  const toast = createToast(document.body);
   const turnMemory = new WeakMap();
   /** The last things drawn, so a part is drawn again only when what it shows has changed. */
   const drawn = { sidebar: '', welcome: '', end: '' };
@@ -204,6 +207,7 @@ export function createView({ refs }) {
       document.body.append(dialog);
       selectDialogText(dialog);
     },
+    showToast: toast.show,
     closeDrawer: drawer.close,
   };
 }

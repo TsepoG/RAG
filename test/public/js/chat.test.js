@@ -1438,6 +1438,43 @@ describe('Copy this conversation', () => {
     expect(refs.live.textContent).toBe('Conversation copied');
   });
 
+  it('shows a message on screen that it was copied, which goes away by itself', async () => {
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    await setup({ clipboard: working() });
+    await ask('How?');
+    const toast = () => /** @type {HTMLElement} */ (document.querySelector('.toast'));
+    expect(toast().hidden).toBe(true);
+
+    inSidebar('[data-action="copy-conversation"]').click();
+    await settle();
+
+    expect(toast().hidden).toBe(false);
+    expect(toast().textContent).toBe('Conversation copied');
+    const [hide] = /** @type {[() => void, number]} */ (
+      timers.mock.calls.find(([, delay]) => delay === 3000)
+    );
+    hide();
+    expect(toast().hidden).toBe(true);
+    timers.mockRestore();
+  });
+
+  it('shows no message that it was copied when it could not be, because the box is shown instead', async () => {
+    await setup({
+      clipboard: {
+        writeText: vi.fn(async () => {
+          throw new DOMException('Not allowed', 'NotAllowedError');
+        }),
+      },
+    });
+    await ask('How?');
+
+    inSidebar('[data-action="copy-conversation"]').click();
+    await settle();
+
+    expect(/** @type {HTMLElement} */ (document.querySelector('.toast')).hidden).toBe(true);
+    expect(document.querySelector('.copy-dialog')).not.toBeNull();
+  });
+
   it('shows the text to copy by hand when the clipboard refuses, and gives focus back when it is closed', async () => {
     await setup({
       clipboard: {

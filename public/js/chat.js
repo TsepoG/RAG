@@ -8,7 +8,7 @@ import {
   isBusy,
   next,
 } from './chatState.js';
-import { conversationToMarkdown, copyConversation } from './ui/copyConversation.js';
+import { conversationToMarkdown, COPIED_MESSAGE, copyConversation } from './ui/copyConversation.js';
 import { focusSource, setSourcesOpen } from './ui/sources.js';
 import { createView } from './view.js';
 
@@ -374,7 +374,7 @@ export function createChat({
    */
   async function copy() {
     const role = roles.find(({ id }) => id === state.conversation?.role);
-    await copyConversation({
+    const outcome = await copyConversation({
       markdown: conversationToMarkdown({
         roleName: role?.displayName ?? 'Unknown role',
         date: new Date(clock.now()),
@@ -384,6 +384,9 @@ export function createChat({
       announce: view.announce,
       showFallback: view.showCopyDialog,
     });
+    if (outcome === 'copied') {
+      view.showToast(COPIED_MESSAGE);
+    }
   }
 
   /**

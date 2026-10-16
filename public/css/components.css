@@ -1075,6 +1075,25 @@ a.source-row__link:hover {
   color: var(--color-low-text);
 }
 
+/* A short message that shows an action worked, such as Copy this conversation. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-32);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-16);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-14);
+  font-weight: 500;
+  box-shadow: var(--shadow-raised);
+  transform: translateX(-50%);
+}
+
 /* ---- Phone ---------------------------------------------------------------------------------- */
 
 @media (max-width: 720px) {
@@ -1139,5 +1158,10 @@ a.source-row__link:hover {
 
   .composer__stop {
     grid-column: 1 / -1;
+  }
+
+  /* Above the question box, which is pinned to the bottom. */
+  .toast {
+    bottom: 96px;
   }
 }
