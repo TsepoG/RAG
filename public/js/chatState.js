@@ -62,7 +62,6 @@ export const CONVERSATION_GONE =
  * @property {string} question - What was asked.
  * @property {'default' | 'more'} detailLevel - The level it was asked at.
  * @property {'running' | 'answered' | 'stopped' | 'failed'} phase - Where it is.
- * @property {string} progress - The latest progress line while it runs.
  * @property {ReadonlyArray<import('./steps.js').Step>} steps - What it has done so far, while it runs.
  * @property {string} currentStep - The kind of step in progress, while it runs.
  * @property {string} draft - The answer text streamed so far.
@@ -277,7 +276,6 @@ function fromTranscript(entry) {
     question: entry.question,
     detailLevel: entry.detailLevel,
     phase,
-    progress: '',
     ...NO_STEPS,
     draft: '',
     answer: entry.answer ?? undefined,
@@ -321,7 +319,7 @@ function applyRecheck(state, { updates, conversation }) {
  * @returns {ChatState} The state.
  */
 function endRunning(state, phase, failure) {
-  return changeNewest(state, (turn) => ({ ...turn, phase, progress: '', ...NO_STEPS, failure }));
+  return changeNewest(state, (turn) => ({ ...turn, phase, ...NO_STEPS, failure }));
 }
 
 /**
@@ -398,7 +396,6 @@ export function next(state, action) {
                 question: action.question,
                 detailLevel: action.detailLevel,
                 phase: 'running',
-                progress: '',
                 ...NO_STEPS,
                 draft: '',
                 answer: undefined,
@@ -440,7 +437,6 @@ function nextWhileRunning(state, action) {
     case 'progress':
       return changeNewest(state, (turn) => ({
         ...turn,
-        progress: action.message,
         ...stepsAfter(recordProgress, turn, action.message),
       }));
     case 'token':
@@ -456,7 +452,6 @@ function nextWhileRunning(state, action) {
           ...turn,
           turn: answer.turn,
           phase: 'answered',
-          progress: '',
           ...NO_STEPS,
           answer,
         })),

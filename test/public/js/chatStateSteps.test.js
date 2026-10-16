@@ -33,7 +33,7 @@ describe('the steps of a running question', () => {
     expect(turn.currentStep).toBe('');
   });
 
-  it('records each progress line as a step, and keeps the single progress line too', () => {
+  it('records each progress line as a step, in the order they came', () => {
     const turn = newest(
       play([
         ASK,
@@ -42,7 +42,8 @@ describe('the steps of a running question', () => {
       ]),
     );
 
-    expect(turn.progress).toBe('Opening a Confluence page…');
+    expect(turn.steps.map(({ id }) => id)).toEqual(['confluence-search', 'confluence-read']);
+    expect(turn).not.toHaveProperty('progress');
     expect(turn.currentStep).toBe('confluence-read');
     expect(describeSteps(turn).map(({ status }) => status)).toEqual(['done', 'current', 'future']);
   });

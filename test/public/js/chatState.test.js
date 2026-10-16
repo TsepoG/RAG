@@ -60,7 +60,7 @@ describe('the first question', () => {
 });
 
 describe('while a question runs', () => {
-  it('shows progress and builds the draft from the tokens', () => {
+  it('builds the draft from the tokens', () => {
     const state = run(INITIAL_CHAT, [
       STARTED,
       ASK,
@@ -69,13 +69,13 @@ describe('while a question runs', () => {
       { type: 'token', text: 'funds' },
     ]);
 
-    expect(state.turns[0]).toMatchObject({ progress: 'Searching…', draft: 'Refunds' });
+    expect(state.turns[0]).toMatchObject({ draft: 'Refunds' });
   });
 
   it('turns into the answer on done, takes the turn from the server and learns where the conversation stands', () => {
     const state = run(INITIAL_CHAT, [STARTED, ASK, { type: 'token', text: 'x' }, DONE()]);
 
-    expect(state.turns[0]).toMatchObject({ phase: 'answered', turn: 1, progress: '' });
+    expect(state.turns[0]).toMatchObject({ phase: 'answered', turn: 1 });
     expect(state.turns[0]?.answer?.answerId).toBe('a1');
     expect(state.turns[0]?.answer).not.toHaveProperty('conversation');
     expect(state.conversation).toMatchObject({ turnCount: 1, roleDepth: 1 });

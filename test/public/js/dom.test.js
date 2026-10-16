@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // @ts-check
 import { describe, expect, it } from 'vitest';
-import { clear, el, externalLink, safeHref, setVisible } from '../../../public/js/dom.js';
+import { el, externalLink, safeHref, setVisible } from '../../../public/js/dom.js';
 
 describe('el', () => {
   it('makes an element with a class, text and attributes', () => {
@@ -25,16 +25,6 @@ describe('el', () => {
 
   it('needs no options', () => {
     expect(el('div').outerHTML).toBe('<div></div>');
-  });
-});
-
-describe('clear', () => {
-  it('removes everything inside', () => {
-    const element = el('ul', {}, [el('li'), el('li')]);
-
-    clear(element);
-
-    expect(element.childNodes).toHaveLength(0);
   });
 });
 

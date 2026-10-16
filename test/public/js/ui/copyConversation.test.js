@@ -25,7 +25,6 @@ function turn(changes = {}) {
     question: 'How long is the refund window?',
     detailLevel: 'default',
     phase: 'answered',
-    progress: '',
     steps: [],
     currentStep: '',
     draft: '',
