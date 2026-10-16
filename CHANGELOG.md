@@ -1,7 +1,43 @@
 # Changelog
 
 One entry per phase. Dates are those of the merge or, for Phase 6, of the last change on its
-branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`, to be tagged after it is merged.
+branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`; Phase 8 is `0.3.0`, to be tagged
+after it is merged.
+
+## Phase 8: A redesigned page, "Clarity" (2026-10-16)
+
+- The page is rebuilt to the approved design: a sidebar with the role list, a lock after the first
+  question, the turn counter and **New conversation**; a centred chat column; and a question box
+  pinned to the bottom. At 720 pixels and below the sidebar becomes a top bar with a menu button
+  and a drawer that traps focus, closes with Esc and returns focus to the button.
+- Every honesty feature is kept and easier to see: a confidence pill with an icon and words, the
+  reason it was lowered, "What I'm not sure about", "Where sources disagree", a Sources list per
+  answer, source badges (checked, changed, couldn't check), **Re-check sources**, **Re-ask with the
+  latest version**, **Show more detail**, Stop, feedback, and a not-found card with "Where I
+  looked" and "Who might know". An error is a card with **Try again**.
+- A list of steps replaces the single progress line while an answer is made: ticks for finished
+  steps, a spinner for the current one, and "Writing and checking the answer" last. It uses the
+  events the server already sends; nothing was added to them.
+- Three features: **Try asking** (up to four suggested questions per role, `suggestedQuestions` in
+  `roles/*.yaml`, sent by `GET /api/roles` when a role has some; clicking one fills the box and
+  does not send), **Copy this conversation** (the conversation as Markdown, a message on screen
+  when it is copied, and a box to copy by hand when the browser refuses), and a typical time next to
+  Stop ("Most answers take 1–3 minutes", the 25th to 75th percentile of run `20261014-190623`).
+- Each end reason has its own end card (turn limit, source budget, memory dropped, lost session,
+  an unconfirmed stop, expired) with the result of the final source check.
+- Fonts: Geist and Geist Mono, served by the app from `public/fonts/` with the licence. The
+  Content-Security-Policy is unchanged; the server now serves `.woff2`.
+- The page has one light theme; the earlier dark mode was dropped. The stylesheet is split into
+  `tokens.css`, `base.css`, `layout.css` and `components.css`, and the script into render
+  modules in `public/js/ui/`. The old `app.css`, answer card and sources panel are gone.
+- Accessibility: landmarks, one heading outline, `aria-pressed`, `aria-expanded`, `aria-busy`,
+  a polite live region, `prefers-reduced-motion`, and axe-core checks in tests on the welcome,
+  conversation, in-progress, not-found and ended states (zero violations). Lighthouse accessibility
+  is 96 on desktop and on a phone; it lists one best practice, touch target size, which is left for
+  now. The skip link was removed on request.
+- New dev dependencies: `axe-core` and `jsdom` (for the accessibility tests only).
+- Not changed: the answer pipeline, prompts, caps, re-check logic, SSE events, the conversation API
+  and the command line.
 
 ## Phase 7: Conversations (2026-10-15)
 

@@ -1,4 +1,5 @@
 // @ts-check
+import { NO_STEPS, recordDraft, recordProgress } from './steps.js';
 
 /** The deepest role depth; a role at it has no more detail to give. */
 const MOST_TECHNICAL_DEPTH = 3;
@@ -61,7 +62,8 @@ export const CONVERSATION_GONE =
  * @property {string} question - What was asked.
  * @property {'default' | 'more'} detailLevel - The level it was asked at.
  * @property {'running' | 'answered' | 'stopped' | 'failed'} phase - Where it is.
- * @property {string} progress - The latest progress line while it runs.
+ * @property {ReadonlyArray<import('./steps.js').Step>} steps - What it has done so far, while it runs.
+ * @property {string} currentStep - The kind of step in progress, while it runs.
  * @property {string} draft - The answer text streamed so far.
  * @property {AnswerView | undefined} answer - The finished answer.
  * @property {string | undefined} failure - What went wrong, in words for the reader.
@@ -274,7 +276,7 @@ function fromTranscript(entry) {
     question: entry.question,
     detailLevel: entry.detailLevel,
     phase,
-    progress: '',
+    ...NO_STEPS,
     draft: '',
     answer: entry.answer ?? undefined,
     failure: phase === 'failed' ? NO_ANSWER : undefined,
@@ -317,7 +319,7 @@ function applyRecheck(state, { updates, conversation }) {
  * @returns {ChatState} The state.
  */
 function endRunning(state, phase, failure) {
-  return changeNewest(state, (turn) => ({ ...turn, phase, progress: '', failure }));
+  return changeNewest(state, (turn) => ({ ...turn, phase, ...NO_STEPS, failure }));
 }
 
 /**
@@ -394,7 +396,7 @@ export function next(state, action) {
                 question: action.question,
                 detailLevel: action.detailLevel,
                 phase: 'running',
-                progress: '',
+                ...NO_STEPS,
                 draft: '',
                 answer: undefined,
                 failure: undefined,
@@ -404,6 +406,21 @@ export function next(state, action) {
     default:
       return nextWhileRunning(state, action);
   }
+}
+
+/**
+ * Works out the steps of a turn after something happened, keeping nothing else of the turn.
+ * @param {(progress: import('./steps.js').StepProgress, ...rest: string[]) => import('./steps.js').StepProgress} record - What takes it in.
+ * @param {TurnView} turn - The running turn.
+ * @param {string[]} rest - What happened.
+ * @returns {import('./steps.js').StepProgress} The steps and the one in progress.
+ */
+function stepsAfter(record, turn, ...rest) {
+  const { steps, currentStep } = record(
+    { steps: turn.steps, currentStep: turn.currentStep },
+    ...rest,
+  );
+  return { steps, currentStep };
 }
 
 /**
@@ -418,9 +435,16 @@ function nextWhileRunning(state, action) {
   }
   switch (action.type) {
     case 'progress':
-      return changeNewest(state, (turn) => ({ ...turn, progress: action.message }));
+      return changeNewest(state, (turn) => ({
+        ...turn,
+        ...stepsAfter(recordProgress, turn, action.message),
+      }));
     case 'token':
-      return changeNewest(state, (turn) => ({ ...turn, draft: turn.draft + action.text }));
+      return changeNewest(state, (turn) => ({
+        ...turn,
+        draft: turn.draft + action.text,
+        ...stepsAfter(recordDraft, turn),
+      }));
     case 'done': {
       const { conversation, ...answer } = action.payload;
       return {
@@ -428,7 +452,7 @@ function nextWhileRunning(state, action) {
           ...turn,
           turn: answer.turn,
           phase: 'answered',
-          progress: '',
+          ...NO_STEPS,
           answer,
         })),
         conversation: mergeConversation(state, conversation),

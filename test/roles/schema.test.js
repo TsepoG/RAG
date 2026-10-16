@@ -127,6 +127,52 @@ describe('roleSchema', () => {
     );
   });
 
+  it('accepts a role with no suggested questions, none, and from one to four', () => {
+    const question = 'What does it do today?';
+
+    expect(problems(role({ suggestedQuestions: undefined }))).toEqual([]);
+    expect(problems(role({ suggestedQuestions: [] }))).toEqual([]);
+    expect(
+      problems(role({ suggestedQuestions: [question, question, question, question] })),
+    ).toEqual([]);
+  });
+
+  it('rejects more than four suggested questions', () => {
+    const question = 'What does it do today?';
+
+    expect(problems(role({ suggestedQuestions: Array(5).fill(question) }))).toEqual([
+      'suggestedQuestions: must have at most 4 questions',
+    ]);
+  });
+
+  it('rejects a suggested question that is too short, too long, blank or over several lines', () => {
+    expect(problems(role({ suggestedQuestions: ['Short?'] }))).toEqual([
+      'suggestedQuestions.0: must be at least 10 characters',
+    ]);
+    expect(problems(role({ suggestedQuestions: ['x'.repeat(161)] }))).toEqual([
+      'suggestedQuestions.0: must be at most 160 characters',
+    ]);
+    expect(problems(role({ suggestedQuestions: ['  '] }))[0]).toBe(
+      'suggestedQuestions.0: must not be empty',
+    );
+    expect(problems(role({ suggestedQuestions: ['What does it\ndo today?'] }))).toEqual([
+      'suggestedQuestions.0: must be a single line',
+    ]);
+  });
+
+  it('accepts a suggested question of exactly 10 and exactly 160 characters', () => {
+    expect(problems(role({ suggestedQuestions: ['x'.repeat(10), 'x'.repeat(160)] }))).toEqual([]);
+  });
+
+  it('rejects suggested questions that are not a list of text', () => {
+    expect(problems(role({ suggestedQuestions: 'What does it do today?' }))[0]).toBe(
+      'suggestedQuestions: must be a list of questions',
+    );
+    expect(problems(role({ suggestedQuestions: [3] }))).toEqual([
+      'suggestedQuestions.0: must be text',
+    ]);
+  });
+
   it.each([0, 1.5, -2, '1', null])('rejects the version %j', (version) => {
     expect(problems(role({ version }))).toEqual(['version: must be a whole number from 1']);
   });

@@ -150,16 +150,19 @@ public/js/                  # chat list, answer card, sources panel, re-check, t
       with the latest version" (owner does the edit; paste screenshots).
 - [x] Auto re-check runs for a reused source and for one older than the
       threshold (unit tests; live where practical).
+      Covered by unit tests; it was not run live.
 - [x] Turn cap and source budget end the conversation gracefully.
 - [x] Stop cancels a turn and the conversation continues.
 - [x] Reload restores the conversation; after a server restart the page starts
       fresh with a notice.
+      Reload was checked in the browser; the notice after a restart is covered by tests only.
 - [x] Multi-turn eval cases added and verified by the owner; the full existing
       set run through the conversation path shows no regression beyond the
       Phase 6 noise level against the Phase 6 final run (logged in `EVAL_LOG.md`).
       The Phase 6 final run was never done, so the comparison is with a new single-question
       baseline on one pinned model (`20261013-163928`); see the Phase 7 sections of `EVAL_LOG.md`.
-- [ ] CI green; SonarQube quality gate passes with zero new issues.
+- [x] CI green; SonarQube quality gate passes with zero new issues.
+      (PR #8: all checks green and the quality gate OK after one fix, `javascript:S2871`.)
 - [x] README and `docs/DEMO.md` updated for conversations, re-checks and the
       new settings; `CHANGELOG.md` entry; `docs/ROADMAP.md` gains Phase 7.
 - [x] Phase 6 acceptance criteria ticked in `docs/phases/phase-6.md`, and

@@ -26,14 +26,6 @@ export function el(tag, { className, text, attributes = {} } = {}, children = []
 }
 
 /**
- * Empties an element.
- * @param {Element} element - The element.
- */
-export function clear(element) {
-  element.replaceChildren();
-}
-
-/**
  * Checks a link that came from a page or a search result before it is put in the page. Only an
  * https link is used; anything else, such as a `javascript:` link, gets no link at all.
  * @param {string | undefined} url - The link.

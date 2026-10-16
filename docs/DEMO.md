@@ -1,110 +1,153 @@
-# Demo script (13 minutes)
+# Demo script (10 minutes, for a manager)
 
 A walkthrough for showing the assistant to someone who has not seen it. It assumes the setup in
 the README is done, `npm start` is running and the page is open at `http://127.0.0.1:3000`.
 
-The questions below are patterns, not fixed text. Replace each topic in square brackets with
-something that really exists in your Confluence spaces and your repositories, and prefer a topic
-that appears in both. Each question is meant to show one thing, so the script says what to point
-out.
+Answers take a while (the typical range the page itself shows is 1–3 minutes), so this script is
+built around the waiting. It uses **four live questions**, picked because they were among the
+fastest in the evaluation that show something worth showing, and it uses the time while each runs
+to explain the step list. The seconds next to each question are the time it took in the last full
+evaluation run (`20261014-190623`, conversation path; see [EVAL_LOG.md](EVAL_LOG.md)). Yours will
+differ, so rehearse first and expect up to double.
 
-Allow about 1 minute per question: answers take 30 to 90 seconds, so ask the next one while you
-talk about the last.
+The questions are real ones about this project's own Confluence and GitHub content, not patterns.
+If your content differs, pick questions for the same four purposes (a sourced answer, out of
+scope, a changed source, not found) and note their timings.
 
-## 0. Before you start (1 minute)
+| # | Role | Conversation | Question | Shows | Eval time |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Product Owner | 1 | How does the product choose short-term picks? (the third **Try asking** suggestion) | a sourced answer with a confidence level, the step list, citations | about 75 s |
+| 2 | Product Owner | 1 | What is the weather like tomorrow? | out of scope | about 25 s |
+| 3 | Business Analyst | 2 | Which service supplies the currency exchange rates the system uses? | not found, and where it looked | about 80 s |
+
+A changed-source re-check, between questions 1 and 2, needs no question and no Copilot request. In
+all, three Copilot requests, about 3 minutes of waiting.
+
+## Before you start
+
+Do this once, ahead of the demo.
+
+1. **Rehearse questions 1 to 3** so you know the answers and which Confluence page question 1 cites
+   (open **Sources** and note the page title).
+2. **Prepare the changed source.** Pick a Confluence page that question 1 cites, in a space where
+   an extra version does no harm. Have it open in a second window, ready to edit: a one-word change
+   to a sentence, then publish. During the demo the edit is made after question 1 has been
+   answered. Undo it afterwards if it matters.
+3. Start with a fresh page: **New conversation**, or clear the browser's session storage, so the
+   welcome screen shows.
+4. Open the page at 1440 pixels wide or full screen. Keep the README's phone screenshot at hand
+   in case someone asks about small screens.
+
+## 1. Introduction (1 minute)
 
 - Say what it is: a local assistant that answers from Confluence and GitHub, read-only, and says
-  how sure it is.
-- Point at the role picker: the five roles get different answers to the same question.
-- Say what to watch for in every answer: the confidence banner, the numbered sources, and the
-  "What I couldn't confirm" list.
+  how sure it is. It runs on one machine for one person.
+- Point at **Answering as** in the sidebar: five roles. The same question gets different answers
+  for a developer and a product owner.
+- Point at the three tiles: every answer is sourced, says how sure it is, admits what it cannot
+  find. The rest of the demo shows each one.
+- Point at **Try asking**: questions that are known to work for the chosen role. Click one: it
+  fills the box and does not send.
 
-## 1. Developer (2 minutes)
+## 2. A sourced answer (3 minutes)
 
-1. **Ask:** "In which file is [a rule or limit in your code] set, and where is it documented?"
-   - Point out: the answer cites a file and a Confluence page, each with its own key.
-   - Click a code source: the link is pinned to a commit, so it shows what the assistant saw, even
-     after the branch moves.
-2. **Ask:** "What does [a configuration option] do?"
-   - Point out: a sentence that starts "Based on the code, it looks like…" and a citation marked
-     with an asterisk is the assistant's own reading, not a quote.
+**Conversation 1 · Product Owner.** Choose **Product Owner**, click **How does the product choose
+short-term picks?** and press **Ask**. (About 75 seconds.)
 
-## 2. Business analyst (1 minute)
+While it runs, talk through the **step list** under the question:
 
-3. **Ask:** "What is the rule for [a business rule], and is it already built?"
-   - Point out: when the documentation says it is done and the repository does not contain it,
-     the answer shows both sides under "Where the documentation and the code disagree", written by
-     the application, not the model. The confidence drops to low.
+- "Searched Confluence", "Read 2 Confluence pages", "Searched the code", "Reading a file from
+  GitHub": these are the real tool calls, not an animation. A tick means done, the spinner is the
+  current step.
+- "Writing and checking the answer" is last, and the longest. Explain that the draft shown in
+  grey is **not checked yet**: the application checks every citation and works out the confidence
+  itself before showing the real answer.
+- Point at the box under the question: **Stop**, and "Most answers take 1–3 minutes".
 
-## 3. QA (1 minute)
+When the answer arrives:
 
-4. **Ask:** "What cases do we need to test for [a feature]?"
-   - Point out: a list from the test documentation, in the QA role's words, and sources for each
-     part.
+- Point at the **confidence pill** and the reason under it. This one is often *medium*: it says
+  why. The confidence is worked out by the application, not claimed by the model.
+- Point at the Product Owner's wording: no code, no file paths. The style check enforces it.
+- Click a **citation chip** (`C1`): it opens **Sources (n)** and highlights that source. Each
+  source says where it came from and in which turn it was fetched.
+- Point at **What I'm not sure about**: the gaps are listed, not hidden.
 
-## 4. Product owner (2 minutes)
+## 3. A changed source (1 minute)
 
-5. **Ask:** "What does [a feature] do for users, and can we rely on it yet?"
-   - Point out: no code, no file paths, no jargon (the style check enforces it, and rewrites the
-     answer once if it slips). The sources list uses plain labels.
-6. Press **Show more detail** under the answer.
-   - Point out: the same question is asked again one step more technical, without changing the role.
+Still in conversation 1.
 
-## 5. Project manager (1 minute)
+1. In the second window, make the prepared edit to the cited Confluence page and publish it.
+2. Back on the page, press **Re-check sources** (in the open Sources list). No Copilot request is
+   made: the application compares the page's version number directly. (If you have not edited, each
+   source shows "✓ checked just now".)
+3. Point out what appears: the source says **changed since this answer**, the answer gets an amber
+   banner, its confidence drops to *medium*, and **Re-ask with the latest version** is offered.
+   Say that pressing it asks again and fetches the page under a new key. Do not press it unless
+   there is time: it is another request of about a minute.
+4. Say that the same check runs by itself for a source reused in a later turn and for every source
+   after the last allowed turn, and that a source that cannot be reached shows "couldn't check",
+   never "changed".
 
-7. **Ask:** "Which releases have been published, and when?"
-   - Point out: the release list is a source; the dates come from it.
-8. **Ask:** "What is the biggest open risk before [next phase]?"
-   - Point out: an open decision is reported as open, not settled.
+## 4. When it should say no (1 minute)
 
-## 6. When it should say no (2 minutes)
+Still in conversation 1, still **Product Owner**. Ask **What is the weather like tomorrow?** (About
+25 seconds, the fastest.)
 
-9. **Ask (any role):** "What will the release date be next year?"
-   - Point out: out of scope. The assistant says that no source can answer, instead of guessing.
-10. **Ask:** a question about something plausible that is not documented, such as [a feature your
-    project does not have].
-    - Point out: "not found", the closest pages, and who might know (from CODEOWNERS). Say that
-      "not found" is a correct outcome, not an error.
-11. **Ask:** a vague question that fits two things, such as "What is the rate limit?" when two
-    services have one.
-    - Point out: one short clarifying question. Say honestly that this is the weakest behaviour: in
-      the evaluation it often picked one reading instead of asking (see `docs/EVAL_LOG.md`).
+- Point out the grey pill **Outside what I can answer**. The assistant says no source can answer,
+  instead of guessing.
+- Say that this is a correct outcome, not an error. Note that this question and the previous one
+  are the same conversation: the sidebar says "Turn 2 of 5".
 
-## 7. Follow-ups and changed sources (3 minutes)
+## 5. Changing the role starts a new conversation (1 minute)
 
-Use the same conversation as the questions above, or start a new one (**New conversation**).
+- Point at the lock beside **Product Owner** and the note: "Role is locked for this conversation.
+  Changing it starts a new one." A conversation is for one role, so an answer is never written
+  for one audience and then explained to another.
+- Press **New conversation**. The welcome screen returns. Choose **Business Analyst**: the
+  **Try asking** questions change with the role.
 
-12. **Ask** a follow-up that builds on an answer, such as "And what happens when that fails?"
-    - Point out: the follow-up cites a source by the key it had in the earlier answer, and the
-      turn counter ("Turn 2 of 5") under the role picker. Each answer has its own **Sources (n)**
-      list, and each source says which turn fetched it.
-    - Try changing the role in the middle: the page asks first, because a conversation is for one
-      role.
-13. Press **Re-check sources** under an answer.
-    - Point out: each source gets "✓ checked 1 min ago". The app compared a version number or a
-      commit SHA directly; it did not ask the model again.
-14. *Optional, needs a second window.* Edit a cited Confluence page (or push a small change to a
-    cited file), then press **Re-check sources** again.
-    - Point out: the source says **changed since this answer**, the answer shows a warning and its
-      confidence drops to medium, and **Re-ask with the latest version** appears. Press it: a new
-      answer cites the page under a new key, and the old key stays marked changed.
-    - Say that the check also runs by itself for a source reused in a later turn and for every
-      source after the last allowed turn, and that "couldn't check" is shown, never "changed", when
-      a source cannot be reached.
-    - Say that a conversation holds at most five questions (`CONVERSATION_MAX_TURNS`); after that
-      the page asks for a new one.
+## 6. Not found (2 minutes)
 
-## 8. Close (1 minute)
+**Conversation 2 · Business Analyst.** Ask **Which service supplies the currency exchange rates
+the system uses?** (About 80 seconds.)
 
-- Press **Esc** while a question runs, to show that it can be stopped.
+While it runs, say that this is a question the documentation does not answer, and that the point is
+whether the assistant admits it.
+
+- Point out the pill **Not found in the docs** and the one sentence under it. There is no invented
+  service name and no sources list.
+- Point at **Where I looked**: the pages and folders it checked, so the person knows the search
+  was not careless. If **Who might know** appears, say it comes from CODEOWNERS.
+- Say that "not found" is a correct outcome too.
+
+## 7. Close (2 minutes)
+
+- Press **Copy this conversation** in the sidebar. A message says "Conversation copied". Paste it
+  into any document: every question, the answer with its citation keys, the confidence and why, and
+  a list of sources with links. Say it is for handing a conversation to someone else.
 - Give a thumbs-down with a comment, and say that it goes to a local file without the answer, and
   can become a test case with `npm run eval:from-feedback`.
-- Say the limits: one person, memory for one conversation only, answers take tens of seconds, the assistant's status and
-  confidence are partly the model's call. The evaluation behind that is in `docs/EVAL_LOG.md`.
+- Say the limits: one person, one conversation at a time, memory for one conversation only (at most
+  five questions), answers take tens of seconds to a few minutes, and the status and confidence
+  are partly the model's call. The measurements behind that are in [EVAL_LOG.md](EVAL_LOG.md).
+
+## Optional extras, if there is time
+
+- **Show more detail** under the Product Owner's answer: the same question again, one step more
+  technical, without changing the role. About a minute.
+- **The end of a conversation.** Start the server with `CONVERSATION_MAX_TURNS=2` and ask two
+  questions: a card replaces the question box, says why, shows the final check of every source and
+  offers **Start a new conversation**.
+- **Stop.** Press **Esc** while a question runs. The conversation stays open.
+- **The phone layout.** Make the window 390 pixels wide: the sidebar becomes a menu.
 
 ## If something goes wrong
 
 - A question stops with a timeout: ask again, or raise `ASK_TIMEOUT_MS`.
+- Question 3 comes back as an answer, not "not found": use the fallback instead, **Can users sign in
+  with single sign-on?** as Product Owner. It was not found in the evaluation too, but takes about
+  165 seconds, and starting it in conversation 2 means choosing Product Owner again.
 - The answer says nothing was found for something you know exists: check that the page is in
   `CONFLUENCE_SPACE_KEYS`; then see Troubleshooting in the README.
 - Nothing loads: check the terminal where `npm start` runs; it prints which setting is wrong.

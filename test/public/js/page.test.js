@@ -1,13 +1,11 @@
 // @vitest-environment happy-dom
 // @ts-check
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { findRefs } from '../../../public/js/refs.js';
 import { loadPage, PAGE_HTML } from '../../helpers/page.js';
 
 /**
- * The page parsed without being loaded, so its stylesheet and script are not fetched.
+ * The page parsed without being loaded, so its stylesheets and script are not fetched.
  * @returns {DocumentFragment} The page's elements.
  */
 function inertPage() {
@@ -17,7 +15,7 @@ function inertPage() {
 }
 
 describe('public/index.html', () => {
-  it('has every element the page code draws into', () => {
+  it('has every place the page code draws into', () => {
     expect(() => loadPage()).not.toThrow();
   });
 
@@ -40,55 +38,75 @@ describe('public/index.html', () => {
     expect(handlers).toEqual([]);
   });
 
-  it('loads its script and styles from this server only', () => {
+  it('loads its script and styles from this server only, tokens and base styles first', () => {
     const page = inertPage();
     const urls = [...page.querySelectorAll('script[src], link[href]')].map(
       (element) => element.getAttribute('src') ?? element.getAttribute('href') ?? '',
     );
 
-    expect(urls.length).toBeGreaterThan(0);
     expect(urls.every((url) => url.startsWith('/'))).toBe(true);
+    expect(urls).toEqual([
+      '/css/tokens.css',
+      '/css/base.css',
+      '/css/layout.css',
+      '/css/components.css',
+      '/js/main.js',
+    ]);
   });
 
-  it('gives every field a label', () => {
-    loadPage();
-    const fields = [...document.querySelectorAll('select, textarea')];
+  it('has a heading for the page, hidden from the eye, so every screen has one', () => {
+    const heading = inertPage().querySelector('main h1');
 
-    expect(fields.length).toBeGreaterThan(0);
-    const unlabelled = fields
-      .filter(({ id }) => document.querySelector(`label[for="${id}"]`) === null)
-      .map(({ id }) => id);
-    expect(unlabelled).toEqual([]);
+    expect(heading?.textContent).toBe('Knowledge Assistant');
+    expect(heading?.classList.contains('visually-hidden')).toBe(true);
   });
 
-  it('starts with Stop, the full-conversation message and the notice hidden', () => {
+  it('has a sidebar, a main area and a place for the phone bar, the drawer cover and the box', () => {
     const refs = loadPage();
 
-    for (const part of [
-      refs.stop,
-      refs.fullMessage,
-      refs.notice,
-      refs.roleConfirm,
-      refs.newConversation,
-    ]) {
-      expect(part.hidden).toBe(true);
-    }
+    expect(refs.sidebar.getAttribute('role')).toBe('complementary');
+    expect(refs.sidebar.getAttribute('aria-label')).toBe('Conversation settings');
+    expect(document.querySelector('main')?.contains(refs.messages)).toBe(true);
+    expect(document.querySelector('main')?.contains(refs.sidebar)).toBe(false);
+    expect(refs.mobileBar.tagName).toBe('DIV');
+    expect(refs.composer.classList.contains('composer-slot')).toBe(true);
+  });
+
+  it('has the landmarks that let a keyboard or screen reader user skip around without a skip link', () => {
+    const page = inertPage();
+
+    expect(page.querySelectorAll('main')).toHaveLength(1);
+    expect(page.querySelector('[role="complementary"][aria-label]')).not.toBeNull();
+    expect(page.querySelector('main h1')).not.toBeNull();
+    expect(page.querySelector('a.skip, .skip-nav')).toBeNull();
+  });
+
+  it('starts with the notice and the drawer cover hidden, and nothing drawn yet', () => {
+    const refs = loadPage();
+
+    expect(refs.notice.hidden).toBe(true);
+    expect(refs.backdrop.hidden).toBe(true);
+    expect(refs.messages.children).toHaveLength(0);
+    expect(refs.sidebar.children).toHaveLength(0);
   });
 
   it('announces each new answer politely, and lists the conversation as a list', () => {
     const refs = loadPage();
 
+    expect(refs.live.tagName).toBe('OUTPUT');
     expect(refs.live.getAttribute('aria-live')).toBe('polite');
-    expect(refs.live.getAttribute('role')).toBe('status');
     expect(refs.messages.tagName).toBe('OL');
     expect(refs.messages.getAttribute('aria-label')).toBe('Conversation');
   });
 
-  it('puts the input after the conversation, so it can sit at the bottom of the page', () => {
+  it('puts the question box after the conversation, so it can sit at the bottom of the page', () => {
     const refs = loadPage();
 
     expect(
-      refs.messages.compareDocumentPosition(refs.form) & Node.DOCUMENT_POSITION_FOLLOWING,
+      refs.messages.compareDocumentPosition(refs.composer) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      refs.messages.compareDocumentPosition(refs.end) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -103,83 +121,9 @@ describe('public/index.html', () => {
 });
 
 describe('findRefs', () => {
-  it('names the element that is missing', () => {
+  it('names the place that is missing', () => {
     document.body.innerHTML = '<p>nothing here</p>';
 
-    expect(() => findRefs()).toThrow('The page has no element with the id "ask-form".');
-  });
-});
-
-describe('the skip link', () => {
-  const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-  it('is the first thing the Tab key reaches', () => {
-    loadPage();
-
-    const [first] = [...document.querySelectorAll(FOCUSABLE)].filter(
-      (element) => !element.hasAttribute('disabled') && !element.closest('[hidden]'),
-    );
-
-    expect(first.classList.contains('skip')).toBe(true);
-  });
-
-  it('points to the question box, which exists and can take the focus', () => {
-    loadPage();
-    const link = document.querySelector('a.skip');
-    const target = document.querySelector(link?.getAttribute('href') ?? '#nothing');
-
-    expect(link?.getAttribute('href')).toBe('#question');
-    expect(target?.tagName).toBe('TEXTAREA');
-  });
-
-  it('can take the focus, and nothing in the page takes it back on load', () => {
-    loadPage();
-    const link = /** @type {HTMLElement} */ (document.querySelector('a.skip'));
-
-    link.focus();
-
-    expect(document.activeElement).toBe(link);
-  });
-
-  it('sits in a navigation landmark, so it is found by screen reader users too', () => {
-    loadPage();
-
-    expect(document.querySelector('nav.skip-nav a.skip')).not.toBeNull();
-  });
-
-  describe('in the stylesheet', () => {
-    const css = readFileSync(resolve('public/css/app.css'), 'utf8');
-    const ruleFor = (/** @type {string} */ selector) => {
-      const start = css.indexOf(`${selector} {`);
-      return start === -1 ? '' : css.slice(start, css.indexOf('}', start));
-    };
-
-    it('is always visible: nothing hides it, moves it off screen or clips it', () => {
-      const rule = ruleFor('.skip');
-
-      expect(rule).not.toBe('');
-      const found = [
-        'display: none',
-        'visibility: hidden',
-        '-9999px',
-        'clip',
-        'opacity: 0',
-        'translate',
-      ].filter((hiding) => rule.includes(hiding));
-
-      expect(found).toEqual([]);
-    });
-
-    it('is not hidden by a rule for when it does not have focus', () => {
-      expect(css).not.toContain('.skip:not(:focus)');
-    });
-
-    it('turns bright yellow with black text and a border when it has focus', () => {
-      const rule = ruleFor('.skip:focus');
-
-      expect(rule).toContain('background: #ffd400');
-      expect(rule).toContain('color: #000000');
-      expect(rule).toContain('border: 3px solid #000000');
-    });
+    expect(() => findRefs()).toThrow('The page has no element with the id "mobile-bar".');
   });
 });

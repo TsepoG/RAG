@@ -7,6 +7,9 @@ const ROLE_ID_PATTERN = /^[a-z][a-z\d_]*$/;
 const MIN_DEPTH = 1;
 const MAX_DEPTH = 3;
 const MAX_EXAMPLES = 3;
+const MAX_SUGGESTED_QUESTIONS = 4;
+const MIN_SUGGESTED_LENGTH = 10;
+const MAX_SUGGESTED_LENGTH = 160;
 const SOURCE_ORDERS = [
   ['confluence', 'github'],
   ['github', 'confluence'],
@@ -28,6 +31,12 @@ const textList = (/** @type {number} */ min) =>
 const example = z
   .object({ question: text, answer: text }, { error: 'must have a question and an answer' })
   .strict();
+
+/** A question the page offers under "Try asking"; it is shown as text and never sent to the model. */
+const suggestedQuestion = text
+  .min(MIN_SUGGESTED_LENGTH, `must be at least ${MIN_SUGGESTED_LENGTH} characters`)
+  .max(MAX_SUGGESTED_LENGTH, `must be at most ${MAX_SUGGESTED_LENGTH} characters`)
+  .refine((value) => !value.includes('\n'), 'must be a single line');
 
 /** The banners a role may word for itself; any it leaves out use the application's default. */
 export const PHRASE_KEYS = Object.freeze(
@@ -73,6 +82,10 @@ export const roleSchema = z
       .array(example, { error: 'must be a list of question and answer pairs' })
       .min(1, 'must have at least one example')
       .max(MAX_EXAMPLES, `must have at most ${MAX_EXAMPLES} examples`),
+    suggestedQuestions: z
+      .array(suggestedQuestion, { error: 'must be a list of questions' })
+      .max(MAX_SUGGESTED_QUESTIONS, `must have at most ${MAX_SUGGESTED_QUESTIONS} questions`)
+      .optional(),
     phrases: phrases.optional(),
     version: z
       .number({ error: 'must be a whole number from 1' })

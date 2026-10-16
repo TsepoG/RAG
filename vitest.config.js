@@ -18,7 +18,10 @@ export default defineConfig({
       // exception CODING_PRINCIPLES §6 allows; sonar.coverage.exclusions mirrors it.
       // public/js/main.js is the same kind of file: it wires the tested page modules to the DOM
       // events and the network, and is checked by hand and by the live test.
-      exclude: ['src/server/index.js', 'src/cli/**', 'public/js/main.js'],
+      // scripts/ is tooling run by hand (npm run screenshots): it drives a real browser against the
+      // app, and is neither part of the product nor run in CI. It is outside `include`; it is named
+      // here so the rule is written down.
+      exclude: ['src/server/index.js', 'src/cli/**', 'public/js/main.js', 'scripts/**'],
       // lcov feeds SonarQube; json-summary feeds the CI job summary.
       reporter: ['text', 'lcov', 'html', 'json-summary'],
       reportsDirectory: 'coverage',

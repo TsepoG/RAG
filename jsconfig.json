@@ -12,6 +12,6 @@
     "maxNodeModuleJsDepth": 0,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "public", "test", "*.js"],
+  "include": ["src", "public", "test", "scripts", "*.js"],
   "exclude": ["node_modules", "coverage"]
 }

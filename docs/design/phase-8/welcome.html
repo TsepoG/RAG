@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Phase 8 design reference (A · Clarity). Owner-approved mockup: reference only, not production code. -->
+<meta charset="utf-8">
+<title>Clarity: welcome</title>
+</head>
+<body>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#F4F6FA}
+a{color:#2446F5}a:hover{color:#1530C4}
+</style>
+<div style="font-family: 'Geist', system-ui, sans-serif; color: #0F1729; background: #F4F6FA; min-height: 900px; display: flex; flex-wrap: wrap; align-items: stretch">
+
+  <aside style="flex: 1 1 260px; max-width: 100%; box-sizing: border-box; padding: 28px 24px; background: #FFFFFF; border-right: 1px solid #E2E6EE; display: flex; flex-direction: column; gap: 28px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <div style="width: 34px; height: 34px; border-radius: 10px; background: #2446F5; display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"></path></svg>
+      </div>
+      <div style="display: flex; flex-direction: column">
+        <span style="font-weight: 600; font-size: 15px">Knowledge Assistant</span>
+        <span style="font-size: 12px; color: #556070">Confluence + GitHub</span>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #556070">Answering as</span>
+      <button type="button" style="font: inherit; text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: #0F1729; cursor: pointer">Developer</button>
+      <button type="button" style="font: inherit; text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: #0F1729; cursor: pointer">Business Analyst</button>
+      <button type="button" style="font: inherit; text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: #0F1729; cursor: pointer">QA</button>
+      <button type="button" aria-pressed="true" style="font: inherit; font-weight: 600; text-align: left; display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid #C9D2FF; background: #EEF1FF; color: #1530C4; cursor: pointer">Product Owner
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+      </button>
+      <button type="button" style="font: inherit; text-align: left; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: #0F1729; cursor: pointer">Project Manager</button>
+      <span style="font-size: 12px; color: #556070; line-height: 1.5">Answers are written for this role. You can change it until you ask your first question.</span>
+    </div>
+  </aside>
+
+  <main style="flex: 999 1 560px; min-width: 0; box-sizing: border-box; padding: 72px 24px 24px; display: flex; flex-direction: column; align-items: center">
+    <div style="width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 32px; flex-grow: 1">
+      <div style="display: flex; flex-direction: column; gap: 12px">
+        <h1 style="margin: 0; font-size: 40px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15">What would you like to know?</h1>
+        <p style="margin: 0; font-size: 17px; line-height: 1.6; color: #3B4556">Ask about the system in plain language. I'll answer from your Confluence pages and GitHub code, and show you exactly where each fact came from.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E6EE">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2446F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"></path></svg>
+          <span style="font-size: 14px; font-weight: 600">Every answer is sourced</span>
+          <span style="font-size: 13px; line-height: 1.5; color: #556070">Links to the exact page or file.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E6EE">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2446F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"></path></svg>
+          <span style="font-size: 14px; font-weight: 600">Says how sure it is</span>
+          <span style="font-size: 13px; line-height: 1.5; color: #556070">High, medium or low, with the reason.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E6EE">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2446F5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          <span style="font-size: 14px; font-weight: 600">Admits what it can't find</span>
+          <span style="font-size: 13px; line-height: 1.5; color: #556070">No guessing to fill the gaps.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600; color: #556070">Try asking</span>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <button type="button" style="font: inherit; font-size: 15px; text-align: left; min-height: 48px; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E6EE; background: #FFFFFF; color: #0F1729; cursor: pointer">What happens when a customer cancels an order after it has shipped?</button>
+          <button type="button" style="font: inherit; font-size: 15px; text-align: left; min-height: 48px; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E6EE; background: #FFFFFF; color: #0F1729; cursor: pointer">Which features changed in the latest release?</button>
+          <button type="button" style="font: inherit; font-size: 15px; text-align: left; min-height: 48px; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E6EE; background: #FFFFFF; color: #0F1729; cursor: pointer">Who should I talk to about the payments integration?</button>
+        </div>
+      </div>
+
+      <form style="margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: #FFFFFF; border: 1px solid #D3D9E4; box-shadow: 0 8px 24px rgba(15, 23, 41, 0.06)">
+        <label for="welcome-q" style="font-size: 12px; font-weight: 600; color: #556070">Your question</label>
+        <textarea id="welcome-q" rows="2" placeholder="Ask anything about the system…" style="font: inherit; font-size: 15px; resize: none; border: none; outline: none; color: #0F1729; background: transparent"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap">
+          <span style="font-size: 12px; color: #556070">Up to 5 questions per conversation</span>
+          <button type="submit" style="font: inherit; font-weight: 600; min-height: 44px; padding: 10px 20px; border-radius: 10px; border: none; background: #2446F5; color: #FFFFFF; cursor: pointer">Ask</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+</body>
+</html>

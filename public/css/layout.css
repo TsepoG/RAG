@@ -1,0 +1,116 @@
+/*
+ * Where things go: the sidebar, the chat column, the phone bar and drawer. Components are styled in
+ * components.css; every value here comes from tokens.css.
+ */
+
+.app {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  flex: 0 0 var(--sidebar-width);
+  width: var(--sidebar-width);
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--space-28) var(--space-24);
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebar__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-28);
+}
+
+.drawer__close {
+  display: none;
+}
+
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-32) var(--space-24) 0;
+}
+
+.column {
+  width: 100%;
+  max-width: var(--column-width);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+/* The question box stays at the bottom of the screen, on every width. */
+.composer-slot {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  margin-top: auto;
+  padding: var(--space-8) 0 var(--space-24);
+  background: var(--color-page);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--color-scrim);
+}
+
+.mobilebar {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .app {
+    display: block;
+  }
+
+  .mobilebar {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+
+  /* The sidebar becomes a drawer, shown only when it is opened. */
+  .sidebar {
+    display: none;
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(320px, 88vw);
+    height: 100%;
+  }
+
+  .sidebar.is-open {
+    display: block;
+  }
+
+  .drawer__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    margin: 0 0 var(--space-12) auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-button);
+    background: var(--color-surface);
+  }
+
+  .main {
+    padding: var(--space-16) var(--space-16) 0;
+  }
+
+  .composer-slot {
+    padding-bottom: var(--space-16);
+  }
+}

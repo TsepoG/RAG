@@ -3,72 +3,38 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <title>Role-Aware Knowledge Assistant</title>
-    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/layout.css" />
+    <link rel="stylesheet" href="/css/components.css" />
     <script type="module" src="/js/main.js"></script>
   </head>
   <body>
-    <nav class="skip-nav" aria-label="Skip links">
-      <a class="skip" href="#question">Skip to the question</a>
-    </nav>
-    <header class="page-header">
-      <h1>Role-Aware Knowledge Assistant</h1>
-      <p class="tagline">Answers from your Confluence pages and code, with the sources shown.</p>
-    </header>
-
     <noscript><p class="error">This page needs JavaScript to ask questions.</p></noscript>
 
-    <main>
-      <section class="controls" aria-label="Conversation settings">
-        <div class="field">
-          <label for="role">Role</label>
-          <select id="role" name="role" disabled>
-            <option>Loading roles…</option>
-          </select>
-          <p id="role-description" class="hint"></p>
-        </div>
-        <div id="role-confirm" class="role-confirm" role="alert" hidden>
-          <p id="role-confirm-text"></p>
-          <button type="button" id="role-confirm-yes" class="primary">
-            Start a new conversation
-          </button>
-          <button type="button" id="role-confirm-no">Keep this conversation</button>
-        </div>
-        <div class="conversation-bar">
-          <p id="turn-counter" class="hint">No questions yet.</p>
-          <button type="button" id="new-conversation" hidden>New conversation</button>
-        </div>
-      </section>
+    <div class="app">
+      <div id="mobile-bar"></div>
+      <div id="backdrop" class="backdrop" hidden></div>
+      <div
+        id="sidebar"
+        class="sidebar"
+        role="complementary"
+        aria-label="Conversation settings"
+      ></div>
 
-      <output id="notice" class="notice" hidden></output>
-
-      <ol id="messages" class="messages" aria-label="Conversation"></ol>
-      <div id="live" class="visually-hidden" role="status" aria-live="polite"></div>
-
-      <form id="ask-form" class="ask" autocomplete="off">
-        <p id="full-message" class="full-message" hidden></p>
-        <div class="field">
-          <label for="question">Your question</label>
-          <textarea
-            id="question"
-            name="question"
-            rows="3"
-            maxlength="2000"
-            aria-describedby="question-hint"
-            placeholder="Ask about the documentation or the code…"
-            required
-          ></textarea>
-          <p id="question-hint" class="hint">
-            Enter sends, Shift+Enter adds a line, Esc stops. Follow-up questions can use what was
-            already found.
-          </p>
+      <main class="main">
+        <div class="column">
+          <h1 class="visually-hidden">Knowledge Assistant</h1>
+          <output id="notice" class="notice-bar" hidden></output>
+          <div id="welcome"></div>
+          <ol id="messages" class="messages" aria-label="Conversation"></ol>
+          <output id="live" class="visually-hidden" aria-live="polite"></output>
+          <div id="end"></div>
+          <div id="composer" class="composer-slot"></div>
         </div>
-        <div class="actions">
-          <button type="submit" id="ask" class="primary">Ask</button>
-          <button type="button" id="stop" hidden>Stop</button>
-        </div>
-      </form>
-    </main>
+      </main>
+    </div>
   </body>
 </html>

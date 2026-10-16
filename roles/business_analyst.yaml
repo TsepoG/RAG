@@ -27,4 +27,9 @@ examples:
       1. A refund is allowed within 30 days of the order [C1]. 2. An order can be refunded only
       once [C1]. 3. Refunds above 5000 need a manager's approval [C1][G1]. The code applies the
       same three rules, so the specification and the code agree.
+# Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
+suggestedQuestions:
+  - What rule decides whether a company counts as a semiconductor company?
+  - When does the system calculate gross profit itself instead of using the filed number?
+  - Why is the historical universe still survivors only?
 version: 1

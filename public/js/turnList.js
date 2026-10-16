@@ -1,20 +1,15 @@
 // @ts-check
-import { buildAnswerCard } from './answerCard.js';
+import { canAsk, canReask, canShowMoreDetail } from './chatState.js';
 import { el } from './dom.js';
-import { canReask, canShowMoreDetail } from './chatState.js';
-
-/** Shown before the first progress line arrives. */
-const STARTING = 'Starting…';
-
-/** Shown for a question the reader stopped. */
-const STOPPED = 'Stopped.';
-const STOPPED_WITH_DRAFT = 'Stopped. What you see is an unchecked draft.';
+import { buildAnswerCard, buildErrorCard } from './ui/answerCard.js';
+import { buildStoppedCard, buildUserMessage } from './ui/message.js';
+import { buildProgressCard } from './ui/progress.js';
 
 /**
  * What is needed to draw the turns, besides the state.
  * @typedef {object} ListContext
  * @property {number} now - The time now, in ms.
- * @property {Set<string>} openSources - Ids of the answers whose Sources panel is open.
+ * @property {Set<string>} openSources - Ids of the answers whose Sources list is open.
  */
 
 /**
@@ -25,55 +20,47 @@ const STOPPED_WITH_DRAFT = 'Stopped. What you see is an unchecked draft.';
  */
 
 /**
- * Builds the reader's question.
+ * Whether a failed turn can be asked again: it is the newest, and the conversation can take it.
+ * @param {import('./chatState.js').ChatState} state - The state.
  * @param {import('./chatState.js').TurnView} turn - The turn.
- * @returns {HTMLElement} The bubble.
+ * @returns {boolean} True when Try again is offered.
  */
-function buildQuestion({ question, detailLevel }) {
-  return el('div', { className: 'bubble user' }, [
-    el('p', { className: 'who', text: 'You' }),
-    el('p', { className: 'text', text: question }),
-    ...(detailLevel === 'more'
-      ? [el('p', { className: 'hint', text: 'Asked for more detail.' })]
-      : []),
-  ]);
+function canRetry(state, turn) {
+  return turn === state.turns.at(-1) && canAsk(state);
 }
 
 /**
- * Builds the reply to a turn that has no finished answer: the progress and draft of one that is
- * running, or what became of one that was stopped or failed.
+ * Builds the reply to a turn: the answer, the progress of one that is running, or what became of
+ * one that was stopped or failed.
+ * @param {import('./chatState.js').ChatState} state - The state.
  * @param {import('./chatState.js').TurnView} turn - The turn.
- * @returns {HTMLElement[]} What to show.
+ * @param {ListContext} context - The time and what is open.
+ * @returns {HTMLElement} The card.
  */
-function buildUnfinished(turn) {
-  const draft =
-    turn.draft === ''
-      ? []
-      : [
-          el('div', { className: 'answer draft', text: turn.draft }),
-          ...(turn.phase === 'running'
-            ? [el('p', { className: 'hint', text: 'Draft. The sources are still being checked…' })]
-            : []),
-        ];
+function buildReply(state, turn, context) {
+  const { answer } = turn;
+  if (turn.phase === 'answered' && answer !== undefined) {
+    return buildAnswerCard({
+      answer,
+      now: context.now,
+      sourcesOpen: context.openSources.has(answer.answerId),
+      checking: state.checking.includes(answer.answerId),
+      canReask: canReask(state, turn),
+      canMoreDetail: canShowMoreDetail(state, turn),
+      rating: state.ratings[answer.answerId],
+    });
+  }
   if (turn.phase === 'running') {
-    return [
-      el('output', {
-        className: 'progress',
-        text: turn.progress === '' ? STARTING : turn.progress,
-      }),
-      ...draft,
-    ];
+    return buildProgressCard(turn);
   }
   if (turn.phase === 'stopped') {
-    return [
-      ...draft,
-      el('p', { className: 'notice', text: turn.draft === '' ? STOPPED : STOPPED_WITH_DRAFT }),
-    ];
+    return buildStoppedCard(turn);
   }
-  return [
-    ...draft,
-    el('p', { className: 'error', text: turn.failure, attributes: { role: 'alert' } }),
-  ];
+  return buildErrorCard({
+    turn: turn.turn,
+    message: /** @type {string} */ (turn.failure),
+    canRetry: canRetry(state, turn),
+  });
 }
 
 /**
@@ -84,22 +71,9 @@ function buildUnfinished(turn) {
  * @returns {HTMLElement} The turn's list item.
  */
 function buildTurn(state, turn, context) {
-  const { answer } = turn;
-  const reply =
-    turn.phase === 'answered' && answer !== undefined
-      ? buildAnswerCard({
-          answer,
-          now: context.now,
-          sourcesOpen: context.openSources.has(answer.answerId),
-          checking: state.checking.includes(answer.answerId),
-          canReask: canReask(state, turn),
-          canMoreDetail: canShowMoreDetail(state, turn),
-          rating: state.ratings[answer.answerId],
-        })
-      : el('div', { className: 'reply' }, buildUnfinished(turn));
   return el('li', { className: 'turn', attributes: { 'data-turn': String(turn.turn) } }, [
-    buildQuestion(turn),
-    reply,
+    buildUserMessage(turn),
+    buildReply(state, turn, context),
   ]);
 }
 
@@ -118,6 +92,7 @@ function inputsOf(state, turn, context) {
     id === undefined ? undefined : state.ratings[id],
     canReask(state, turn),
     canShowMoreDetail(state, turn),
+    canRetry(state, turn),
     id !== undefined && context.openSources.has(id),
   ];
 }
@@ -134,7 +109,7 @@ function sameInputs(left, right) {
 
 /**
  * Draws the turns of a conversation into a list, changing only the turns whose state changed. The
- * Sources panels the reader opened stay open, and the control that had focus keeps it.
+ * Sources lists the reader opened stay open, and the control that had focus keeps it.
  * @param {HTMLElement} list - The list element.
  * @param {WeakMap<HTMLElement, Drawn[]>} memory - What was drawn into each list; keep one for the page.
  * @param {import('./chatState.js').ChatState} state - The state.
