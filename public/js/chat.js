@@ -8,6 +8,7 @@ import {
   isBusy,
   next,
 } from './chatState.js';
+import { orderRoles } from './roleOrder.js';
 import { conversationToMarkdown, COPIED_MESSAGE, copyConversation } from './ui/copyConversation.js';
 import { focusSource, setSourcesOpen } from './ui/sources.js';
 import { createView } from './view.js';
@@ -554,7 +555,7 @@ export function createChat({
       attach();
       render();
       try {
-        roles = await api.fetchRoles();
+        roles = orderRoles(await api.fetchRoles());
         const remembered = storage.loadRole();
         roleId = roles.some(({ id }) => id === remembered) ? remembered : roles[0]?.id;
         render();

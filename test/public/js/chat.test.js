@@ -257,6 +257,28 @@ describe('starting', () => {
 });
 
 describe('choosing a role', () => {
+  it('lists the roles in the order of the design, and starts on the first, whatever order the server sent', async () => {
+    const roles = ['qa', 'project_manager', 'developer', 'business_analyst', 'product_owner'].map(
+      (id) => ({ id, displayName: id, description: '', depth: 1 }),
+    );
+    await setup({ api: { fetchRoles: vi.fn(async () => roles) } });
+
+    const listed = [...refs.sidebar.querySelectorAll('[data-role]')].map((button) =>
+      button.getAttribute('data-role'),
+    );
+
+    expect(listed).toEqual([
+      'developer',
+      'business_analyst',
+      'qa',
+      'product_owner',
+      'project_manager',
+    ]);
+    expect(
+      refs.sidebar.querySelector('[data-role="developer"]')?.getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
   it('remembers it, and shows the questions to try for it', async () => {
     const { storage } = await setup({ storedRole: 'dev' });
 

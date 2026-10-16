@@ -1076,10 +1076,11 @@ a.source-row__link:hover {
 }
 
 /* A short message that shows an action worked, such as Copy this conversation. */
+/* Above the question box (about 180px tall with its margin), so it covers neither the box nor its hint. */
 .toast {
   position: fixed;
   left: 50%;
-  bottom: var(--space-32);
+  bottom: 200px;
   z-index: 80;
   display: flex;
   align-items: center;
@@ -1162,6 +1163,26 @@ a.source-row__link:hover {
 
   /* Above the question box, which is pinned to the bottom. */
   .toast {
-    bottom: 96px;
+    bottom: 140px;
+  }
+
+  /* A long file name and the status do not fit on one line: the status goes underneath. */
+  .source-row__link {
+    flex-wrap: wrap;
+    row-gap: var(--space-8);
+  }
+
+  .source-row__text {
+    flex: 1 1 140px;
+  }
+
+  .source-row__title--mono {
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .source-status {
+    flex-basis: 100%;
   }
 }
