@@ -97,9 +97,17 @@ Values already exported in your shell win over `.env`.
 | `npm run eval:review -- <run>`                             | Write `review.csv` for a run, for manual verdicts                                                              |
 | `npm run eval:report -- <run> [--compare <run>]`           | Merge the verdicts and write `report.md`: correctness, calibration, targets                                    |
 | `npm run eval:from-feedback`                               | Turn thumbs-down feedback into draft eval cases                                                                |
+| `npm run screenshots`                                      | Take the page's screenshots with example data, next to the design mockups, into `.screenshots/` (see below)    |
 | `npm run verify`                                           | lint, format check, typecheck and coverage in sequence; stops at the first failure                             |
 
 Run `npm run verify` before every commit and PR.
+
+`npm run screenshots` is for the page's appearance and needs a browser once: `npm install` already
+adds Playwright, then run `npx playwright install chromium` (about 150 MB). The script starts the
+real server with fake data, asks Copilot nothing and reads no `.env`, and writes each state of the
+page at 1440 and 390 pixels wide into `.screenshots/` (git-ignored), with the matching mockup from
+`docs/design/phase-8/` beside it: `conversation-1440-app.png` and `conversation-1440-mockup.png`.
+The screenshots in this README are copies of some of these. The script is not run in CI.
 
 ## Environment variables
 
@@ -177,13 +185,15 @@ Open `http://127.0.0.1:3000`. `npm start` loads `.env`, starts Copilot, checks y
 and then listens; a bad setting or a missing Copilot login prints one message and exits with
 code 1. Ctrl+C stops the server, any question that is running, and Copilot.
 
+The screenshots below show example data from `npm run screenshots`, not a real project's content.
+
 The page has a sidebar and a chat column. In the sidebar you pick a role under **Answering as**
 (your choice is remembered in the browser). Before the first question the page shows what the
 assistant promises (sourced, says how sure it is, admits what it can't find) and **Try asking**: a
 few questions for the chosen role. Clicking one puts it in the question box and does not send it.
 Type a question; Enter sends, Shift+Enter adds a line and Esc stops.
 
-![The welcome screen: roles on the left, three promises, questions to try and the question box](docs/screenshots/welcome.png)
+![The welcome screen: roles on the left, three promises, questions to try and the question box (example data)](docs/screenshots/welcome.png)
 
 While it works you see a list of steps ("Searched Confluence", "Read 2 Confluence pages",
 "Reading a file from GitHub", then "Writing and checking the answer"): finished steps have a tick
@@ -191,7 +201,7 @@ and the current one a spinner. The question box shows **Stop** and a typical tim
 take 1–3 minutes"). A draft of the answer may appear in grey under the label "Draft: sources still
 being checked"; it is not checked yet.
 
-![An answer in progress: the step list and the Stop button](docs/screenshots/in-progress.png)
+![An answer in progress: the step list and the Stop button (example data)](docs/screenshots/in-progress.png)
 
 When the answer has been checked it replaces the draft with:
 
@@ -216,13 +226,13 @@ underneath. A follow-up can use what was already found, and a citation key such 
 same source for the whole conversation. After the first question the role is locked and shown with
 a lock; **New conversation** is how to change it.
 
-![A conversation at turn 2: a medium-confidence answer, its citations and the Sources list with a changed source](docs/screenshots/conversation.png)
+![A conversation at turn 2: a medium-confidence answer, its citations and the Sources list with a changed source (example data)](docs/screenshots/conversation.png)
 
 Clicking a chip highlights its source. When nothing is found, or the question is outside what the
 assistant can answer, the role's own wording is shown instead of an answer, with where it looked
 and who might know:
 
-![A not-found answer: where it looked, and no sources](docs/screenshots/not-found.png)
+![A not-found answer: where it looked, and no sources (example data)](docs/screenshots/not-found.png)
 
 **Copy this conversation** (in the sidebar and on the end card) puts the whole conversation on the
 clipboard as Markdown: each question, the answer with its citation keys, the confidence and why,
@@ -232,16 +242,16 @@ allow the clipboard, the text is shown in a box to copy by hand.
 When a conversation is full or has ended, a card replaces the question box. It says why, gives the
 result of the final check of the sources, and offers **Start a new conversation**:
 
-![A conversation that has reached its turn limit: the end card with the final source check](docs/screenshots/ended.png)
+![A conversation that has reached its turn limit: the end card with the final source check (example data)](docs/screenshots/ended.png)
 
 On a screen 720 pixels wide or less the sidebar becomes a menu button in a top bar, with the role
 and the turn shown under it; the menu opens as a drawer that keeps the keyboard inside it and
 closes with Esc. The page has one light theme, uses the Geist fonts from the app itself, and can be
 used with the keyboard alone.
 
-![The page on a 390 pixel wide screen](docs/screenshots/phone.png)
+![The page on a 390 pixel wide screen (example data)](docs/screenshots/phone.png)
 
-![The phone menu drawer](docs/screenshots/phone-drawer.png)
+![The phone menu drawer (example data)](docs/screenshots/phone-drawer.png)
 
 **Stop** (or Esc) cancels the question that is running; the server aborts that turn, the
 conversation stays open and you can ask the next question. A stopped question still counts toward
@@ -339,9 +349,8 @@ source this answer cites has changed since it was written.", and its confidence 
 new turn that tells the model which keys changed; it fetches them again under new keys, and the
 old keys stay marked `changed`.
 
-![A changed source: the banner, the changed badge on the source, and the Re-check and Re-ask buttons](docs/screenshots/changed-source.png)
-
-![After Re-ask with the latest version: a new answer that cites the page under a new key](docs/screenshots/after-reask.png)
+The conversation screenshot under [Using the web page](#using-the-web-page) shows a changed source,
+with its banner, its badge and the **Re-ask with the latest version** button.
 
 ### Asking a question
 

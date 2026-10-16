@@ -347,9 +347,10 @@ animation and the streaming caret.
       tests pass without being modified, and one smoke conversation in the
       browser behaves as in Phase 7.
       _The server and answer tests are unmodified; the smoke conversation behaved as in Phase 7._
-- [ ] README screenshots are updated. `docs/DEMO.md` is rewritten as a
+- [x] README screenshots are updated. `docs/DEMO.md` is rewritten as a
       10-minute manager demo on the new UI. `CHANGELOG.md` has an entry.
       `docs/ROADMAP.md` gains Phase 8.
+      _README screenshots are made by `npm run screenshots` with example data, and say so. The DEMO still needs the owner's rehearsal._
 - [ ] Phase 7 acceptance boxes are ticked to reflect reality, and this file
       plus `docs/design/phase-8/` are committed, in the first commit of the
       branch.
