@@ -3,32 +3,6 @@
  * components.css; every value here comes from tokens.css.
  */
 
-/* The skip link is always visible, small and quiet, at the top of the page, so it never depends on
-   the browser moving focus to something that cannot be seen. When it has focus it becomes bright
-   yellow with black text and a thick border. */
-.skip-nav {
-  position: absolute;
-  top: var(--space-4);
-  left: var(--space-8);
-  z-index: 60;
-}
-
-.skip {
-  display: inline-block;
-  padding: 2px var(--space-4);
-  font-size: var(--font-size-13);
-  color: var(--color-muted);
-}
-
-.skip:focus {
-  padding: var(--space-8) var(--space-12);
-  background: var(--color-skip-bg);
-  color: var(--color-skip-text);
-  font-weight: 700;
-  border: 3px solid var(--color-skip-text);
-  border-radius: var(--radius-chip);
-}
-
 .app {
   display: flex;
   align-items: stretch;

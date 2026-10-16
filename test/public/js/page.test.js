@@ -1,7 +1,5 @@
 // @vitest-environment happy-dom
 // @ts-check
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { findRefs } from '../../../public/js/refs.js';
 import { loadPage, PAGE_HTML } from '../../helpers/page.js';
@@ -118,74 +116,5 @@ describe('findRefs', () => {
     document.body.innerHTML = '<p>nothing here</p>';
 
     expect(() => findRefs()).toThrow('The page has no element with the id "mobile-bar".');
-  });
-});
-
-describe('the skip link', () => {
-  const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-  it('is the first thing the Tab key reaches', () => {
-    loadPage();
-
-    const [first] = [...document.querySelectorAll(FOCUSABLE)].filter(
-      (element) => !element.hasAttribute('disabled') && !element.closest('[hidden]'),
-    );
-
-    expect(first.classList.contains('skip')).toBe(true);
-  });
-
-  it('points to the question box, and sits in a navigation landmark', () => {
-    loadPage();
-
-    expect(document.querySelector('a.skip')?.getAttribute('href')).toBe('#question');
-    expect(document.querySelector('nav.skip-nav a.skip')).not.toBeNull();
-  });
-
-  it('can take the focus, and nothing in the page takes it back on load', () => {
-    loadPage();
-    const link = /** @type {HTMLElement} */ (document.querySelector('a.skip'));
-
-    link.focus();
-
-    expect(document.activeElement).toBe(link);
-  });
-
-  describe('in the stylesheet', () => {
-    const css = readFileSync(resolve('public/css/layout.css'), 'utf8');
-    const tokens = readFileSync(resolve('public/css/tokens.css'), 'utf8');
-    const ruleFor = (/** @type {string} */ selector) => {
-      const start = css.indexOf(`${selector} {`);
-      return start === -1 ? '' : css.slice(start, css.indexOf('}', start));
-    };
-
-    it('is always visible: nothing hides it, moves it off screen or clips it', () => {
-      const rule = ruleFor('.skip');
-
-      expect(rule).not.toBe('');
-      const found = [
-        'display: none',
-        'visibility: hidden',
-        '-9999px',
-        'clip',
-        'opacity: 0',
-        'translate',
-      ].filter((hiding) => rule.includes(hiding));
-
-      expect(found).toEqual([]);
-    });
-
-    it('is not hidden by a rule for when it does not have focus', () => {
-      expect(css).not.toContain('.skip:not(:focus)');
-    });
-
-    it('turns bright yellow with black text and a border when it has focus', () => {
-      const rule = ruleFor('.skip:focus');
-
-      expect(rule).toContain('background: var(--color-skip-bg)');
-      expect(rule).toContain('color: var(--color-skip-text)');
-      expect(rule).toContain('border: 3px solid var(--color-skip-text)');
-      expect(tokens).toContain('--color-skip-bg: #ffd400;');
-      expect(tokens).toContain('--color-skip-text: #000000;');
-    });
   });
 });

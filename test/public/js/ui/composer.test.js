@@ -31,7 +31,7 @@ function parts(form) {
 }
 
 describe('the composer before the first question', () => {
-  it('is a form with a labelled question box that the skip link can reach', () => {
+  it('is a form with a labelled question box', () => {
     const form = build();
 
     const { label, field } = parts(form);

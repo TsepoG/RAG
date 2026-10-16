@@ -249,13 +249,9 @@ describe('starting', () => {
     expect(refs.notice.textContent).toBe('The roles could not be loaded.');
   });
 
-  it('gives the skip link a question box to go to, with a label', async () => {
+  it('gives the question box a label', async () => {
     await setup();
 
-    const target = document.querySelector(
-      document.querySelector('a.skip')?.getAttribute('href') ?? '',
-    );
-    expect(target).toBe(field());
     expect(document.querySelector(`label[for="${field().id}"]`)).not.toBeNull();
   });
 });

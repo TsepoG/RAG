@@ -3,7 +3,7 @@ import { el } from '../dom.js';
 import { icon } from './icons.js';
 import { buildTimeHint } from './timeHint.js';
 
-/** The id of the question box; the skip link and the labels point to it. */
+/** The id of the question box; the labels point to it. */
 export const QUESTION_ID = 'question';
 
 /** The id of the line under the box, which the box is described by. */
