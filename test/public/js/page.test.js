@@ -66,7 +66,7 @@ describe('public/index.html', () => {
   it('has a sidebar, a main area and a place for the phone bar, the drawer cover and the box', () => {
     const refs = loadPage();
 
-    expect(refs.sidebar.tagName).toBe('ASIDE');
+    expect(refs.sidebar.getAttribute('role')).toBe('complementary');
     expect(refs.sidebar.getAttribute('aria-label')).toBe('Conversation settings');
     expect(document.querySelector('main')?.contains(refs.messages)).toBe(true);
     expect(document.querySelector('main')?.contains(refs.sidebar)).toBe(false);

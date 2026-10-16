@@ -90,9 +90,7 @@ function buildHeader(spec, turn) {
  * @returns {string} The phrase.
  */
 function listKeys(keys) {
-  return keys.length === 1
-    ? keys[0]
-    : `${keys.slice(0, -1).join(', ')} and ${keys[keys.length - 1]}`;
+  return keys.length === 1 ? keys[0] : `${keys.slice(0, -1).join(', ')} and ${keys.at(-1)}`;
 }
 
 /**
@@ -183,7 +181,7 @@ function section(title, items, modifier = '') {
     ? []
     : [
         el('section', { className: `note ${modifier}`.trim() }, [
-          el('h3', { className: 'note__title', text: title }),
+          el('h2', { className: 'note__title', text: title }),
           el('ul', { className: 'note__list' }, items),
         ]),
       ];

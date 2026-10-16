@@ -58,7 +58,8 @@ describe('buildMobileBar', () => {
   it('shows the name of the product in a header, and the role and the turn in a strip', () => {
     const { element } = buildMobileBar({ roleName: 'Product Owner', turnText: 'Turn 2 of 5' });
 
-    expect(element.querySelector('header .brand__name')?.textContent).toBe('Knowledge Assistant');
+    expect(element.tagName).toBe('HEADER');
+    expect(element.querySelector('.topbar .brand__name')?.textContent).toBe('Knowledge Assistant');
     expect(element.querySelector('.strip__role')?.textContent).toBe('Product Owner');
     expect(element.querySelector('.strip__turn')?.textContent).toBe('Turn 2 of 5');
   });
@@ -108,7 +109,6 @@ describe('the drawer', () => {
     expect(panel.classList.contains('is-open')).toBe(true);
     expect(panel.getAttribute('role')).toBe('dialog');
     expect(panel.getAttribute('aria-modal')).toBe('true');
-    expect(panel.getAttribute('aria-label')).toBe('Conversation menu');
     expect(backdrop.hidden).toBe(false);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
   });
@@ -141,10 +141,21 @@ describe('the drawer', () => {
     expect(panel.classList.contains('is-open')).toBe(false);
     expect(panel.hasAttribute('role')).toBe(false);
     expect(panel.hasAttribute('aria-modal')).toBe(false);
-    expect(panel.hasAttribute('aria-label')).toBe(false);
     expect(backdrop.hidden).toBe(true);
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(toggle);
+  });
+
+  it('goes back to the role it had, such as complementary, when it closes', () => {
+    const { panel, toggle } = setup();
+    panel.setAttribute('role', 'complementary');
+
+    toggle.click();
+    expect(panel.getAttribute('role')).toBe('dialog');
+    toggle.click();
+
+    expect(panel.getAttribute('role')).toBe('complementary');
+    expect(panel.hasAttribute('aria-modal')).toBe(false);
   });
 
   it('closes on Escape, puts focus back, and keeps the key from reaching anything else', () => {

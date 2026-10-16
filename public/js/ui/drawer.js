@@ -37,8 +37,9 @@ export function buildMobileBar({ roleName, turnText }) {
   );
   const role = el('span', { className: 'strip__role', text: roleName });
   const turn = el('span', { className: 'strip__turn', text: turnText });
-  const element = el('div', { className: 'mobilebar' }, [
-    el('header', { className: 'topbar' }, [
+  // One header holds both parts, so the whole bar is a landmark and no content sits outside one.
+  const element = el('header', { className: 'mobilebar' }, [
+    el('div', { className: 'topbar' }, [
       el('div', { className: 'topbar__brand' }, [
         el('span', { className: 'brand__mark brand__mark--small' }, [icon('brand', { size: 16 })]),
         el('span', { className: 'brand__name', text: PRODUCT_NAME }),
@@ -97,6 +98,9 @@ function focusablesIn(root) {
  */
 export function createDrawer({ panel, toggle, backdrop }) {
   let isOpen = false;
+  /** The role the panel has when it is not a drawer, put back when it closes. */
+  /** @type {string | null} */
+  let restingRole = null;
 
   /**
    * Keeps Tab inside the drawer, and closes it on Escape.
@@ -113,7 +117,7 @@ export function createDrawer({ panel, toggle, backdrop }) {
     }
     const items = focusablesIn(panel);
     const first = items[0];
-    const last = items[items.length - 1];
+    const last = items.at(-1);
     if (first === undefined || last === undefined) {
       event.preventDefault();
       return;
@@ -134,9 +138,9 @@ export function createDrawer({ panel, toggle, backdrop }) {
     }
     isOpen = true;
     panel.classList.add('is-open');
+    restingRole = panel.getAttribute('role');
     panel.setAttribute('role', 'dialog');
     panel.setAttribute('aria-modal', 'true');
-    panel.setAttribute('aria-label', MENU_LABEL);
     backdrop.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
     panel.addEventListener('keydown', onKeydown);
@@ -150,9 +154,12 @@ export function createDrawer({ panel, toggle, backdrop }) {
     }
     isOpen = false;
     panel.classList.remove('is-open');
-    panel.removeAttribute('role');
+    if (restingRole === null) {
+      panel.removeAttribute('role');
+    } else {
+      panel.setAttribute('role', restingRole);
+    }
     panel.removeAttribute('aria-modal');
-    panel.removeAttribute('aria-label');
     backdrop.hidden = true;
     toggle.setAttribute('aria-expanded', 'false');
     panel.removeEventListener('keydown', onKeydown);

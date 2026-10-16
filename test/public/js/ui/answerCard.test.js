@@ -231,7 +231,7 @@ describe('what it could not confirm and where sources disagree', () => {
     const card = build();
 
     const note = /** @type {HTMLElement} */ (card.querySelector('.note'));
-    expect(note.querySelector('h3')?.textContent).toBe("What I'm not sure about");
+    expect(note.querySelector('h2')?.textContent).toBe("What I'm not sure about");
     expect(note.querySelector('li')?.textContent).toBe('The refund window for gift cards');
   });
 
@@ -244,7 +244,7 @@ describe('what it could not confirm and where sources disagree', () => {
     });
 
     const note = /** @type {HTMLElement} */ (card.querySelector('.note--conflicts'));
-    expect(note.querySelector('h3')?.textContent).toBe('Where sources disagree');
+    expect(note.querySelector('h2')?.textContent).toBe('Where sources disagree');
     expect(note.querySelectorAll('button.cite')).toHaveLength(2);
     expect(note.querySelector('button.cite')?.getAttribute('aria-describedby')).toBe(
       'source-title-a1-C1',
@@ -261,7 +261,7 @@ describe('what it could not confirm and where sources disagree', () => {
     const card = build({ rendered: { gaps: [] } });
 
     const note = /** @type {HTMLElement} */ (card.querySelector('.note'));
-    expect(note.querySelector('h3')?.textContent).toBe('Who might know');
+    expect(note.querySelector('h2')?.textContent).toBe('Who might know');
     expect(note.textContent).toContain('@acme/payments (G1)');
   });
 
@@ -309,7 +309,7 @@ describe('not found, and out of scope', () => {
     const card = build(notFound);
 
     const panel = /** @type {HTMLElement} */ (card.querySelector('.answer-card__panel'));
-    const titles = [...panel.querySelectorAll('h3')].map(({ textContent }) => textContent);
+    const titles = [...panel.querySelectorAll('h2')].map(({ textContent }) => textContent);
     expect(titles).toEqual(['Where I looked', 'Who might know']);
     expect(panel.querySelector('a')?.textContent).toBe('Payments FAQ');
     expect(panel.querySelector('a')?.getAttribute('href')).toBe(
@@ -321,14 +321,14 @@ describe('not found, and out of scope', () => {
   it('leaves out Who might know when nobody is suggested', () => {
     const card = build({ ...notFound, rendered: { ...notFound.rendered, whoToAsk: [] } });
 
-    const titles = [...card.querySelectorAll('.answer-card__panel h3')].map((h) => h.textContent);
+    const titles = [...card.querySelectorAll('.answer-card__panel h2')].map((h) => h.textContent);
     expect(titles).toEqual(['Where I looked']);
   });
 
   it('leaves out Where I looked when no page was consulted', () => {
     const card = build({ ...notFound, rendered: { ...notFound.rendered, closestPages: [] } });
 
-    const titles = [...card.querySelectorAll('.answer-card__panel h3')].map((h) => h.textContent);
+    const titles = [...card.querySelectorAll('.answer-card__panel h2')].map((h) => h.textContent);
     expect(titles).toEqual(['Who might know']);
   });
 
