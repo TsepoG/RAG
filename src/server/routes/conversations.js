@@ -14,6 +14,7 @@ import { SECURITY_HEADERS } from '../headers.js';
 import { toolEventToProgress } from '../progress.js';
 import { openEventStream } from '../sse.js';
 import { MAX_QUESTION_LENGTH } from './ask.js';
+import { SIGN_IN_REQUIRED, UNAUTHORIZED } from './atlassianAuth.js';
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
@@ -70,6 +71,8 @@ const RECHECK_BODY_SCHEMA = Object.freeze({
  * @property {import('../answers.js').AnswerMemory} answers - Where answers are remembered for feedback.
  * @property {(markdown: string) => string} renderHtml - Turns markdown into safe HTML.
  * @property {Pick<import('../../logger/index.js').Logger, 'info' | 'warn' | 'error'>} logger - Where to log.
+ * @property {() => Promise<boolean>} [isSignedIn] - In oauth mode, whether someone is signed in to
+ *   Atlassian; a conversation cannot be started until they are. Absent in the other modes.
  */
 
 /**
@@ -109,7 +112,7 @@ function buildRecheckPayload(conversation, outcome, renderHtml, alwaysShow = [])
  */
 export function registerConversationRoutes(
   app,
-  { roles, store, runner, recheck, answers, renderHtml, logger },
+  { roles, store, runner, recheck, answers, renderHtml, logger, isSignedIn },
 ) {
   /**
    * Finds the live conversation of a request, noting that it was used.
@@ -134,7 +137,10 @@ export function registerConversationRoutes(
         },
       },
     },
-    async (request) => {
+    async (request, reply) => {
+      if (isSignedIn !== undefined && !(await isSignedIn())) {
+        return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      }
       const { role: roleId } = /** @type {{ role: string }} */ (request.body);
       const role = /** @type {import('../../roles/index.js').Role} */ (roles.get(roleId));
       const conversation = await store.create({ role });

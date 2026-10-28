@@ -1097,6 +1097,44 @@ a.source-row__link:hover {
 
 /* ---- Phone ---------------------------------------------------------------------------------- */
 
+/* ---- Sign-in pages: the error page the callback shows ---------------------------------- */
+
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-16);
+  background: var(--color-page);
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-16);
+  width: 100%;
+  max-width: 460px;
+  padding: var(--space-32);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.auth-card__heading {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-17);
+  font-weight: 600;
+}
+
+.auth-card__text {
+  margin: 0;
+  color: var(--color-body);
+  font-size: var(--font-size-15);
+}
+
 @media (max-width: 720px) {
   .welcome__heading {
     font-size: 30px;

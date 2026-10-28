@@ -104,6 +104,58 @@ export function checkRequest({ method, headers }, policy) {
 }
 
 /**
+ * The values of `Sec-Fetch-Site` for a navigation the person started on this site, or typed in.
+ * `same-site` is not among them: another port on this machine is another origin.
+ */
+const OWN_NAVIGATION = new Set(['same-origin', 'none']);
+
+/**
+ * Checks a browser navigation to a sign-in route. Only the Host and where the navigation came from
+ * are checked: these are GET routes with no body, which the page reaches by following a link.
+ * - Starting a sign-in must come from this app's own page (or be typed in), so another site cannot
+ *   start one in the person's browser (login CSRF).
+ * - The callback is the one route that accepts a navigation from another site, because Atlassian
+ *   sends the browser back to it. Its state, cookie and PKCE checks protect it instead.
+ * @param {{ headers: Readonly<Record<string, string | string[] | undefined>> }} request - The request.
+ * @param {GuardPolicy} policy - What counts as this server.
+ * @param {{ allowCrossSite: boolean }} options - Whether a navigation from another site is allowed.
+ * @returns {GuardReason | undefined} Why it is refused, or undefined when it may go on.
+ */
+export function checkAuthNavigation({ headers }, policy, { allowCrossSite }) {
+  const { host } = headers;
+  if (typeof host !== 'string' || !policy.hosts.has(host.toLowerCase())) {
+    return 'host';
+  }
+  const site = headers['sec-fetch-site'];
+  // A missing header is allowed so curl and tests work; browsers always send it.
+  if (!allowCrossSite && site !== undefined && !OWN_NAVIGATION.has(String(site))) {
+    return 'cross-site';
+  }
+  return undefined;
+}
+
+/**
+ * Builds the hook for one sign-in route. A refusal is a 403 with a short plain-text message, and
+ * only the reason code is logged.
+ * @param {{ policy: GuardPolicy, logger: Pick<import('../logger/index.js').Logger, 'warn'>, allowCrossSite: boolean }} deps - Dependencies.
+ * @returns {import('fastify').onRequestAsyncHookHandler} The hook.
+ */
+export function createAuthNavigationHook({ policy, logger, allowCrossSite }) {
+  return async (request, reply) => {
+    const reason = checkAuthNavigation(request, policy, { allowCrossSite });
+    if (reason === undefined) {
+      return;
+    }
+    logger.warn({ reason, method: request.method }, 'refused a sign-in request');
+    await reply
+      .code(FORBIDDEN)
+      .header('Cache-Control', 'no-store')
+      .type('text/plain; charset=utf-8')
+      .send(MESSAGES[reason]);
+  };
+}
+
+/**
  * Builds the Fastify hook that refuses a request to `/api/*` that fails the guards, with a 403
  * and a short JSON message. The reason code is logged at warn, never the header values.
  * @param {{ policy: GuardPolicy, logger: Pick<import('../logger/index.js').Logger, 'warn'> }} deps - Dependencies.

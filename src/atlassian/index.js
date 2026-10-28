@@ -8,6 +8,8 @@
 /** @typedef {import('./pending.js').StartedSignIn} StartedSignIn */
 /** @typedef {import('./pending.js').TakenSignIn} TakenSignIn */
 /** @typedef {import('./revoke.js').SignOutResult} SignOutResult */
+/** @typedef {import('./signIn.js').SignInFlow} SignInFlow */
+/** @typedef {import('./signIn.js').SignInOutcome} SignInOutcome */
 /** @typedef {import('./store.js').SignInStore} SignInStore */
 /** @typedef {import('./store.js').StoredClient} StoredClient */
 /** @typedef {import('./store.js').StoredSignIn} StoredSignIn */
@@ -37,6 +39,7 @@ export { withLock } from './lock.js';
 export { createPendingSignIns, PENDING_SIGN_IN_MS } from './pending.js';
 export { challengeFor, createPkce, randomToken } from './pkce.js';
 export { signOut } from './revoke.js';
+export { createSignInFlow } from './signIn.js';
 export { createSignInStore } from './store.js';
 export { exchangeCode, refreshTokens } from './tokenEndpoint.js';
 export { createTokenProvider } from './tokens.js';
