@@ -25,3 +25,21 @@ export function validEnv(overrides = {}) {
     Object.fromEntries(Object.entries(env).filter(([, value]) => value !== undefined))
   );
 }
+
+/** A cloud id in the right shape, for oauth mode, where one is required. */
+export const FAKE_CLOUD_ID = '0f1e2d3c-4b5a-4968-8776-655443322110';
+
+/**
+ * Builds a complete, valid environment for oauth mode: no email or API token, and a cloud id.
+ * @param {Record<string, string | undefined>} [overrides] - Variables to change; undefined removes one.
+ * @returns {Record<string, string>} Environment that passes validation unless overridden.
+ */
+export function oauthEnv(overrides = {}) {
+  return validEnv({
+    ATLASSIAN_AUTH_MODE: 'oauth',
+    ATLASSIAN_EMAIL: undefined,
+    ATLASSIAN_API_TOKEN: undefined,
+    ATLASSIAN_CLOUD_ID: FAKE_CLOUD_ID,
+    ...overrides,
+  });
+}

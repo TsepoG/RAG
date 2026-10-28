@@ -2,6 +2,15 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { askQuestion } from '../answer/index.js';
+import {
+  createDiscovery,
+  createPendingSignIns,
+  createSignInFlow,
+  createSignInStore,
+  createTokenProvider,
+  redirectUriFor,
+  signOut,
+} from '../atlassian/index.js';
 import { loadConfig, loadEnvFileIfPresent, redactConfig } from '../config/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../copilot/index.js';
 import { AppError, ConfigError } from '../errors/index.js';
@@ -12,7 +21,12 @@ import {
   createSessionCloser,
 } from '../conversation/index.js';
 import { createGithubApi } from '../github/index.js';
-import { createConfluenceChecker, createGithubChecker } from '../recheck/index.js';
+import { connectMcp } from '../mcp/index.js';
+import {
+  createConfluenceChecker,
+  createGithubChecker,
+  createMcpConfluenceChecker,
+} from '../recheck/index.js';
 import { loadRoles } from '../roles/index.js';
 import { createAnswerMemory } from './answers.js';
 import { buildApp } from './app.js';
@@ -54,6 +68,52 @@ function reportFailure(error) {
 }
 
 /**
+ * Builds the Atlassian sign-in, in oauth mode only. In the other modes there is nothing to build.
+ * @param {object} deps - What the sign-in is built from.
+ * @param {import('../config/index.js').AppConfig} deps.config - Validated config.
+ * @param {import('../logger/index.js').Logger} deps.logger - Where to log.
+ * @param {{ now: () => number }} deps.clock - Time source.
+ * @param {import('../conversation/index.js').ConversationStore} deps.store - The conversations, so signing out ends the open one.
+ * @returns {(NonNullable<import('./app.js').AppDeps['atlassianAuth']> & { tokens: import('../atlassian/index.js').TokenProvider }) | undefined}
+ *   The sign-in, or undefined outside oauth mode.
+ */
+function buildAtlassianAuth({ config, logger, clock, store }) {
+  const { auth, cloudId, siteUrl } = config.atlassian;
+  if (auth.mode !== 'oauth') {
+    return undefined;
+  }
+  const fetch = globalThis.fetch;
+  const signInStore = createSignInStore({ dir: auth.dir, logger });
+  const discovery = createDiscovery({ fetch });
+  return {
+    flow: createSignInFlow({
+      settings: {
+        // The config requires a cloud id in oauth mode.
+        cloudId: /** @type {string} */ (cloudId),
+        siteUrl,
+        redirectUri: redirectUriFor(config.port),
+        mcpTimeoutMs: config.mcp.timeoutMs,
+      },
+      discovery,
+      store: signInStore,
+      pending: createPendingSignIns({ clock }),
+      fetch,
+      clock,
+      connect: connectMcp,
+      logger,
+    }),
+    tokens: createTokenProvider({ store: signInStore, discovery, fetch, clock, logger }),
+    signOut: () => signOut({ store: signInStore, discovery, fetch, clock, logger }),
+    async endActiveConversation() {
+      const active = store.active();
+      if (active !== undefined) {
+        await store.end(active, 'signed-out');
+      }
+    },
+  };
+}
+
+/**
  * Starts the web server: reads config and the roles, starts Copilot and checks it is signed in,
  * then listens. Stopping it (Ctrl+C) closes the server, which stops any running question, and then
  * the Copilot client.
@@ -78,6 +138,7 @@ async function main() {
       closeSession: createSessionCloser(logger),
       newId: randomUUID,
     });
+    const atlassianAuth = buildAtlassianAuth({ config, logger, clock, store });
     const runner = createConversationRunner({
       client: handle.client,
       workingDirectory: handle.workingDirectory,
@@ -85,6 +146,7 @@ async function main() {
       logger,
       clock,
       endConversation: (conversation, reason) => store.end(conversation, reason),
+      atlassianTokens: atlassianAuth?.tokens,
     });
     const recheck = createRecheckService({
       checkers: {
@@ -93,7 +155,17 @@ async function main() {
           repos: config.github.repos,
           logger,
         }),
-        confluence: createConfluenceChecker({ atlassian: config.atlassian, logger }),
+        // The REST route refuses a signed-in person's token, so oauth mode checks over MCP.
+        confluence:
+          atlassianAuth === undefined
+            ? createConfluenceChecker({ atlassian: config.atlassian, logger })
+            : createMcpConfluenceChecker({
+                atlassian: config.atlassian,
+                getAtlassianToken: atlassianAuth.tokens.getAtlassianToken,
+                connect: connectMcp,
+                timeoutMs: config.mcp.timeoutMs,
+                logger,
+              }),
       },
       clock,
       afterMinutes: config.conversation.recheckAfterMinutes,
@@ -115,10 +187,12 @@ async function main() {
           workingDirectory: handle.workingDirectory,
           config,
           logger,
+          getAtlassianToken: atlassianAuth?.tokens.getAtlassianToken,
         }),
       answers: createAnswerMemory(),
       saveFeedback: (answer, input) => appendFeedback(answer, input, { dir: DATA_DIRECTORY }),
       conversations: { store, runner, recheck },
+      atlassianAuth,
       staticFiles: await listStaticFiles(PUBLIC_DIRECTORY),
       logger,
     });

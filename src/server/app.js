@@ -4,6 +4,7 @@ import { createAnswerHtmlRenderer } from '../render/index.js';
 import { createGuardHook, createGuardPolicy } from './guards.js';
 import { createSecurityHeadersHook } from './headers.js';
 import { registerAskRoute } from './routes/ask.js';
+import { registerAtlassianAuthRoutes, registerAuthStatusRoute } from './routes/atlassianAuth.js';
 import { registerConversationRoutes } from './routes/conversations.js';
 import { registerFeedbackRoute } from './routes/feedback.js';
 import { registerInfoRoutes } from './routes/info.js';
@@ -28,6 +29,8 @@ const GITHUB_HOST = 'github.com';
  * @property {import('./routes/feedback.js').FeedbackRouteDeps['save']} saveFeedback - Stores feedback.
  * @property {Omit<import('./routes/conversations.js').ConversationRouteDeps, 'roles' | 'answers' | 'renderHtml' | 'logger'>} [conversations] -
  *   The conversations, the runner that asks in them and the re-check; the routes are left out without it.
+ * @property {Omit<import('./routes/atlassianAuth.js').AtlassianAuthRouteDeps, 'policy' | 'port' | 'siteHost' | 'logger'>} [atlassianAuth] -
+ *   The sign-in, in oauth mode only: its routes are added, and questions wait for a sign-in.
  * @property {ReadonlyMap<string, import('./static.js').StaticFile>} staticFiles - Files to serve.
  * @property {import('../logger/index.js').Logger} logger - Where to log.
  */
@@ -45,6 +48,7 @@ export function buildApp({
   answers,
   saveFeedback,
   conversations,
+  atlassianAuth,
   staticFiles,
   logger,
 }) {
@@ -72,11 +76,33 @@ export function buildApp({
     return reply.code(status).send({ message: error.message });
   });
 
+  const isSignedIn =
+    atlassianAuth === undefined
+      ? undefined
+      : async () => (await atlassianAuth.tokens.status()).signedIn;
+
   registerInfoRoutes(app, { roles });
-  registerAskRoute(app, { roles, ask, answers, renderHtml, logger });
+  registerAuthStatusRoute(app, { mode: config.atlassian.auth.mode, tokens: atlassianAuth?.tokens });
+  if (atlassianAuth !== undefined) {
+    registerAtlassianAuthRoutes(app, {
+      ...atlassianAuth,
+      policy,
+      port: config.port,
+      siteHost: new URL(config.atlassian.siteUrl).host,
+      logger,
+    });
+  }
+  registerAskRoute(app, { roles, ask, answers, renderHtml, logger, isSignedIn });
   registerFeedbackRoute(app, { answers, save: saveFeedback });
   if (conversations !== undefined) {
-    registerConversationRoutes(app, { ...conversations, roles, answers, renderHtml, logger });
+    registerConversationRoutes(app, {
+      ...conversations,
+      roles,
+      answers,
+      renderHtml,
+      logger,
+      isSignedIn,
+    });
   }
   app.get('/*', createStaticHandler(staticFiles));
   return app;

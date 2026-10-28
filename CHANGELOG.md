@@ -1,8 +1,48 @@
 # Changelog
 
 One entry per phase. Dates are those of the merge or, for Phase 6, of the last change on its
-branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`; Phase 8 is `0.3.0`, to be tagged
-after it is merged.
+branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`; Phase 8 is `0.3.0`; Phase 9 is
+`0.4.0`, to be tagged after it is merged.
+
+## Phase 9: Sign in with Atlassian (2026-10-28)
+
+- A new, opt-in `ATLASSIAN_AUTH_MODE=oauth`. The person signs in with their own Atlassian account
+  from the web page (**Sign in with Atlassian**), and Copilot's Confluence connection uses that
+  sign-in, so answers draw only on pages they may see. `basic` and `bearer` are unchanged and
+  `basic` is still the default.
+- The sign-in uses Atlassian's OAuth 2.1 as the MCP server advertises it: discovery at runtime,
+  dynamic client registration as a public client, PKCE S256, and only read scopes
+  (`offline_access`, `read:me`, `read:account`, `read:confluence:agent-interface` and
+  `search:confluence:agent-interface`). After consent the app checks the scopes and that the
+  account can reach the configured site before saving anything.
+- The sign-in is kept outside the project in `ATLASSIAN_OAUTH_DIR` (default
+  `~/.role-aware-assistant`), written atomically with modes 0700 and 0600 (not enforced on
+  Windows). It renews by itself, saving the rotated refresh token before using it, with a lock so
+  the server, `npm run ask` and the eval never renew at once. An open conversation gets the renewed
+  token through `restartServer` and keeps its history.
+- New routes: `GET /auth/atlassian/start`, `GET /auth/atlassian/callback`, `GET /api/auth/status`
+  and `POST /api/auth/atlassian/logout`. Start is same-origin only; the callback is the only route
+  open to a cross-site navigation and needs the pending `state` and a short-lived cookie from the
+  same browser. Questions are refused with 401 `atlassian_signin_required` while nobody is signed
+  in; a refused turn is not counted and the conversation is kept.
+- The page: a sign-in screen instead of the welcome when signed out, "Signed in to `<site>`" with
+  **Sign out** at the bottom of the sidebar (and in the phone menu), and an expired banner with
+  **Sign in again** in place of the question box. Sign out revokes both tokens, deletes the sign-in
+  and ends the conversation with the new end reason `signed-out`.
+- Re-check in oauth mode reads Confluence page versions through the Atlassian MCP server, one
+  connection per batch, because the REST gateway refuses the token. A deleted page shows
+  "Couldn't check" in this mode.
+- The CLI (`ask`, `eval`, `mcp:tools`, `mcp:sample`) uses the stored sign-in in oauth mode, or
+  stops with "Sign in through the web app first".
+- Tokens never reach the log, an error, an API response or the page: new redacted keys, `/auth/*`
+  query strings left out of the log, `no-store` on the sign-in responses.
+- The thumbs up and down are hidden for now (`SHOW_FEEDBACK` in `public/js/main.js`). The feedback
+  route and file are unchanged.
+- Dependency updates for `npm audit`: `zod` 4.6.7 (with an override so the Copilot SDK uses it too),
+  `fastify` 5.12.7, `sanitize-html` 2.18.1, `happy-dom` 21.0.4 (tests only), and the lockfile fixes
+  for `body-parser`, `fast-uri`, `qs` and `ip-address`.
+- `@modelcontextprotocol/sdk` moved from dev dependencies to dependencies; the app now uses it for
+  the site check and the re-check. No new dependency.
 
 ## Phase 8: A redesigned page, "Clarity" (2026-10-16)
 

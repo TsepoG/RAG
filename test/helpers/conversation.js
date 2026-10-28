@@ -45,6 +45,7 @@ export const NOW = Date.parse('2026-10-11T00:00:00Z');
  * @param {boolean} [options.abortGoesQuiet] - Whether aborting makes the session report idle, as the runtime does.
  * @param {Error} [options.createFailure] - Makes `createSession` reject.
  * @param {import('../../src/roles/index.js').Role} [options.role] - The role.
+ * @param {Pick<import('../../src/atlassian/index.js').TokenProvider, 'getAtlassianToken'>} [options.atlassianTokens] - The signed-in tokens, in oauth mode.
  * @returns {Promise<Harness>} The pieces.
  */
 export async function setupConversation({
@@ -54,6 +55,7 @@ export async function setupConversation({
   abortGoesQuiet = true,
   createFailure,
   role = TEST_ROLE,
+  atlassianTokens,
 } = {}) {
   const { stream, lines } = createMemoryStream();
   const logger = createLogger({ level: 'debug', destination: stream });
@@ -100,6 +102,7 @@ export async function setupConversation({
     clock,
     endConversation,
     fetch: vi.fn(async () => new Response('', { status: 404 })),
+    atlassianTokens,
   });
   return {
     conversation,

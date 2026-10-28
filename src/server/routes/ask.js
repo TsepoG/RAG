@@ -5,6 +5,7 @@ import { describeFailure } from '../failure.js';
 import { SECURITY_HEADERS } from '../headers.js';
 import { toolEventToProgress } from '../progress.js';
 import { openEventStream } from '../sse.js';
+import { SIGN_IN_REQUIRED, UNAUTHORIZED } from './atlassianAuth.js';
 
 /**
  * The body of an ask request, once the schema has checked it.
@@ -29,6 +30,8 @@ const HAS_TEXT = '\\S';
  * @property {import('../answers.js').AnswerMemory} answers - Where answers are remembered for feedback.
  * @property {(markdown: string) => string} renderHtml - Turns markdown into safe HTML.
  * @property {Pick<import('../../logger/index.js').Logger, 'info' | 'warn' | 'error'>} logger - Where to log.
+ * @property {() => Promise<boolean>} [isSignedIn] - In oauth mode, whether someone is signed in to
+ *   Atlassian; a question is refused with a 401 until they are. Absent in the other modes.
  */
 
 /**
@@ -80,13 +83,16 @@ function rememberAnswer(answers, question, result) {
  * @param {import('fastify').FastifyInstance} app - The app.
  * @param {AskRouteDeps} deps - Dependencies.
  */
-export function registerAskRoute(app, { roles, ask, answers, renderHtml, logger }) {
+export function registerAskRoute(app, { roles, ask, answers, renderHtml, logger, isSignedIn }) {
   let busy = false;
   app.post(
     '/api/ask',
     { schema: { body: bodySchema([...roles.keys()]) } },
     async (request, reply) => {
       const { question, role: roleId, detailLevel } = /** @type {RequestBody} */ (request.body);
+      if (isSignedIn !== undefined && !(await isSignedIn())) {
+        return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      }
       if (busy) {
         return reply
           .code(TOO_MANY_REQUESTS)

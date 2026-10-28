@@ -21,6 +21,7 @@ export const REASK_TEXT = 'Re-ask with the latest version';
  * @property {boolean} canReask - Whether "Re-ask with the latest version" is offered.
  * @property {boolean} canMoreDetail - Whether "Show more detail" is offered.
  * @property {import('../chatState.js').Rating | undefined} rating - What the reader said about it.
+ * @property {boolean} [showFeedback] - Whether the thumbs up and down are offered (default true).
  */
 
 /**
@@ -305,12 +306,12 @@ function buildFeedback({ answerId, result }, rating) {
 /**
  * Builds the foot of a card: "Show more detail" on the left and the thumbs on the right.
  * @param {import('../chatState.js').AnswerView} answer - The answer.
- * @param {boolean} canMoreDetail - Whether "Show more detail" is offered.
- * @param {import('../chatState.js').Rating | undefined} rating - What the reader said.
- * @returns {HTMLElement} The footer.
+ * @param {{ canMoreDetail: boolean, rating: import('../chatState.js').Rating | undefined, showFeedback: boolean }} offer
+ *   Whether "Show more detail" and the thumbs are offered, and what the reader said.
+ * @returns {HTMLElement[]} The footer, or nothing when it would be empty.
  */
-function buildFooter(answer, canMoreDetail, rating) {
-  return el('footer', { className: 'answer-card__footer' }, [
+function buildFooter(answer, { canMoreDetail, rating, showFeedback }) {
+  const parts = [
     ...(canMoreDetail
       ? [
           actionButton({
@@ -321,8 +322,9 @@ function buildFooter(answer, canMoreDetail, rating) {
           }),
         ]
       : []),
-    buildFeedback(answer, rating),
-  ]);
+    ...(showFeedback ? [buildFeedback(answer, rating)] : []),
+  ];
+  return parts.length === 0 ? [] : [el('footer', { className: 'answer-card__footer' }, parts)];
 }
 
 /**
@@ -341,6 +343,7 @@ export function buildAnswerCard({
   canReask,
   canMoreDetail,
   rating,
+  showFeedback = true,
 }) {
   const { answerId, result } = answer;
   const notice = buildChangedNotice(answer, canReask);
@@ -356,7 +359,7 @@ export function buildAnswerCard({
     buildText(answer),
     ...buildNotes(answer),
     ...(sources === undefined ? [] : [sources]),
-    buildFooter(answer, canMoreDetail, rating),
+    ...buildFooter(answer, { canMoreDetail, rating, showFeedback }),
   );
   // Over the whole card, so the chips in a conflict point to their source too.
   describeChips(card, answerId, new Set(result.sources.map(({ key }) => key)));

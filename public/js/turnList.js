@@ -10,6 +10,9 @@ import { buildProgressCard } from './ui/progress.js';
  * @typedef {object} ListContext
  * @property {number} now - The time now, in ms.
  * @property {Set<string>} openSources - Ids of the answers whose Sources list is open.
+ * @property {boolean} [showFeedback] - Whether answers offer the thumbs up and down (default true).
+ * @property {boolean} [signInNeeded] - Whether the Atlassian sign-in must be renewed first; a retry
+ *   would only be refused again, so Try again is not offered.
  */
 
 /**
@@ -20,13 +23,15 @@ import { buildProgressCard } from './ui/progress.js';
  */
 
 /**
- * Whether a failed turn can be asked again: it is the newest, and the conversation can take it.
+ * Whether a failed turn can be asked again: it is the newest, the conversation can take it, and no
+ * sign-in is needed first.
  * @param {import('./chatState.js').ChatState} state - The state.
  * @param {import('./chatState.js').TurnView} turn - The turn.
+ * @param {ListContext} context - Whether a sign-in is needed.
  * @returns {boolean} True when Try again is offered.
  */
-function canRetry(state, turn) {
-  return turn === state.turns.at(-1) && canAsk(state);
+function canRetry(state, turn, context) {
+  return turn === state.turns.at(-1) && canAsk(state) && context.signInNeeded !== true;
 }
 
 /**
@@ -48,6 +53,7 @@ function buildReply(state, turn, context) {
       canReask: canReask(state, turn),
       canMoreDetail: canShowMoreDetail(state, turn),
       rating: state.ratings[answer.answerId],
+      showFeedback: context.showFeedback,
     });
   }
   if (turn.phase === 'running') {
@@ -59,7 +65,7 @@ function buildReply(state, turn, context) {
   return buildErrorCard({
     turn: turn.turn,
     message: /** @type {string} */ (turn.failure),
-    canRetry: canRetry(state, turn),
+    canRetry: canRetry(state, turn, context),
   });
 }
 
@@ -92,7 +98,7 @@ function inputsOf(state, turn, context) {
     id === undefined ? undefined : state.ratings[id],
     canReask(state, turn),
     canShowMoreDetail(state, turn),
-    canRetry(state, turn),
+    canRetry(state, turn, context),
     id !== undefined && context.openSources.has(id),
   ];
 }

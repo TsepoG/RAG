@@ -1,6 +1,7 @@
 # How it works
 
-This document describes the system as the code stands at commit `a4375af` (Phase 8 merged). It is
+This document describes the system as the code stands at commit `3a270d9` (Phase 9, Atlassian sign-in,
+on its branch). It is
 taken from the code, not from the phase briefs; where they differ, the code is what is described.
 Paths are relative to the repository root. Where a point could not be confirmed from the code, it
 says **Not found in code**.
@@ -52,6 +53,9 @@ Browser (public/js)                    Server (src/server)                     C
    `reaskAnswerId`). Otherwise it opens the event stream (`sse.js`: `text/event-stream`,
    `no-store`, `X-Accel-Buffering: no`) and calls the conversation runner.
 6. **The turn.** `createConversationRunner().ask` in `turn.js`:
+   - in oauth mode only, first makes sure the Atlassian sign-in is fresh enough (`prepare`, see
+     [section 11](#11-atlassian-sign-in-oauth-mode)); the route calls it before opening the stream, so a
+     sign-in that cannot be renewed is a 401 `atlassian_signin_required` and the turn is not counted;
    - starts the turn (`conversation.beginTurn`), which counts toward the cap from that moment;
    - reuses the conversation's Copilot session, or creates it on the first turn with
      `client.createSession(buildSessionConfig(...))`. There is one session per conversation;
@@ -81,7 +85,8 @@ Browser (public/js)                    Server (src/server)                     C
     answer-meta block, asks once for a style rewrite, builds who-to-ask, and composes the result.
     The route then stores an answer record, sends `done` (the answer, its sources and the
     conversation's state), runs the automatic re-check, sends `recheck`, and closes. On failure it
-    sends `error` with `kind` `timeout`, `cancelled`, `copilot` or `internal` (`failure.js`).
+    sends `error` with `kind` `timeout`, `cancelled`, `copilot`, `internal` or, in oauth mode, `signin`
+    (`failure.js`).
 11. **Back in the page.** `sseParser.js` splits events; `chatState.js` turns `progress` into
     steps, `token` into a grey draft labelled `Draft: sources still being checked`, and `done`
     into the checked answer, which replaces the draft. `view.js` redraws only what changed.
@@ -112,10 +117,12 @@ Both are remote HTTP MCP servers (`servers.js`); nothing is started locally.
 
 | Key | URL | Auth | Allow-listed tools |
 | --- | --- | --- | --- |
-| `atlassian` | `https://mcp.atlassian.com/v2/mcp` | `Basic email:token` (default) or `Bearer token` | `searchConfluence`, `getConfluenceContent`, `getAccessibleAtlassianResources` |
+| `atlassian` | `https://mcp.atlassian.com/v2/mcp` | `Basic email:token` (default), `Bearer token`, or in oauth mode `Bearer <signed-in access token>` | `searchConfluence`, `getConfluenceContent`, `getAccessibleAtlassianResources` |
 | `github_repos` | `https://api.githubcopilot.com/mcp/` | `Bearer GITHUB_TOKEN`, plus `X-MCP-Readonly: true`, `X-MCP-Toolsets: repos` | `search_code`, `get_file_contents`, `get_commit`, `list_commits`, `list_releases`, `get_latest_release` |
 
-Each call has a timeout of `MCP_TIMEOUT_MS` (default 30000). Comments in `allowlist.js` give why
+Each call has a timeout of `MCP_TIMEOUT_MS` (default 30000). In oauth mode only the `Authorization`
+header differs; the allow-list, hooks, permission handler and cloudId injection are the same
+(`buildMcpServers(config, toolNames, { atlassianToken })`). Comments in `allowlist.js` give why
 other tools are left out: Rovo `search` and Teamwork Graph tools cannot be limited to a space,
 `executeRead`/`discover` are gateways to hundreds of operations, Jira tools are out of scope, and
 `search_repositories`, `search_commits` and `list_repository_collaborators` are not limited to
@@ -467,13 +474,20 @@ A re-check compares a cited source with its live version directly. It never asks
 - **Confluence** (`confluence.js`): one GET of `/wiki/api/v2/pages/<id>` (through
   `api.atlassian.com` with the cloudId in bearer mode), 10 s timeout. The page's `version.number`
   is compared with the version that was read.
+- **Confluence in oauth mode** (`confluenceMcp.js`): Atlassian's REST gateway refuses the signed-in
+  token, so the app calls the MCP tool `getConfluenceContent` itself (not through Copilot) with the
+  token, the configured cloudId and a `content_url` of `<site>/wiki/spaces/<KEY>/pages/<id>`. It asks
+  for `detail: "summary"` and falls back to `full` when the summary has no version, then reads
+  `data.metadata.version.number`. `recheckSources` runs a whole batch over one MCP connection
+  (`confluence.batch`). The space check still applies. Any MCP error, including a deleted page, is
+  `unavailable`, because it cannot be told apart from a page that cannot be reached.
 - **GitHub** (`github.js`): a file is compared by a hash of its blob SHA, a folder by a hash of its
   sorted entries, a release list by its newest tag, all read at the ref the model read. The baseline
   is the fingerprint stored when the source was fetched. With no stored fingerprint the app fetches
   the same path at the pinned commit as the baseline; with neither, the result is "couldn't check".
 
 **Outcomes:** `unchanged`, `changed`, or `unavailable` (shown as "Couldn't check"). A source that
-now returns 404 counts as changed. A source that cannot be reached is never reported as changed.
+now returns 404 counts as changed (REST only; see the oauth note above). A source that cannot be reached is never reported as changed.
 
 **What "changed" does**
 
@@ -519,6 +533,8 @@ now returns 404 counts as changed. A source that cannot be reached is never repo
 `src/server/feedbackStore.js`, `src/server/answers.js`, `src/eval/feedback.js`,
 `src/eval/report.js`, `src/cli/evalFromFeedback.js`, `src/cli/evalReport.js`.
 
+- **Hidden for now.** `SHOW_FEEDBACK` in `public/js/main.js` is `false`, so the cards show no
+  thumbs. Everything below still works and comes back when it is set to `true`.
 - **In the page:** thumbs up sends at once. Thumbs down opens a form with an optional comment
   ("What was wrong?", up to 1000 characters) and an optional "A source that was wrong", chosen from
   the answer's cited keys. There is no fixed list of reasons; the reason is the free-text comment.
@@ -613,3 +629,96 @@ What the system does not do today, as the code shows:
   often does not.
 - **Re-checks** cover Confluence pages, GitHub files, folders and release lists; commits and single
   releases are not checked, and a source that cannot be reached is shown as "Couldn't check".
+- **Atlassian sign-in (oauth mode)** is one sign-in per machine, not per browser. A token that
+  stops working in the middle of an answer reaches the model as an ordinary tool error; only the
+  next question is refused. Atlassian does not advertise the `iss` callback parameter today, so
+  that check is built but does not run.
+
+---
+
+## 11. Atlassian sign-in (oauth mode)
+
+**Files:** `src/config/oauthSchema.js`, `src/atlassian/*` (`discovery.js`, `client.js`, `pkce.js`,
+`pending.js`, `authorize.js`, `http.js`, `tokenEndpoint.js`, `signIn.js`, `identity.js`,
+`store.js`, `lock.js`, `tokens.js`, `revoke.js`), `src/server/routes/atlassianAuth.js`,
+`src/server/guards.js`, `src/server/authPages.js`, `src/conversation/sessionToken.js`,
+`src/recheck/confluenceMcp.js`, `public/js/signIn.js`, `public/js/ui/signIn.js`,
+`public/js/ui/signedInPanel.js`, `public/js/ui/expiredBanner.js`.
+
+With `ATLASSIAN_AUTH_MODE=oauth` the Atlassian MCP connection uses the token of the person who
+signed in, instead of a key from `.env`. `basic` and `bearer` are unchanged and stay the default.
+The mode requires `ATLASSIAN_CLOUD_ID` and `HOST=127.0.0.1`, and not the email or API token
+(`oauthSchema.js`). The routes below exist only in this mode.
+
+**Signing in** (`GET /auth/atlassian/start`, then `GET /auth/atlassian/callback`):
+
+1. **Guards.** Both routes check the `Host` and allow only GET (`checkAuthNavigation`). Start
+   refuses any `Sec-Fetch-Site` other than `same-origin` or `none`, so another site cannot start a
+   sign-in; the callback alone accepts a cross-site navigation, since it comes from atlassian.com.
+   Started on `localhost`, start redirects to the same path on `127.0.0.1`.
+2. **Discovery** (`discovery.js`). The app reads
+   `https://mcp.atlassian.com/.well-known/oauth-protected-resource/v2/mcp`, then the authorization
+   server's metadata, validates both with Zod (https, S256, every endpoint) and caches them for the
+   process. No endpoint is hard-coded.
+3. **Registration** (`client.js`). Once, by dynamic client registration as a public client with the
+   redirect `http://127.0.0.1:<PORT>/auth/atlassian/callback`, kept in `atlassian-client.json`. It
+   registers again when the issuer or the redirect changes, or when Atlassian answers
+   `invalid_client`.
+4. **Start** (`pending.js`, `pkce.js`, `authorize.js`). A PKCE verifier, an S256 challenge, a
+   32-byte `state` and a nonce, kept in memory for 10 minutes; one pending sign-in at a time, used
+   once. The nonce goes in an `HttpOnly; SameSite=Lax; Path=/auth/atlassian; Max-Age=600` cookie.
+   The 302 goes to the authorize URL with exactly the scopes `offline_access`, `read:me`,
+   `read:account`, `read:confluence:agent-interface` and `search:confluence:agent-interface`, and
+   `resource=https://mcp.atlassian.com/v2/mcp`; building a URL with a `write:` scope throws.
+5. **Callback** (`signIn.js`). The query's shape is checked, then the `state` and the cookie must
+   match the pending sign-in (`iss` too, when the metadata says it is sent; Atlassian's does not).
+   `error=access_denied` is "cancelled". The code is exchanged with the verifier and `resource`;
+   both Confluence scopes must have been granted. Then the site check (`identity.js`): the app
+   calls `getAccessibleAtlassianResources` over its own MCP client and requires the configured
+   cloudId and site URL. Only then is `atlassian-oauth.json` written and the browser sent to `/`.
+   On any failure nothing is saved and `authPages.js` shows a fixed page, "Sign-in didn't
+   complete", with the reason (cancelled, expired, missing permissions, wrong site, failed) and
+   **Try again**.
+
+`atlassianUserInfo` returns only an `accountId`, so it is not called: the panel says "Signed in to
+`<site host>`", taken from the site check.
+
+**Storage** (`store.js`, `lock.js`). `ATLASSIAN_OAUTH_DIR` (default `~/.role-aware-assistant`,
+absolute and outside the project) holds `atlassian-client.json` and `atlassian-oauth.json`
+(access token, refresh token, `expiresAt`, scopes, cloudId, site host). Writes are a temp file then
+a rename, folder 0700 and files 0600 (not enforced on Windows). A damaged file counts as signed out.
+`atlassian-oauth.lock` is taken with `open(..., 'wx')`; a lock older than 30 s is broken, and a
+waiter gives up after 15 s.
+
+**Renewal** (`tokens.js`). `getAtlassianToken({ minValidityMs })` returns the stored token if it
+lasts long enough. Otherwise one renewal runs per process (single-flight) under the lock: it
+re-reads the file (another process may have renewed already), refreshes, and **saves the new pair
+before returning it**, because Atlassian rotates the refresh token every time. On `invalid_grant`
+it re-reads once more, then deletes the sign-in; on `invalid_client` it also deletes the
+registration. Every failure surfaces as `AtlassianSignInRequiredError`. Token endpoint failures
+carry only the HTTP status and the OAuth error code, never the body.
+
+**Tokens in conversations** (`sessionToken.js`, `turn.js`). A new session asks for a token valid
+for at least 3 hours. Before every later turn the runner asks for one valid for
+`max(5 min, ASK_TIMEOUT_MS + 1 min)`; if the token differs from the one the session holds, it calls
+`session.rpc.mcp.restartServer({ serverName: 'atlassian', config })` with the same Atlassian entry
+and a new `Authorization` header. Live checks showed the session keeps its history. A failure
+answers 401 `atlassian_signin_required` before the stream opens; the conversation is kept and the
+turn is not counted. `askQuestion` (CLI and eval) asks for a 3-hour token before its session.
+
+**Status and sign-out.** `GET /api/auth/status` reads the file without a network call and returns
+`{ mode, signedIn, expiresAt?, siteHost? }`, never a token. `POST /api/auth/atlassian/logout`
+(`revoke.js`) revokes the refresh token, then the access token, deletes `atlassian-oauth.json`
+(keeping the registration) and ends the open conversation with the reason `signed-out`. If revoking
+fails, the file is still deleted and `revoked` is false.
+
+**Keeping tokens out of sight.** The logger redacts `accessToken`, `refreshToken`, `access_token`,
+`refresh_token`, `codeVerifier` and `code_verifier`, and drops the query string of every `/auth/*`
+request. The start, callback, error page and status responses are `no-store`.
+
+**The page.** On load, `chat.js` asks `/api/auth/status`. Signed out, it shows the sign-in screen
+(a real link to the start route) instead of the welcome, and hides the roles. Signed in, the
+sidebar ends with "Signed in to `<site>`" and **Sign out**. A 401 `atlassian_signin_required`, or
+an `error` event of kind `signin`, replaces the question box with "Your Atlassian sign-in has
+expired." and **Sign in again**; the failed turn offers no Try again until then. Signing in again
+returns to `/`, which restores the conversation as a reload does.

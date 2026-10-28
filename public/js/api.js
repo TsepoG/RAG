@@ -265,3 +265,35 @@ export async function recheckAnswer(
 export async function sendFeedback(feedback, fetchFunction = (...args) => fetch(...args)) {
   await send(fetchFunction, '/feedback', postJson(feedback));
 }
+
+/**
+ * Whether someone is signed in to Atlassian. In basic and bearer modes the service account always
+ * is; in oauth mode the person signs in from the page.
+ * @typedef {object} AuthStatus
+ * @property {string} mode - `basic`, `bearer` or `oauth`.
+ * @property {boolean} signedIn - Whether a sign-in is there.
+ * @property {string} [siteHost] - The Atlassian site the sign-in reaches, in oauth mode.
+ * @property {number} [expiresAt] - When the current token runs out, in ms; it is renewed by itself.
+ */
+
+/**
+ * Reads whether someone is signed in to Atlassian.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<AuthStatus>} The status.
+ * @throws {ApiError} When the server cannot be reached or answers with an error.
+ */
+export async function fetchAuthStatus(fetchFunction = (...args) => fetch(...args)) {
+  const response = await send(fetchFunction, '/auth/status', { headers: { Accept: JSON_TYPE } });
+  return response.json();
+}
+
+/**
+ * Signs out of Atlassian: the server revokes the sign-in, forgets it, and ends the conversation.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<{ signedOut: boolean, revoked: boolean }>} Whether Atlassian also revoked it.
+ * @throws {ApiError} When the server cannot be reached or refuses.
+ */
+export async function signOut(fetchFunction = (...args) => fetch(...args)) {
+  const response = await send(fetchFunction, '/auth/atlassian/logout', postJson({}));
+  return response.json();
+}

@@ -14,6 +14,9 @@ const PAGE_ID = /^\d+$/;
  * a token) is logged.
  * @typedef {object} ConfluenceChecker
  * @property {(source: import('../citations/index.js').ConfluenceSource) => Promise<import('./github.js').CheckStatus>} check - Checks one page.
+ * @property {<T>(run: (pages: Pick<ConfluenceChecker, 'check'>) => Promise<T>) => Promise<T>} [batch] -
+ *   Runs several checks over one connection, opened when the first check needs it and closed
+ *   afterwards. Only checkers that hold a connection have it.
  */
 
 /**
@@ -25,6 +28,10 @@ const PAGE_ID = /^\d+$/;
  * @returns {{ url: string, authorization: string } | undefined} The request, or undefined when the settings do not allow one.
  */
 function buildRequest({ siteUrl, cloudId, auth, apiToken }, id) {
+  // Oauth mode has no API token, and this REST route refuses the token of a person who signed in.
+  if (apiToken === undefined) {
+    return undefined;
+  }
   if (auth.mode === 'basic') {
     return {
       url: `${siteUrl}/wiki/api/v2/pages/${id}`,

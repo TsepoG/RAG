@@ -35,7 +35,13 @@ import {
   SUMMARY_FILE,
 } from '../eval/index.js';
 import { loadRoles } from '../roles/index.js';
-import { describeError, EXIT_FAILURE, loadSettings, withCopilot } from './shared.js';
+import {
+  atlassianSignIn,
+  describeError,
+  EXIT_FAILURE,
+  loadSettings,
+  withCopilot,
+} from './shared.js';
 
 const run = promisify(execFile);
 
@@ -92,6 +98,8 @@ async function main() {
     const args = parseEvalArguments(process.argv.slice(2));
     const settings = loadSettings();
     const { config, logger } = settings;
+    const signIn = await atlassianSignIn(settings);
+    const { getAtlassianToken } = signIn;
     const roles = await loadRoles();
     const all = await loadCases({ roles });
     const cases = selectCases(all, {
@@ -149,13 +157,14 @@ async function main() {
         logger,
         clock,
         endConversation: (conversation, reason) => store.end(conversation, reason),
+        atlassianTokens: getAtlassianToken === undefined ? undefined : { getAtlassianToken },
       });
       const outcome = await runEval({
         cases: runnable,
         roles,
         path: args.path,
         startConversation: createConversationPath({ store, runner }),
-        ask: (input) => askQuestion(input, { client, workingDirectory, config, logger }),
+        ask: (input) => askQuestion(input, { client, workingDirectory, config, logger, ...signIn }),
         guard: createRequestGuard(args.maxRequests),
         clock,
         maxToolCalls: config.mcp.maxToolCalls,

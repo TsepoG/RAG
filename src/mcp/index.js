@@ -13,6 +13,7 @@ export {
   toAvailableTools,
 } from './allowlist.js';
 export { classifyTool, isWriteToolName } from './classify.js';
+export { connectMcp, MCP_FACTORIES } from './connect.js';
 export { collectToolReport, listServerTools, renderToolsMarkdown } from './discovery.js';
 export { createCallBudget, createToolHooks } from './hooks.js';
 export { createPermissionHandler } from './permissions.js';

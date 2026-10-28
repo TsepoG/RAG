@@ -10,7 +10,9 @@ read-only. The project was built in phases (see [docs/ROADMAP.md](docs/ROADMAP.m
 and config, the Copilot and MCP connection, roles and citations, the honesty checks, the local web
 page, an evaluation (see [Evaluation](#evaluation)), conversations (follow-up questions in one
 chat, with checks that cited sources have not changed since they were read; see
-[Conversations](#conversations)), and last a redesigned page. The change history is in
+[Conversations](#conversations)), a redesigned page, and last an opt-in sign-in with your own
+Atlassian account (see [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)). The
+change history is in
 [CHANGELOG.md](CHANGELOG.md) and a ten-minute walkthrough is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
@@ -20,7 +22,8 @@ chat, with checks that cited sources have not changed since they were read; see
    ([Environment variables](#environment-variables), [Atlassian access](#atlassian-access)).
 3. Sign in to Copilot, for example with `gh auth login` ([Copilot login](#copilot-login)).
 4. `npm start`
-5. Open `http://127.0.0.1:3000`, pick a role and ask a question.
+5. Open `http://127.0.0.1:3000`, pick a role and ask a question. In oauth mode, press **Sign in
+   with Atlassian** first.
 
 ## How it fits together
 
@@ -114,39 +117,47 @@ The screenshots in this README are copies of some of these. The script is not ru
 Only `src/config` reads the environment. Everything else receives the validated config object.
 Invalid values are reported by variable name, never by value.
 
-| Variable                        | Required | Default       | Rule                                                                           |
-| ------------------------------- | -------- | ------------- | ------------------------------------------------------------------------------ |
-| `NODE_ENV`                      | no       | `development` | `development`, `test` or `production`                                          |
-| `LOG_LEVEL`                     | no       | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                   |
-| `PORT`                          | no       | `3000`        | Integer from 1 to 65535                                                        |
-| `HOST`                          | no       | `127.0.0.1`   | Address the web server listens on; non-loopback needs `ALLOW_REMOTE=true`      |
-| `ALLOW_REMOTE`                  | no       | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login          |
-| `GITHUB_TOKEN`                  | yes      |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos      |
-| `GITHUB_REPOS`                  | yes      |               | Comma-separated `owner/repo` list, at least one                                |
-| `ATLASSIAN_SITE_URL`            | yes      |               | `https://<site>.atlassian.net`; a trailing slash is removed                    |
-| `ATLASSIAN_CLOUD_ID`            | no       |               | Site cloudId (UUID); when set it is used on every Confluence call              |
-| `ATLASSIAN_AUTH_MODE`           | no       | `basic`       | `basic` (personal API token) or `bearer` (service-account API key)             |
-| `ATLASSIAN_EMAIL`               | basic    |               | Email of the account that owns the API token; not used in `bearer` mode        |
-| `ATLASSIAN_API_TOKEN`           | yes      |               | Atlassian API token or service-account API key (see Atlassian access)          |
-| `CONFLUENCE_SPACE_KEYS`         | yes      |               | Comma-separated space keys, at least one                                       |
-| `COPILOT_MODEL`                 | no       | none          | Non-empty model name when set; unset uses your account's default               |
-| `COPILOT_GITHUB_TOKEN`          | no       | none          | Credential for Copilot only; unset uses your logged-in user (see below)        |
-| `ASK_TIMEOUT_MS`                | no       | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)        |
-| `MAX_TOOL_CALLS`                | no       | `12`          | Integer from 1 to 50; further tool calls in one question are denied            |
-| `MCP_TIMEOUT_MS`                | no       | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server               |
-| `CONVERSATION_MAX_TURNS`        | no       | `5`           | Integer from 1 to 10; questions one conversation may hold                      |
-| `CONVERSATION_MAX_SOURCE_CHARS` | no       | `250000`      | Integer from 10000 to 5000000; source text one conversation may give the model |
-| `CONVERSATION_IDLE_MINUTES`     | no       | `30`          | Integer from 1 to 1440; minutes without activity before a conversation closes  |
-| `RECHECK_AFTER_MINUTES`         | no       | `15`          | Integer from 1 to 1440; age after which a cited source is checked again        |
+| Variable                        | Required      | Default       | Rule                                                                                      |
+| ------------------------------- | ------------- | ------------- | ----------------------------------------------------------------------------------------- |
+| `NODE_ENV`                      | no            | `development` | `development`, `test` or `production`                                                     |
+| `LOG_LEVEL`                     | no            | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                              |
+| `PORT`                          | no            | `3000`        | Integer from 1 to 65535                                                                   |
+| `HOST`                          | no            | `127.0.0.1`   | Listen address; non-loopback needs `ALLOW_REMOTE=true`; must be `127.0.0.1` in oauth mode |
+| `ALLOW_REMOTE`                  | no            | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login                     |
+| `GITHUB_TOKEN`                  | yes           |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos                 |
+| `GITHUB_REPOS`                  | yes           |               | Comma-separated `owner/repo` list, at least one                                           |
+| `ATLASSIAN_SITE_URL`            | yes           |               | `https://<site>.atlassian.net`; a trailing slash is removed                               |
+| `ATLASSIAN_CLOUD_ID`            | oauth         |               | Site cloudId (UUID); when set it is used on every Confluence call                         |
+| `ATLASSIAN_AUTH_MODE`           | no            | `basic`       | `basic` (API token), `bearer` (service-account key) or `oauth` (your sign-in)             |
+| `ATLASSIAN_EMAIL`               | basic         |               | Email of the account that owns the API token; not used in the other modes                 |
+| `ATLASSIAN_API_TOKEN`           | basic, bearer |               | Atlassian API token or service-account API key; not used in `oauth` mode                  |
+| `ATLASSIAN_OAUTH_DIR`           | no            | see rule      | oauth only: absolute folder outside the project; default `~/.role-aware-assistant`        |
+| `CONFLUENCE_SPACE_KEYS`         | yes           |               | Comma-separated space keys, at least one                                                  |
+| `COPILOT_MODEL`                 | no            | none          | Non-empty model name when set; unset uses your account's default                          |
+| `COPILOT_GITHUB_TOKEN`          | no            | none          | Credential for Copilot only; unset uses your logged-in user (see below)                   |
+| `ASK_TIMEOUT_MS`                | no            | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)                   |
+| `MAX_TOOL_CALLS`                | no            | `12`          | Integer from 1 to 50; further tool calls in one question are denied                       |
+| `MCP_TIMEOUT_MS`                | no            | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server                          |
+| `CONVERSATION_MAX_TURNS`        | no            | `5`           | Integer from 1 to 10; questions one conversation may hold                                 |
+| `CONVERSATION_MAX_SOURCE_CHARS` | no            | `250000`      | Integer from 10000 to 5000000; source text one conversation may give the model            |
+| `CONVERSATION_IDLE_MINUTES`     | no            | `30`          | Integer from 1 to 1440; minutes without activity before a conversation closes             |
+| `RECHECK_AFTER_MINUTES`         | no            | `15`          | Integer from 1 to 1440; age after which a cited source is checked again                   |
 
 ### Atlassian access
 
 Which mode to use depends on the kind of credential:
 
-| Credential              | `ATLASSIAN_AUTH_MODE` | `ATLASSIAN_EMAIL` | Header sent                 |
-| ----------------------- | --------------------- | ----------------- | --------------------------- |
-| Personal API token      | `basic` (default)     | required          | `Basic base64(email:token)` |
-| Service-account API key | `bearer`              | not used          | `Bearer <key>`              |
+| Credential                                 | `ATLASSIAN_AUTH_MODE` | Settings needed                          | Header sent                  |
+| ------------------------------------------ | --------------------- | ---------------------------------------- | ---------------------------- |
+| Personal API token                         | `basic` (default)     | `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN` | `Basic base64(email:token)`  |
+| Service-account API key                    | `bearer`              | `ATLASSIAN_API_TOKEN`                    | `Bearer <key>`               |
+| Your own Atlassian account, signed in here | `oauth`               | `ATLASSIAN_CLOUD_ID`, `HOST=127.0.0.1`   | `Bearer <your access token>` |
+
+`basic` and `bearer` work exactly as before Phase 9, and `basic` stays the default. With either of
+them every answer draws on what that one account can see. With `oauth` it draws on what the person
+who signed in can see; see [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode).
+
+The rest of this section is about the API token and key:
 
 - A service account needs Confluence product access and **view** permission on every space listed
   in `CONFLUENCE_SPACE_KEYS`, or its searches return nothing.
@@ -155,6 +166,85 @@ Which mode to use depends on the kind of credential:
   the site), `search:confluence:agent-interface` and `read:confluence:agent-interface`.
 - When a tool call fails, the first 300 characters of the error are logged with secrets masked, so
   a scope or permission problem shows up in the log.
+
+### Signing in with Atlassian (oauth mode)
+
+With `ATLASSIAN_AUTH_MODE=oauth`, each person signs in with their own Atlassian account from the
+web page, and Copilot's Confluence connection uses that sign-in. Answers then come only from pages
+that person may see. GitHub and Copilot keep their own settings.
+
+**Setup.** In `.env`:
+
+```bash
+ATLASSIAN_AUTH_MODE=oauth
+ATLASSIAN_SITE_URL=https://your-site.atlassian.net
+ATLASSIAN_CLOUD_ID=00000000-0000-0000-0000-000000000000   # required in this mode
+CONFLUENCE_SPACE_KEYS=ENG,PROD
+HOST=127.0.0.1                                             # required in this mode (the default)
+# ATLASSIAN_OAUTH_DIR=/home/you/.role-aware-assistant      # optional
+```
+
+`ATLASSIAN_EMAIL` and `ATLASSIAN_API_TOKEN` are not needed and not used. Nothing has to be set up
+in Atlassian beforehand: the app registers itself with Atlassian the first time someone signs in.
+
+**Signing in.** `npm start`, then open `http://127.0.0.1:3000` (not `localhost`; a sign-in started
+on `localhost` is sent to `127.0.0.1` first, because that is where Atlassian sends it back). The
+page shows **Sign in with Atlassian**. It opens Atlassian's consent page, which asks only for
+read-only access: `offline_access`, `read:me`, `read:account`,
+`read:confluence:agent-interface` and `search:confluence:agent-interface`. The app never asks for
+a `write:` permission. If Atlassian lets you choose a site, choose the one in `ATLASSIAN_SITE_URL`. After you accept, the app checks
+that both Confluence permissions were granted and that your account can reach that site, then
+returns to the page, which says "Signed in to `<your site>`" at the bottom of the sidebar. If
+something is wrong, a page says "Sign-in didn't complete" and why (cancelled, took too long,
+permissions missing, wrong site, or something went wrong), with **Try again**. Nothing is saved
+in that case.
+
+**Staying signed in.** Atlassian's access token lasts 8 hours. The app renews it by itself with
+the refresh token: when a conversation starts, if under 3 hours remain, and before each question,
+if less than `ASK_TIMEOUT_MS` plus one minute remains (at least 5 minutes). A renewed token is
+handed to the open conversation without losing what it remembers. Atlassian replaces the refresh
+token at every renewal, so the new pair is saved before it is used.
+
+**When the sign-in has expired** or was revoked and cannot be renewed, the question is refused
+(HTTP 401 `atlassian_signin_required`), the question box is replaced with "Your Atlassian sign-in
+has expired." and **Sign in again**, and the conversation is kept. After signing in again, the page
+comes back to the same conversation. A refused question does not count toward the turn limit.
+
+**Signing out.** **Sign out** at the bottom of the sidebar (or in the phone menu) revokes both
+tokens with Atlassian, deletes the sign-in file, ends the open conversation and shows "Signed out".
+If Atlassian cannot be reached, the file is still deleted and the log says the tokens were not
+revoked. The app's registration is kept, so the next sign-in skips that step.
+
+**Where the sign-in is kept.** In `ATLASSIAN_OAUTH_DIR` (default `.role-aware-assistant` in your
+home folder), which must be an absolute path outside this project:
+
+| File                    | Holds                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `atlassian-client.json` | The app's registration with Atlassian: issuer, client id, redirect URI            |
+| `atlassian-oauth.json`  | The access and refresh tokens, their expiry, the granted scopes, cloudId and site |
+| `atlassian-oauth.lock`  | Present only while a renewal runs, so two processes never renew at once           |
+
+The folder is created with mode 0700 and the files are written with mode 0600, each in one step
+(a temporary file, then a rename), so a crash never leaves half a file. A damaged file is treated
+as signed out. **On Windows these modes do not apply**: the files are protected only by your
+Windows user account's permissions on your home folder. Never copy these files into the project
+or share them. Tokens never appear in the log, in an error, in an API response or on the page.
+
+**Command line and evaluation.** `npm run ask`, `npm run eval`, `npm run mcp:tools` and
+`npm run mcp:sample` use the same stored sign-in in oauth mode, and renew it the same way. With
+nobody signed in they stop with "Sign in through the web app first (ATLASSIAN_AUTH_MODE=oauth)."
+Evaluation runs are normally done in `bearer` mode, so that their results do not depend on who is
+signed in.
+
+**What is different in oauth mode.**
+
+- **Re-check** reads a Confluence page's version through the Atlassian MCP server with your token
+  (one connection per batch, no Copilot request), because Atlassian's REST gateway does not accept
+  this token. A page that was deleted, or that cannot be reached, shows "Couldn't check", not
+  "changed".
+- If the token stops working in the middle of an answer, the Confluence call fails and the model
+  sees an ordinary tool error; the next question then asks you to sign in again.
+- The status of the sign-in is at `GET /api/auth/status` (see [API](#api)).
 
 ### Copilot login
 
@@ -219,7 +309,8 @@ When the answer has been checked it replaces the draft with:
 - **Show more detail**, which asks for the same answer one step more technically, as a follow-up
   in the conversation (not offered to the Developer role, or when the answer was not found);
 - **thumbs up and down** feedback. A thumbs-down opens a box for a comment and the source that was
-  wrong.
+  wrong. **The thumbs are hidden for now** (`SHOW_FEEDBACK` in `public/js/main.js`); the feedback
+  route and `data/feedback.jsonl` still work, so setting it back to `true` brings them back.
 
 The page is a chat: your question and its answer stay on screen and the next question goes
 underneath. A follow-up can use what was already found, and a citation key such as `C1` means the
@@ -276,6 +367,15 @@ The page has no login, so it is built to be reachable only from the machine it r
   own; and a `Sec-Fetch-Site: cross-site` request is refused. A refusal is a 403 with a short JSON
   message, logged at warn with only the reason. No CORS headers are sent, so other sites cannot
   read the responses.
+- **The sign-in routes (oauth mode only).** `GET /auth/atlassian/start` and
+  `GET /auth/atlassian/callback` check the `Host` the same way and accept only GET. Start must be
+  opened from the page itself (`Sec-Fetch-Site` absent, `same-origin` or `none`), so another site
+  cannot start a sign-in. The callback is the one route a cross-site navigation may reach, because
+  it comes from atlassian.com; it accepts only a `state` that matches the pending sign-in (one at a
+  time, used once, 10 minutes) and a short-lived `HttpOnly; SameSite=Lax` cookie set by start, so
+  the sign-in must finish in the browser that began it. The `code` and `state` are left out of the
+  log, these responses are `no-store`, and the error page is fixed text that never repeats
+  anything from the address. In basic and bearer modes these paths do not exist.
 - **Headers.** `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src
 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'`, `X-Content-Type-Options:
 nosniff`, `Referrer-Policy: no-referrer`; API responses are `no-store`. The page has no inline
@@ -302,6 +402,19 @@ nosniff`, `Referrer-Policy: no-referrer`; API responses are `no-store`. The page
 | `GET /api/conversations/:id`           | The transcript: every turn with its answer, sources and check state. 404 `conversation_ended`.                                                                                                                                                                                                                                                                                                                                                                  |
 | `POST /api/conversations/:id/recheck`  | Body `{ answerId }`. Checks that answer's sources now and answers with the new check state; `ignored` when the last manual check was under 30 seconds ago. 404 `conversation_ended` or `answer_not_found`, 429 `recheck_busy`.                                                                                                                                                                                                                                  |
 | `DELETE /api/conversations/:id`        | Body `{}`. Ends the conversation. 404 `conversation_ended`.                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+Sign-in routes:
+
+| Route                             | What it does                                                                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/auth/status`            | In every mode. Basic and bearer: `{ mode, signedIn: true }`. Oauth: `{ mode, signedIn: false }` or `{ mode, signedIn: true, expiresAt, siteHost }`. Never a token. |
+| `GET /auth/atlassian/start`       | Oauth only. Starts a sign-in and redirects (302) to Atlassian.                                                                                                     |
+| `GET /auth/atlassian/callback`    | Oauth only. Where Atlassian sends the browser back. Saves the sign-in and redirects to `/`, or shows "Sign-in didn't complete".                                    |
+| `POST /api/auth/atlassian/logout` | Oauth only. Body `{}`. Revokes the tokens, deletes the sign-in, ends the open conversation (end reason `signed-out`). Answers `{ signedOut: true, revoked }`.      |
+
+In oauth mode, `POST /api/conversations`, `POST /api/ask` and a new message answer 401
+`atlassian_signin_required` while nobody is signed in or the sign-in cannot be renewed. If it runs
+out once an answer has started, the stream ends with an `error` event of kind `signin`.
 
 `POST /api/ask` still answers one question on its own, as before; the page uses the conversation
 routes. Conversation and answer ids are random UUIDs, and the conversation routes pass through the
@@ -332,7 +445,8 @@ A conversation is one Copilot session that stays open for several questions, for
 again whether it has changed, directly (no Copilot request, read-only, only your listed spaces and
 repositories):
 
-- A Confluence page is compared by version number.
+- A Confluence page is compared by version number (through REST in basic and bearer modes, through
+  the Atlassian MCP server in oauth mode).
 - A GitHub file is compared by its blob SHA at the commit the answer used, a folder by a hash of
   its entries, and the release list by its newest tag. Commits do not change, so they are skipped.
 - A source that cannot be checked shows "couldn't check", never "changed".
@@ -579,6 +693,7 @@ create each token.
 ```
 src/
   answer/    askQuestion: runs one question through Copilot; validated result, report, argument parsing
+  atlassian/ oauth mode: discovery, registration, PKCE, the sign-in flow, token storage, lock, renewal, revoking, site check
   citations/ source registry, wrapping, labels, citation checking, extractors for each tool result
   cli/       ask, roles, models, mcp:tools, mcp:sample, fixtures:sanitise and eval commands (wiring only)
   config/    validated config loader (loadConfig, redactConfig, buildRuntimeEnv)
@@ -621,6 +736,9 @@ npm run eval:report -- <run-folder> --compare <earlier-run-folder>
 npm run eval:from-feedback                     # thumbs-down answers become draft cases
 ```
 
+- Run evaluations in `bearer` mode as a rule, so the results do not depend on whose Atlassian
+  account is signed in. In oauth mode the eval uses the stored sign-in (see
+  [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)).
 - A case names a role, a question, the expected status and sources, and a short reference answer.
   The runner refuses a case still marked `draft: true`.
 - A case can instead have `turns`: a conversation of 2 to 10 questions, each with its own expectation.
@@ -654,7 +772,8 @@ confidence than it had earned. See the Phase 7 sections of the log.
 ## Limitations
 
 - **One person, one machine.** The web server has no login and listens only on the local machine
-  unless you set `ALLOW_REMOTE=true`, which is not advised. Credentials come from `.env`.
+  unless you set `ALLOW_REMOTE=true`, which is not advised. Credentials come from `.env`. In oauth
+  mode there is one Atlassian sign-in per machine, not per browser: whoever opens the page uses it.
 - **Memory lasts one conversation.** Follow-ups can use what was found earlier in the same
   conversation (at most `CONVERSATION_MAX_TURNS` questions), and nothing is kept after it ends or
   the server restarts, except the thumbs-up and thumbs-down you record (`data/feedback.jsonl`, no
@@ -687,8 +806,14 @@ confidence than it had earned. See the Phase 7 sections of the log.
 | The model is not the one in `COPILOT_MODEL`                         | Copilot picks the model for each question and may not honour the setting; the result and the eval summary show which model answered.                                                                                                                                                                                                                                                                                                                         |
 | The assistant cannot find something you know is documented          | The page may be outside `CONFLUENCE_SPACE_KEYS`, or too long: when a page is cut, the model is asked to list the sections it could not read under "What I couldn't confirm", so ask about one of them directly.                                                                                                                                                                                                                                              |
 | "That conversation has ended" or "This conversation is full"        | The conversation was closed (idle for `CONVERSATION_IDLE_MINUTES`, the server restarted, a new one was started elsewhere, or its history was cut) or reached `CONVERSATION_MAX_TURNS` or `CONVERSATION_MAX_SOURCE_CHARS`. Press **New conversation**.                                                                                                                                                                                                        |
-| A source shows "couldn't check"                                     | The re-check could not reach the source, the page or repository is outside `CONFLUENCE_SPACE_KEYS` or `GITHUB_REPOS`, or `ATLASSIAN_CLOUD_ID` is not set. It never means the source changed; use **Re-check sources** to try again.                                                                                                                                                                                                                          |
+| A source shows "couldn't check"                                     | The re-check could not reach the source, the page or repository is outside `CONFLUENCE_SPACE_KEYS` or `GITHUB_REPOS`, or `ATLASSIAN_CLOUD_ID` is not set. In oauth mode a deleted page shows it too. It never means the source changed; use **Re-check sources** to try again.                                                                                                                                                                               |
 | The page will not start                                             | The message names the variable that is missing or invalid; nothing is printed about its value.                                                                                                                                                                                                                                                                                                                                                               |
+| Oauth mode: "must be 127.0.0.1 when ATLASSIAN_AUTH_MODE is oauth"   | Set `HOST=127.0.0.1` (or remove it). Atlassian sends the sign-in back to `http://127.0.0.1:<PORT>/auth/atlassian/callback`, so the app must listen there. `ATLASSIAN_CLOUD_ID` is also required in this mode.                                                                                                                                                                                                                                                |
+| Oauth mode: `/auth/atlassian/start` says "Not found"                | The server is not in oauth mode. Check `ATLASSIAN_AUTH_MODE=oauth` and restart `npm start` (it reads `.env` only at start).                                                                                                                                                                                                                                                                                                                                  |
+| Oauth mode: "This Atlassian account can't reach …"                  | The account you signed in with has no access to `ATLASSIAN_SITE_URL`, or a different site was chosen on the consent page. Try again and choose the site in `ATLASSIAN_SITE_URL`; check that `ATLASSIAN_CLOUD_ID` belongs to that site.                                                                                                                                                                                                                       |
+| Oauth mode: sign-in fails after changing `PORT`                     | The redirect address includes the port, so the app registers itself with Atlassian again on the next sign-in. If it still fails, stop the server, delete `atlassian-client.json` from `ATLASSIAN_OAUTH_DIR` and sign in again; the same happens by itself when Atlassian no longer knows the registration.                                                                                                                                                   |
+| Oauth mode: "Your Atlassian sign-in has expired"                    | The refresh token was revoked, expired or replaced. Press **Sign in again**; the conversation is kept. The log line `could not renew the Atlassian sign-in` gives the reason without the token.                                                                                                                                                                                                                                                              |
+| Oauth mode: "Sign in through the web app first"                     | `npm run ask`, `eval`, `mcp:tools` and `mcp:sample` use the web page's sign-in. Sign in at `http://127.0.0.1:<PORT>` once, using the same `ATLASSIAN_OAUTH_DIR`.                                                                                                                                                                                                                                                                                             |
 
 ## Quality gates
 

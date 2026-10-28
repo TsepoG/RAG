@@ -398,6 +398,19 @@ describe('the foot of the card', () => {
     expect(button.getAttribute('data-answer-id')).toBe('a1');
   });
 
+  it('has no thumbs when feedback is switched off', () => {
+    const card = build({}, { showFeedback: false, canMoreDetail: true });
+
+    expect(card.querySelector('.feedback')).toBeNull();
+    expect(card.querySelector('[data-action="more"]')).not.toBeNull();
+  });
+
+  it('has no footer at all when it would be empty', () => {
+    const card = build({}, { showFeedback: false, canMoreDetail: false });
+
+    expect(card.querySelector('.answer-card__footer')).toBeNull();
+  });
+
   it('has a thumbs up and a thumbs down with names for a screen reader, neither pressed yet', () => {
     const card = build();
 

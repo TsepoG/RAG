@@ -38,11 +38,19 @@ export function isCheckable(source) {
  * @returns {Promise<CheckResult[]>} A result for each source that can change, in the order given.
  */
 export async function recheckSources(sources, { github, confluence, clock }) {
-  return Promise.all(
-    sources.filter(isCheckable).map(async (source) => {
-      const status =
-        source.type === 'confluence' ? await confluence.check(source) : await github.check(source);
-      return { key: source.key, status, checkedAt: clock.now() };
-    }),
-  );
+  /**
+   * Checks every source, with the given way of checking pages.
+   * @param {Pick<import('./confluence.js').ConfluenceChecker, 'check'>} pages - Checks pages.
+   * @returns {Promise<CheckResult[]>} The results.
+   */
+  const run = (pages) =>
+    Promise.all(
+      sources.filter(isCheckable).map(async (source) => {
+        const status =
+          source.type === 'confluence' ? await pages.check(source) : await github.check(source);
+        return { key: source.key, status, checkedAt: clock.now() };
+      }),
+    );
+  // A checker that holds a connection opens one for the whole batch, not one per page.
+  return confluence.batch === undefined ? run(confluence) : confluence.batch(run);
 }

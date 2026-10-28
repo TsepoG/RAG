@@ -1,11 +1,15 @@
 // @ts-check
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { loadConfig, loadEnvFileIfPresent } from '../config/index.js';
 import { AppError } from '../errors/index.js';
-import { buildMcpServers, checkSample, parseSampleArgs, rawSamplePath } from '../mcp/index.js';
-import { connectMcp } from './mcpConnect.js';
-import { describeError, EXIT_FAILURE } from './shared.js';
+import {
+  buildMcpServers,
+  checkSample,
+  connectMcp,
+  parseSampleArgs,
+  rawSamplePath,
+} from '../mcp/index.js';
+import { describeError, EXIT_FAILURE, loadSettings, serverOptions } from './shared.js';
 
 const JSON_INDENT = 2;
 
@@ -15,14 +19,15 @@ const JSON_INDENT = 2;
 async function main() {
   try {
     const request = parseSampleArgs(process.argv.slice(2));
-    loadEnvFileIfPresent();
-    const config = loadConfig();
+    const settings = loadSettings();
+    const { config } = settings;
     const { server, tool } = checkSample(request, {
       repos: config.github.repos,
       spaceKeys: config.atlassian.spaceKeys,
       siteUrl: config.atlassian.siteUrl,
     });
-    const client = await connectMcp(buildMcpServers(config, {})[server]);
+    const servers = buildMcpServers(config, {}, await serverOptions(settings));
+    const client = await connectMcp(servers[server]);
     try {
       const result = await client.callTool({ name: tool, arguments: request.args });
       if (result.isError === true) {

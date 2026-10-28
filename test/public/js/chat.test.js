@@ -53,6 +53,7 @@ function done(answer = {}, conversation = {}) {
  * @param {string} [options.storedRole] - The role remembered.
  * @param {Record<string, any>} [options.api] - Replacements for parts of the fake server.
  * @param {{ writeText: (text: string) => Promise<void> }} [options.clipboard] - A clipboard.
+ * @param {boolean} [options.showFeedback] - Whether the answers offer thumbs up and down.
  * @returns {Promise<{ chat: ReturnType<typeof createChat>, api: Record<string, import('vitest').Mock>, storage: Record<string, import('vitest').Mock>, time: { value: number } }>} The chat and its fakes.
  */
 async function setup({
@@ -61,6 +62,7 @@ async function setup({
   storedRole,
   api: replace = {},
   clipboard,
+  showFeedback,
 } = {}) {
   let message = 0;
   const time = { value: FETCHED_AT };
@@ -94,6 +96,7 @@ async function setup({
     storage: /** @type {any} */ (storage),
     clock: { now: () => time.value },
     clipboard,
+    showFeedback,
   });
   await chat.start();
   return { chat, api, storage, time };
@@ -1355,6 +1358,15 @@ describe('reloading', () => {
 });
 
 describe('feedback', () => {
+  it('shows no thumbs when the page switches feedback off', async () => {
+    await setup({ showFeedback: false });
+
+    await ask('How?');
+
+    expect(refs.messages.querySelector('.answer-card')).not.toBeNull();
+    expect(refs.messages.querySelector('.feedback')).toBeNull();
+  });
+
   it('sends a thumbs up at once and says it was saved', async () => {
     const { api } = await setup();
     await ask('How?');

@@ -20,11 +20,14 @@ repo when that phase starts.
 | 6 | Evaluation and polish | 15–20 real questions per role in an eval set, eval runner and report, prompt tuning, README and demo script | 1 day |
 | 7 | Conversations | A chat: follow-up questions in one Copilot session per conversation, citation keys that last the whole conversation, per-answer Sources panels, manual and automatic re-checks of cited sources, multi-turn eval cases and a regression run | 1–2 days |
 | 8 | UI and UX redesign | The page rebuilt to the approved Clarity design: sidebar and chat layout, step-by-step progress, per-answer sources and re-check states, suggested questions per role, Copy this conversation, a typical answer time hint, self-hosted fonts, accessibility checks and a phone layout | 3–4 days |
+| 9 | Sign in with Atlassian | Opt-in `ATLASSIAN_AUTH_MODE=oauth`: the person signs in with their own Atlassian account from the web app, the sign-in is kept on the machine and renewed automatically, Copilot's Confluence connection uses it, re-check reads page versions over MCP, and Sign out revokes it. Service-account modes unchanged | 4–5 days |
 
 ## Out of scope for the MVP
 
-SSO, per-user OAuth, the MCP Gateway service, Postgres answer log, dashboards,
-deployment and multi-user access. Credentials come from a local `.env` file.
+SSO, the MCP Gateway service, Postgres answer log, dashboards, deployment and
+multi-user access. Credentials come from a local `.env` file. The one exception
+is per-user Atlassian sign-in, added in Phase 9 as an opt-in mode; GitHub and
+Copilot keep their shared credentials.
 
 ## Branch and PR flow (every phase)
 

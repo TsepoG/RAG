@@ -1097,6 +1097,125 @@ a.source-row__link:hover {
 
 /* ---- Phone ---------------------------------------------------------------------------------- */
 
+/* ---- Sign-in screen, signed-in panel and expired banner ---------------------------------- */
+
+.sign-in {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-16);
+  max-width: 560px;
+  width: 100%;
+  margin: var(--space-32) auto 0;
+}
+
+.sign-in__heading {
+  margin: 0;
+  font-size: var(--font-size-40);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.sign-in__text {
+  margin: 0;
+  color: var(--color-body);
+  font-size: var(--font-size-16);
+  line-height: var(--line-height-ui);
+}
+
+.signed-in {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-10);
+  margin-top: auto;
+  padding-top: var(--space-16);
+  border-top: 1px solid var(--color-border);
+}
+
+.signed-in__text {
+  margin: 0;
+  color: var(--color-body);
+  font-size: var(--font-size-14);
+  overflow-wrap: anywhere;
+}
+
+.expired-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12) var(--space-16);
+  padding: var(--space-16) var(--space-22);
+  border: 1px solid var(--color-medium-border);
+  border-radius: var(--radius-card);
+  background: var(--color-medium-panel);
+  color: var(--color-medium-deep);
+}
+
+.expired-banner__icon {
+  display: flex;
+  flex: none;
+  color: var(--color-medium-text);
+}
+
+.expired-banner__body {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.expired-banner__title {
+  margin: 0;
+  font-size: var(--font-size-16);
+  font-weight: 600;
+}
+
+.expired-banner__text {
+  margin: 0;
+  font-size: var(--font-size-14);
+  line-height: var(--line-height-ui);
+}
+
+/* ---- Sign-in pages: the error page the callback shows ---------------------------------- */
+
+.auth-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-16);
+  background: var(--color-page);
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-16);
+  width: 100%;
+  max-width: 460px;
+  padding: var(--space-32);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.auth-card__heading {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-17);
+  font-weight: 600;
+}
+
+.auth-card__text {
+  margin: 0;
+  color: var(--color-body);
+  font-size: var(--font-size-15);
+}
+
 @media (max-width: 720px) {
   .welcome__heading {
     font-size: 30px;

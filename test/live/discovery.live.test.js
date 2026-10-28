@@ -2,7 +2,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig, loadEnvFileIfPresent } from '../../src/config/index.js';
 import { ALLOWLIST, buildMcpServers, collectToolReport } from '../../src/mcp/index.js';
-import { connectMcp } from '../../src/cli/mcpConnect.js';
+import { connectMcp } from '../../src/mcp/index.js';
 
 const LIVE_TIMEOUT_MS = 60_000;
 

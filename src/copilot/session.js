@@ -13,6 +13,7 @@ import { buildSystemMessage } from './systemMessage.js';
  * @property {import('@github/copilot-sdk').SessionHooks} hooks - The tool hooks for this question.
  * @property {import('@github/copilot-sdk').PermissionHandler} onPermissionRequest - Answers
  *   every permission request.
+ * @property {string} [atlassianToken] - The signed-in person's access token, in oauth mode.
  */
 
 /** Names the application in the User-Agent of requests made for the session. */
@@ -30,8 +31,16 @@ export const EXCLUDED_TOOLS = Object.freeze(['builtin:*', 'custom:*']);
  * each call again.
  * @param {SessionParts} parts - Config, working directory, hooks and permission handler.
  * @returns {SessionConfig} The session configuration.
+ * @throws {import('../errors/index.js').AtlassianSignInRequiredError} In oauth mode, without a token.
  */
-export function buildSessionConfig({ config, role, workingDirectory, hooks, onPermissionRequest }) {
+export function buildSessionConfig({
+  config,
+  role,
+  workingDirectory,
+  hooks,
+  onPermissionRequest,
+  atlassianToken,
+}) {
   const { model } = config.copilot;
   return {
     clientName: CLIENT_NAME,
@@ -48,7 +57,7 @@ export function buildSessionConfig({ config, role, workingDirectory, hooks, onPe
         cloudId: config.atlassian.cloudId,
       }),
     },
-    mcpServers: buildMcpServers(config, ALLOWLIST),
+    mcpServers: buildMcpServers(config, ALLOWLIST, { atlassianToken }),
     availableTools: toAvailableTools(),
     excludedTools: [...EXCLUDED_TOOLS],
     workingDirectory,

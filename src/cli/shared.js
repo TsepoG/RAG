@@ -1,6 +1,11 @@
 // @ts-check
 import { loadConfig, loadEnvFileIfPresent } from '../config/index.js';
-import { ConfigError } from '../errors/index.js';
+import {
+  createStoredTokenProvider,
+  MIN_TURN_TOKEN_MARGIN_MS,
+  SIGN_IN_FIRST,
+} from '../atlassian/index.js';
+import { AppError, ConfigError } from '../errors/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../copilot/index.js';
 import { createLogger } from '../logger/index.js';
 
@@ -60,4 +65,40 @@ export async function withCopilot({ config, logger }, work) {
   } finally {
     await handle.stop();
   }
+}
+
+/**
+ * In oauth mode, gives the commands the sign-in made in the web app; in the other modes, nothing.
+ * @param {{ config: import('../config/index.js').AppConfig, logger: import('../logger/index.js').Logger }} settings
+ *   Config and logger from {@link loadSettings}.
+ * @returns {Promise<{ getAtlassianToken?: import('../atlassian/index.js').TokenProvider['getAtlassianToken'] }>}
+ *   The way to get the token, in oauth mode.
+ * @throws {AppError} In oauth mode, when nobody has signed in through the web app.
+ */
+export async function atlassianSignIn({ config, logger }) {
+  const { auth } = config.atlassian;
+  if (auth.mode !== 'oauth') {
+    return {};
+  }
+  const provider = createStoredTokenProvider({ dir: auth.dir, logger });
+  if (!(await provider.status()).signedIn) {
+    throw new AppError(SIGN_IN_FIRST);
+  }
+  return { getAtlassianToken: provider.getAtlassianToken };
+}
+
+/**
+ * The options for building the MCP servers' entries: in oauth mode, the signed-in token.
+ * @param {{ config: import('../config/index.js').AppConfig, logger: import('../logger/index.js').Logger }} settings
+ *   Config and logger from {@link loadSettings}.
+ * @returns {Promise<import('../mcp/servers.js').McpServerOptions>} The options.
+ * @throws {AppError} In oauth mode, when nobody has signed in through the web app.
+ */
+export async function serverOptions(settings) {
+  const { getAtlassianToken } = await atlassianSignIn(settings);
+  if (getAtlassianToken === undefined) {
+    return {};
+  }
+  const { accessToken } = await getAtlassianToken({ minValidityMs: MIN_TURN_TOKEN_MARGIN_MS });
+  return { atlassianToken: accessToken };
 }

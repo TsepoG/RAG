@@ -9,6 +9,15 @@ import {
   next,
 } from './chatState.js';
 import { orderRoles } from './roleOrder.js';
+import {
+  createSignInState,
+  EXPIRED_MESSAGE,
+  isSignInError,
+  isSignInEvent,
+  SIGN_OUT_FAILED,
+  SIGNED_OUT_MESSAGE,
+  STATUS_FAILED,
+} from './signIn.js';
 import { conversationToMarkdown, COPIED_MESSAGE, copyConversation } from './ui/copyConversation.js';
 import { focusSource, setSourcesOpen } from './ui/sources.js';
 import { createView } from './view.js';
@@ -39,6 +48,9 @@ const ROLES_FAILED = 'The roles could not be loaded.';
  * @property {typeof import('./api.js').deleteConversation} deleteConversation - Ends it.
  * @property {typeof import('./api.js').recheckAnswer} recheckAnswer - Checks an answer's sources now.
  * @property {typeof import('./api.js').sendFeedback} sendFeedback - Sends a thumb.
+ * @property {typeof import('./api.js').fetchAuthStatus} [fetchAuthStatus] - Says whether someone
+ *   is signed in to Atlassian; without it, nobody needs to sign in.
+ * @property {typeof import('./api.js').signOut} [signOut] - Signs out of Atlassian.
  */
 
 /**
@@ -79,6 +91,7 @@ function attribute(element, name) {
  * @param {ChatStorage} deps.storage - What is remembered.
  * @param {{ now: () => number }} deps.clock - The time source.
  * @param {{ writeText: (text: string) => Promise<void> } | undefined} [deps.clipboard] - The clipboard; the browser's by default.
+ * @param {boolean} [deps.showFeedback] - Whether answers offer the thumbs up and down (default true).
  * @returns {{
  *   start: () => Promise<void>,
  *   tick: () => void,
@@ -91,8 +104,9 @@ export function createChat({
   storage,
   clock,
   clipboard = globalThis.navigator?.clipboard,
+  showFeedback,
 }) {
-  const view = createView({ refs });
+  const view = createView({ refs, showFeedback });
   let state = /** @type {import('./chatState.js').ChatState} */ (INITIAL_CHAT);
   /** @type {import('./ui/sidebar.js').RoleSummary[]} */
   let roles = [];
@@ -101,10 +115,18 @@ export function createChat({
   /** @type {AbortController | undefined} */
   let controller;
   const openSources = new Set();
+  const signIn = createSignInState();
 
   /** Draws the page for the state. */
   function render() {
-    view.render({ state, roles, roleId, openSources, now: clock.now() });
+    view.render({ state, roles, roleId, openSources, now: clock.now(), signIn: signIn.view() });
+  }
+
+  /** Shows that the Atlassian sign-in is needed: the sign-in screen, or the expired banner. */
+  function needSignIn() {
+    signIn.markNeeded();
+    view.announce(EXPIRED_MESSAGE);
+    render();
   }
 
   /**
@@ -174,6 +196,10 @@ export function createChat({
       });
       return true;
     } catch (error) {
+      if (isSignInError(error)) {
+        needSignIn();
+        return false;
+      }
       dispatch({
         type: 'notice',
         text: error instanceof ApiError ? error.message : 'The conversation could not be started.',
@@ -201,6 +227,9 @@ export function createChat({
     dispatch({ type: 'error', kind: 'request', message });
     if (error instanceof ApiError && error.code === 'conversation_ended') {
       dispatch({ type: 'gone' });
+    }
+    if (isSignInError(error)) {
+      needSignIn();
     }
   }
 
@@ -230,6 +259,9 @@ export function createChat({
           }
           if (action?.type === 'done') {
             announceAnswer(action.payload);
+          }
+          if (isSignInEvent(event)) {
+            needSignIn();
           }
         },
       });
@@ -354,6 +386,47 @@ export function createChat({
       } catch {
         // It may already be gone, which is what was wanted.
       }
+    }
+  }
+
+  /**
+   * Signs out of Atlassian. The server revokes the sign-in and ends the conversation; the page
+   * forgets the conversation and shows the sign-in screen. It asks for no confirmation.
+   * @returns {Promise<void>} Resolves once the page shows the outcome.
+   */
+  async function signOutNow() {
+    if (api.signOut === undefined) {
+      return;
+    }
+    stop();
+    try {
+      await api.signOut();
+    } catch {
+      dispatch({ type: 'notice', text: SIGN_OUT_FAILED });
+      return;
+    }
+    storage.clearConversationId();
+    signIn.signedOut();
+    dispatch({ type: 'reset' });
+    view.closeDrawer();
+    render();
+    view.showToast(SIGNED_OUT_MESSAGE);
+    view.announce(SIGNED_OUT_MESSAGE);
+  }
+
+  /**
+   * Reads whether someone is signed in to Atlassian, when the server has a sign-in.
+   * @returns {Promise<void>} Resolves once known, or once the failure is shown.
+   */
+  async function loadSignIn() {
+    if (api.fetchAuthStatus === undefined) {
+      return;
+    }
+    try {
+      signIn.load(await api.fetchAuthStatus());
+      render();
+    } catch {
+      dispatch({ type: 'notice', text: STATUS_FAILED });
     }
   }
 
@@ -497,6 +570,8 @@ export function createChat({
       void copy();
     } else if (action === 'stop') {
       stop();
+    } else if (action === 'sign-out') {
+      void signOutNow();
     }
   }
 
@@ -554,6 +629,7 @@ export function createChat({
     async start() {
       attach();
       render();
+      await loadSignIn();
       try {
         roles = orderRoles(await api.fetchRoles());
         const remembered = storage.loadRole();

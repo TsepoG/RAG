@@ -21,6 +21,7 @@ import {
 import { applyMemoryDroppedCap } from '../honesty/index.js';
 import { createCallBudget, createPermissionHandler, createTurnGate } from '../mcp/index.js';
 import { withDetailLevel } from '../roles/index.js';
+import { createSessionTokens } from './sessionToken.js';
 import { buildTurnNote } from './turnNote.js';
 
 /** The parts of a session a turn uses. */
@@ -50,6 +51,8 @@ import { buildTurnNote } from './turnNote.js';
  *   Closes a conversation to new questions and frees its session (the store's `end`).
  * @property {{ now: () => number }} clock - Time source.
  * @property {typeof fetch} [fetch] - Used to look up commits and CODEOWNERS; defaults to the global fetch.
+ * @property {Pick<import('../atlassian/index.js').TokenProvider, 'getAtlassianToken'>} [atlassianTokens] -
+ *   The signed-in person's tokens, in oauth mode only; absent in basic and bearer modes.
  */
 
 /**
@@ -140,7 +143,7 @@ function watchMemory(session, logger) {
  * Creates the runner for conversations: the one function that asks a question in a conversation,
  * through the same stages a single question goes through.
  * @param {RunnerDeps} deps - Client, config, logger and how to end a conversation.
- * @returns {{ ask: (conversation: import('./conversation.js').Conversation, input: TurnInput) => Promise<import('../answer/askQuestion.js').AskResult & { turn: number }> }} The runner.
+ * @returns {{ prepare: (conversation: import('./conversation.js').Conversation) => Promise<void>, ask: (conversation: import('./conversation.js').Conversation, input: TurnInput) => Promise<import('../answer/askQuestion.js').AskResult & { turn: number }> }} The runner.
  * @throws {AppError} (from `ask`) When the question is blank.
  * @throws {QuestionCancelledError} (from `ask`) When the turn is stopped.
  * @throws {AskTimeoutError} (from `ask`) When the turn takes longer than ASK_TIMEOUT_MS.
@@ -148,11 +151,36 @@ function watchMemory(session, logger) {
  * @throws {ConversationFullError} (from `ask`) When the turn cap or the source budget is used up.
  * @throws {ConversationEndedError} (from `ask`) When the conversation was closed.
  * @throws {CopilotError} (from `ask`) When Copilot or the session fails; the conversation ends.
+ * @throws {import('../errors/index.js').AtlassianSignInRequiredError} (from `prepare` and `ask`) In oauth
+ *   mode, when there is no sign-in or it cannot be renewed; no turn is used and the conversation goes on.
  */
 export function createConversationRunner(deps) {
-  const { client, workingDirectory, config, logger, endConversation, fetch, clock } = deps;
+  const {
+    client,
+    workingDirectory,
+    config,
+    logger,
+    endConversation,
+    fetch,
+    clock,
+    atlassianTokens,
+  } = deps;
   /** @type {WeakMap<import('./conversation.js').Conversation, Runtime>} */
   const runtimes = new WeakMap();
+  // Only in oauth mode: the other modes put a fixed credential in the session config.
+  const sessionTokens =
+    atlassianTokens === undefined
+      ? undefined
+      : createSessionTokens({ atlassianTokens, config, logger });
+
+  /**
+   * Makes sure the conversation has an Atlassian token that lasts the next turn, in oauth mode.
+   * @param {import('./conversation.js').Conversation} conversation - The conversation.
+   * @returns {Promise<void>}
+   */
+  async function prepare(conversation) {
+    await sessionTokens?.prepare(conversation);
+  }
 
   /**
    * Makes what lasts as long as the conversation's session.
@@ -196,6 +224,7 @@ export function createConversationRunner(deps) {
         workingDirectory,
         hooks: runtime.hooks,
         onPermissionRequest: createPermissionHandler({ logger }),
+        atlassianToken: sessionTokens?.tokenFor(conversation),
       }),
     );
     conversation.setSession(session);
@@ -246,6 +275,7 @@ export function createConversationRunner(deps) {
   }
 
   return {
+    prepare,
     async ask(conversation, input) {
       const { question, detailLevel = 'default', changedKeys, signal, onActivity, onDelta } = input;
       if (question.trim() === '') {
@@ -253,6 +283,10 @@ export function createConversationRunner(deps) {
       }
       if (signal?.aborted) {
         throw new QuestionCancelledError();
+      }
+      // Before the turn starts, so a missing sign-in refuses the question without using a turn.
+      if (!conversation.isBusy()) {
+        await prepare(conversation);
       }
       const begun = conversation.beginTurn({ question, detailLevel });
       if (!begun.ok) {

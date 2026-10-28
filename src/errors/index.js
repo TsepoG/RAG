@@ -160,6 +160,44 @@ export class ConversationBusyError extends AppError {
 }
 
 /**
+ * Thrown when oauth mode needs the person's Atlassian sign-in and there is none that works: nobody
+ * has signed in, they signed out, or renewing the sign-in failed. The web layer answers it with a
+ * 401 and the code `atlassian_signin_required`.
+ */
+export class AtlassianSignInRequiredError extends AppError {
+  /**
+   * Creates the error.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(options) {
+    super('Sign in with Atlassian to keep going.', options);
+  }
+}
+
+/**
+ * Why signing in to Atlassian did not complete. The sign-in error page has a sentence for each.
+ * @typedef {'cancelled' | 'expired' | 'missing-permissions' | 'wrong-site' | 'failed'} AtlassianAuthReason
+ */
+
+/**
+ * Thrown when signing in to Atlassian, or talking to its authorization server, fails. The message
+ * and the cause never hold a token, a code or a response body.
+ */
+export class AtlassianAuthError extends AppError {
+  /**
+   * Creates the error and records why it happened.
+   * @param {AtlassianAuthReason} reason - Why the sign-in did not complete.
+   * @param {string} message - What went wrong, free of secret values.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(reason, message, options) {
+    super(message, options);
+    /** @type {AtlassianAuthReason} */
+    this.reason = reason;
+  }
+}
+
+/**
  * Thrown when a conversation cannot take another question because it has used its turns or its
  * allowance of source text.
  */

@@ -592,3 +592,40 @@ difference in sources) kept their baseline verdict.
 - The confidence report was got by asking again on 5 cases (baseline 1).
 - 2 answers were rewritten for style; no style problems were left at depth 1.
 - `dev-append-only-trigger` is the one real loss. It was not run again; it may be search noise.
+
+## Smoke in oauth mode (2026-10-28)
+
+The 8 smoke cases asked with `ATLASSIAN_AUTH_MODE=oauth` (the owner's own Atlassian sign-in),
+compared with the same 8 cases in the latest bearer-mode run, `20261014-190623`.
+
+| | |
+| --- | --- |
+| Run | `20261028-155909` |
+| Path | conversation, the 8 smoke cases |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `193656d98ccb`, base prompt hash `81ddc08c88b9` (same as the comparison run) |
+| Requests | 10 for 8 cases; no question failed |
+| Verdicts | drafted by Claude Code, reviewed and accepted by the owner. The comparison run keeps the baseline verdicts. |
+
+### Against the noise rule
+
+| Measure | Bearer (`20261014-190623`) | Oauth | Rule | Result |
+| --- | --- | --- | --- | --- |
+| Cases passed | 7 of 8 | 6 of 8 | net loss of more than 5 (over 38) is a regression | none (net −1) |
+| Status exactly as expected | 88% (7 of 8) | 75% (6 of 8) | no drop of more than 13 points | met (down 12.5) |
+| Declined when it should | 2 of 2 | 2 of 2 | no drop of more than 13 points | met |
+| Answered cases that are correct | 92% (5 correct, 1 partial of 6) | 83% (4 correct, 2 partial of 6) | no drop of more than 13 points | met (down 8.3) |
+
+**No regression beyond noise**, on a small sample. Every answered case cited Confluence through the
+signed-in token.
+
+- `oos-pm-next-year-releases`: `out_of_scope` → `not_found`. It still declines without describing
+  how releases work. The same case moved the other way in the Phase 7 regression, so it is part of
+  the measured variation.
+- `qa-split-tests`: correct at `medium` → partial at `high`. It lists Apple, both Nvidia splits and
+  a GE reverse split but leaves out both Tesla splits, citing the code's fixtures rather than the
+  Testing page. One run cannot say whether this is search noise or a difference in what the
+  signed-in account sees.
+- `dev-rate-limit-clarify` still answers instead of asking which limit is meant, as in bearer mode.
+- Median time to an answer 67.1 s (the same cases in bearer mode: 77.2 s); 95th percentile 81.1 s.

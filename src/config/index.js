@@ -66,10 +66,15 @@ export function loadConfig(env = process.env) {
  */
 export function redactConfig(config) {
   const { githubToken } = config.copilot;
+  const { apiToken } = config.atlassian;
   return {
     ...config,
     github: { ...config.github, token: REDACTED_VALUE },
-    atlassian: { ...config.atlassian, apiToken: REDACTED_VALUE },
+    // An unset token (oauth mode has none) stays unset, so the log doesn't suggest one is configured.
+    atlassian: {
+      ...config.atlassian,
+      apiToken: apiToken === undefined ? undefined : REDACTED_VALUE,
+    },
     // An unset token stays unset, so the log doesn't suggest one is configured.
     copilot: {
       ...config.copilot,
@@ -91,18 +96,31 @@ export function encodeBasicCredentials(email, apiToken) {
 
 /**
  * Lists every secret value in the config, so error text can have them masked. It includes the
- * encoded Basic credential, which can show up in a message without its "Basic " prefix.
+ * encoded Basic credential, which can show up in a message without its "Basic " prefix. A sign-in
+ * made in oauth mode is not part of the config, so its tokens are not listed here.
  * @param {AppConfig} config - Validated config.
  * @returns {string[]} The secrets; unset ones are left out.
  */
 export function listSecrets(config) {
-  const { apiToken, auth } = config.atlassian;
   return [
     config.github.token,
-    apiToken,
-    ...(auth.mode === 'basic' ? [encodeBasicCredentials(auth.email, apiToken)] : []),
+    ...atlassianSecrets(config.atlassian),
     ...(config.copilot.githubToken === undefined ? [] : [config.copilot.githubToken]),
   ];
+}
+
+/**
+ * Lists the Atlassian secrets in the config: the API token and, in basic mode, its encoded form.
+ * @param {AppConfig['atlassian']} atlassian - The Atlassian settings.
+ * @returns {string[]} The secrets; none in oauth mode.
+ */
+function atlassianSecrets({ apiToken, auth }) {
+  if (apiToken === undefined) {
+    return [];
+  }
+  return auth.mode === 'basic'
+    ? [apiToken, encodeBasicCredentials(auth.email, apiToken)]
+    : [apiToken];
 }
 
 /**

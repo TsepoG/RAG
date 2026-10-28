@@ -295,9 +295,9 @@ describe('configSchema Atlassian auth mode', () => {
     expect(configSchema.parse(env).atlassian.auth).toEqual({ mode: 'bearer' });
   });
 
-  it.each(['Bearer', 'token', 'oauth', ''])('rejects the auth mode %j', (mode) => {
+  it.each(['Bearer', 'token', 'OAuth', ''])('rejects the auth mode %j', (mode) => {
     expect(failures(validEnv({ ATLASSIAN_AUTH_MODE: mode }))).toEqual([
-      'ATLASSIAN_AUTH_MODE: must be one of basic, bearer',
+      'ATLASSIAN_AUTH_MODE: must be one of basic, bearer, oauth',
     ]);
   });
 
