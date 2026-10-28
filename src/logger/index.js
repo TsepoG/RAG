@@ -29,6 +29,13 @@ const SECRET_KEYS = [
   'authorization',
   'Authorization',
   'password',
+  // An Atlassian sign-in, as the app holds it and as Atlassian's token endpoint names it.
+  'accessToken',
+  'refreshToken',
+  'access_token',
+  'refresh_token',
+  'codeVerifier',
+  'code_verifier',
 ];
 // pino has no recursive wildcard, so cover each key at the top level and up to four levels down.
 // That reaches sessionConfig.mcpServers.<server>.headers.Authorization, the deepest shape we log.
@@ -69,8 +76,43 @@ export function maskSecrets(text, secrets, maxChars) {
     : masked;
 }
 
+/** Paths under this prefix carry sign-in data (an authorization code and its state) in the query. */
+const AUTH_PATH_PREFIX = '/auth';
+
+const QUERY_MARK = '?';
+
 /**
- * Creates a JSON logger that censors secret-looking keys.
+ * Makes a request URL safe to log: on a sign-in path the query string is replaced, because it can
+ * hold the authorization code and the state. Every other URL is left as it is.
+ * @param {unknown} url - The URL, with any query; anything that is not a string is left alone.
+ * @returns {unknown} The URL, with the query of a sign-in path masked.
+ */
+export function redactAuthQuery(url) {
+  if (typeof url !== 'string') {
+    return url;
+  }
+  const queryAt = url.indexOf(QUERY_MARK);
+  const path = queryAt === -1 ? url : url.slice(0, queryAt);
+  const isAuthPath = path === AUTH_PATH_PREFIX || path.startsWith(`${AUTH_PATH_PREFIX}/`);
+  return isAuthPath && queryAt !== -1 ? `${path}${QUERY_MARK}${REDACTED_VALUE}` : url;
+}
+
+/**
+ * Logs a request as its method and URL only, with the query of a sign-in path masked.
+ * @param {unknown} request - What was logged under `req`.
+ * @returns {unknown} The method and the safe URL, or the value as it was when it is not an object.
+ */
+function serializeRequest(request) {
+  if (typeof request !== 'object' || request === null) {
+    return request;
+  }
+  const { method, url } = /** @type {{ method?: unknown, url?: unknown }} */ (request);
+  return { method, url: redactAuthQuery(url) };
+}
+
+/**
+ * Creates a JSON logger that censors secret-looking keys, and the query string of a sign-in URL
+ * logged under `url` or `req`.
  * @param {LoggerOptions} [options] - Level, component name and an optional output stream.
  * @returns {Logger} A pino logger writing one JSON object per line.
  */
@@ -80,6 +122,7 @@ export function createLogger({ level = DEFAULT_LOG_LEVEL, name, destination } = 
       level,
       name,
       redact: { paths: [...REDACT_PATHS], censor: REDACTED_VALUE },
+      serializers: { url: redactAuthQuery, req: serializeRequest },
       // Label instead of pino's numeric level so log lines are readable without a lookup table.
       formatters: { level: (label) => ({ level: label }) },
     },

@@ -25,6 +25,10 @@ const PAGE_ID = /^\d+$/;
  * @returns {{ url: string, authorization: string } | undefined} The request, or undefined when the settings do not allow one.
  */
 function buildRequest({ siteUrl, cloudId, auth, apiToken }, id) {
+  // Oauth mode has no API token, and this REST route refuses the token of a person who signed in.
+  if (apiToken === undefined) {
+    return undefined;
+  }
   if (auth.mode === 'basic') {
     return {
       url: `${siteUrl}/wiki/api/v2/pages/${id}`,

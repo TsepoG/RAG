@@ -89,6 +89,12 @@ describe('createLogger redaction', () => {
     'authorization',
     'Authorization',
     'password',
+    'accessToken',
+    'refreshToken',
+    'access_token',
+    'refresh_token',
+    'codeVerifier',
+    'code_verifier',
   ];
   /** @type {Array<{ where: string, wrap: (secret: Record<string, string>) => object }>} */
   const depths = [

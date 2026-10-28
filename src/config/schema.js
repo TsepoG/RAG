@@ -1,6 +1,14 @@
 // @ts-check
 import { z } from 'zod';
 import { DEFAULT_LOG_LEVEL } from '../logger/index.js';
+import {
+  isOauthMode,
+  OAUTH_MODE,
+  oauthAuth,
+  oauthDirectorySchema,
+  requireCloudId,
+  requireOauthHost,
+} from './oauthSchema.js';
 
 // Messages describe the rule, never the offending value, so a bad token can't leak into an error.
 
@@ -15,7 +23,7 @@ const CONVERSATION_MAX_SOURCE_CHARS_LIMITS = { min: 10_000, max: 5_000_000, fall
 const CONVERSATION_IDLE_MINUTES_LIMITS = { min: 1, max: 1440, fallback: 30 };
 const RECHECK_AFTER_MINUTES_LIMITS = { min: 1, max: 1440, fallback: 15 };
 const MCP_TIMEOUT_LIMITS = { min: 1000, max: 120_000, fallback: 30_000 };
-const ATLASSIAN_AUTH_MODES = ['basic', 'bearer'];
+const ATLASSIAN_AUTH_MODES = ['basic', 'bearer', OAUTH_MODE];
 const DEFAULT_ATLASSIAN_AUTH_MODE = 'basic';
 const LIST_SEPARATOR = ',';
 const REPO_PATTERN = /^[\w.-]+\/[\w.-]+$/;
@@ -164,9 +172,13 @@ const envSchemaWithAuthRule = envSchema.superRefine(
   },
 );
 
-// The web server has no login, so it must not listen beyond this machine unless that is asked for
-// by name. Checked on the whole object so the host and the switch are reported together.
-const envSchemaWithHostRule = envSchemaWithAuthRule.superRefine((env, context) => {
+/**
+ * The web server has no login, so it must not listen beyond this machine unless that is asked for
+ * by name. Checked on the whole object so the host and the switch are reported together.
+ * @param {{ HOST: string, ALLOW_REMOTE: boolean }} env - The parsed settings.
+ * @param {import('zod').RefinementCtx} context - Where issues are reported.
+ */
+function requireLoopbackHost(env, context) {
   if (!isLoopbackHost(env.HOST) && !env.ALLOW_REMOTE) {
     context.addIssue({
       code: 'custom',
@@ -175,7 +187,22 @@ const envSchemaWithHostRule = envSchemaWithAuthRule.superRefine((env, context) =
         'must be a loopback address (127.0.0.1, localhost or ::1) unless ALLOW_REMOTE is true',
     });
   }
+}
+
+const envSchemaWithHostRule = envSchemaWithAuthRule.superRefine(requireLoopbackHost);
+
+// In oauth mode the person signs in from the page, so there is no API token to require; the cloud
+// id and the sign-in folder take its place. Basic and bearer modes never see this schema, so their
+// rules and messages are exactly what they were.
+const oauthEnvSchema = envSchema.extend({
+  ATLASSIAN_API_TOKEN: requiredString.optional(),
+  ATLASSIAN_OAUTH_DIR: oauthDirectorySchema,
 });
+
+const oauthEnvSchemaWithRules = oauthEnvSchema
+  .superRefine(requireCloudId, { when: () => true })
+  .superRefine(requireLoopbackHost)
+  .superRefine(requireOauthHost);
 
 /**
  * Builds how to authenticate to Atlassian. A bearer key has no email, so the shape makes it
@@ -194,34 +221,101 @@ function atlassianAuth({ ATLASSIAN_AUTH_MODE: mode, ATLASSIAN_EMAIL: email }) {
  * Names of every environment variable the app reads, for code that must know what to strip.
  * @type {ReadonlyArray<string>}
  */
-export const ENV_VARIABLE_NAMES = Object.freeze(Object.keys(envSchema.shape));
+export const ENV_VARIABLE_NAMES = Object.freeze(Object.keys(oauthEnvSchema.shape));
 
 /**
- * Schema for the process environment. Parsing yields the nested, typed config object.
+ * How the app authenticates to Atlassian: a personal API token with its email, a service-account
+ * key, or the person's own sign-in kept in a folder.
+ * @typedef {{ mode: 'basic', email: string } | { mode: 'bearer' } | { mode: 'oauth', dir: string }} AtlassianAuth
  */
-export const configSchema = envSchemaWithHostRule.transform((env) => ({
-  nodeEnv: env.NODE_ENV,
-  logLevel: env.LOG_LEVEL,
-  port: env.PORT,
-  server: { host: env.HOST, allowRemote: env.ALLOW_REMOTE },
-  github: { token: env.GITHUB_TOKEN, repos: env.GITHUB_REPOS },
-  atlassian: {
+
+/**
+ * The Atlassian settings. `apiToken` is set in basic and bearer modes and never in oauth mode;
+ * `cloudId` is always set in oauth mode.
+ * @typedef {object} AtlassianConfig
+ * @property {string} siteUrl - The site's origin.
+ * @property {string | undefined} cloudId - The site's cloud id, when known.
+ * @property {AtlassianAuth} auth - How to authenticate.
+ * @property {string | undefined} apiToken - The API token or service-account key.
+ * @property {string[]} spaceKeys - The Confluence spaces that may be read.
+ */
+
+/**
+ * Groups the settings every mode shares, around the Atlassian part the mode builds.
+ * @param {Omit<import('zod').output<typeof envSchema>, 'ATLASSIAN_API_TOKEN'>} env - Parsed settings.
+ * @param {AtlassianConfig} atlassian - The Atlassian settings.
+ * @returns {{
+ *   nodeEnv: string,
+ *   logLevel: string,
+ *   port: number,
+ *   server: { host: string, allowRemote: boolean },
+ *   github: { token: string, repos: string[] },
+ *   atlassian: AtlassianConfig,
+ *   copilot: { model: string | undefined, githubToken: string | undefined, askTimeoutMs: number },
+ *   mcp: { maxToolCalls: number, timeoutMs: number },
+ *   conversation: { maxTurns: number, maxSourceChars: number, idleMinutes: number, recheckAfterMinutes: number },
+ * }} The config.
+ */
+function toConfig(env, atlassian) {
+  return {
+    nodeEnv: env.NODE_ENV,
+    logLevel: env.LOG_LEVEL,
+    port: env.PORT,
+    server: { host: env.HOST, allowRemote: env.ALLOW_REMOTE },
+    github: { token: env.GITHUB_TOKEN, repos: env.GITHUB_REPOS },
+    atlassian,
+    copilot: {
+      model: env.COPILOT_MODEL,
+      githubToken: env.COPILOT_GITHUB_TOKEN,
+      askTimeoutMs: env.ASK_TIMEOUT_MS,
+    },
+    mcp: { maxToolCalls: env.MAX_TOOL_CALLS, timeoutMs: env.MCP_TIMEOUT_MS },
+    conversation: {
+      maxTurns: env.CONVERSATION_MAX_TURNS,
+      maxSourceChars: env.CONVERSATION_MAX_SOURCE_CHARS,
+      idleMinutes: env.CONVERSATION_IDLE_MINUTES,
+      recheckAfterMinutes: env.RECHECK_AFTER_MINUTES,
+    },
+  };
+}
+
+const serviceAccountSchema = envSchemaWithHostRule.transform((env) =>
+  toConfig(env, {
     siteUrl: env.ATLASSIAN_SITE_URL,
     cloudId: env.ATLASSIAN_CLOUD_ID,
     auth: atlassianAuth(env),
     apiToken: env.ATLASSIAN_API_TOKEN,
     spaceKeys: env.CONFLUENCE_SPACE_KEYS,
-  },
-  copilot: {
-    model: env.COPILOT_MODEL,
-    githubToken: env.COPILOT_GITHUB_TOKEN,
-    askTimeoutMs: env.ASK_TIMEOUT_MS,
-  },
-  mcp: { maxToolCalls: env.MAX_TOOL_CALLS, timeoutMs: env.MCP_TIMEOUT_MS },
-  conversation: {
-    maxTurns: env.CONVERSATION_MAX_TURNS,
-    maxSourceChars: env.CONVERSATION_MAX_SOURCE_CHARS,
-    idleMinutes: env.CONVERSATION_IDLE_MINUTES,
-    recheckAfterMinutes: env.RECHECK_AFTER_MINUTES,
-  },
-}));
+  }),
+);
+
+const oauthSchema = oauthEnvSchemaWithRules.transform((env) =>
+  toConfig(env, {
+    siteUrl: env.ATLASSIAN_SITE_URL,
+    // The refinement above guarantees a cloud id in oauth mode.
+    cloudId: env.ATLASSIAN_CLOUD_ID,
+    auth: oauthAuth(env),
+    // There is no API token in oauth mode; any that is set is ignored, so it is never sent.
+    apiToken: undefined,
+    spaceKeys: env.CONFLUENCE_SPACE_KEYS,
+  }),
+);
+
+/**
+ * Schema for the process environment. Parsing yields the nested, typed config object. The mode is
+ * read first, so basic and bearer modes are validated exactly as they always were and only oauth
+ * mode gets the oauth rules.
+ */
+export const configSchema = z.unknown().transform((input, context) => {
+  const result = isOauthMode(input)
+    ? oauthSchema.safeParse(input)
+    : serviceAccountSchema.safeParse(input);
+  if (!result.success) {
+    // Only the path and the message are passed on; they are all loadConfig reports.
+    result.error.issues.forEach(({ path, message }) =>
+      context.addIssue({ code: 'custom', path, message }),
+    );
+    return z.NEVER;
+  }
+  return result.data;
+});
