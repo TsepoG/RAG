@@ -254,3 +254,16 @@ describe('createSignInStore deleting', () => {
     await expect(setup().store.deleteSignIn()).resolves.toBeUndefined();
   });
 });
+
+describe('createSignInStore forgetting the registration', () => {
+  it('removes the registration and keeps the sign-in', async () => {
+    const { store } = setup();
+    await store.writeClient(CLIENT);
+    await store.writeSignIn(SIGN_IN);
+
+    await store.deleteClient();
+
+    expect(await store.readClient()).toBeUndefined();
+    expect(await store.readSignIn()).toEqual(SIGN_IN);
+  });
+});

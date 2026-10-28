@@ -1,6 +1,8 @@
 // @ts-check
 import { z } from 'zod';
 import { AtlassianAuthError } from '../errors/index.js';
+import { ATLASSIAN_MCP_URL } from '../mcp/index.js';
+import { getJson } from './http.js';
 import { CHALLENGE_METHOD } from './pkce.js';
 
 // Atlassian's sign-in endpoints are read from its published metadata, never written into the code:
@@ -148,5 +150,59 @@ export function parseAuthorizationServer(body, expectedIssuer) {
     revocationEndpoint: metadata.revocation_endpoint,
     registrationEndpoint: metadata.registration_endpoint,
     issParameterSupported: metadata.authorization_response_iss_parameter_supported === true,
+  };
+}
+
+/**
+ * Finds Atlassian's authorization server and its endpoints.
+ * @typedef {object} Discovery
+ * @property {() => Promise<AuthorizationServer>} authorizationServer - The server, read once per process.
+ */
+
+/**
+ * Creates the discovery: the MCP server's metadata names the authorization server, whose own
+ * metadata lists its endpoints. Both are read the first time they are needed and kept for the life
+ * of the process; a failure is not kept, so the next call tries again.
+ * @param {{ fetch?: typeof fetch, resource?: string }} [deps] - The fetch to use, and the MCP server.
+ * @returns {Discovery} The discovery.
+ */
+export function createDiscovery({
+  fetch: fetchFunction = globalThis.fetch,
+  resource = ATLASSIAN_MCP_URL,
+} = {}) {
+  /** @type {Promise<AuthorizationServer> | undefined} */
+  let cached;
+
+  /**
+   * Reads both documents.
+   * @returns {Promise<AuthorizationServer>} The server.
+   */
+  async function load() {
+    const issuer = parseProtectedResource(
+      await getJson(
+        fetchFunction,
+        protectedResourceMetadataUrl(resource),
+        'read the MCP server metadata',
+      ),
+      resource,
+    );
+    return parseAuthorizationServer(
+      await getJson(
+        fetchFunction,
+        authorizationServerMetadataUrl(issuer),
+        'read the sign-in server metadata',
+      ),
+      issuer,
+    );
+  }
+
+  return {
+    authorizationServer() {
+      cached ??= load().catch((error) => {
+        cached = undefined;
+        throw error;
+      });
+      return cached;
+    },
   };
 }

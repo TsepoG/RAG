@@ -61,6 +61,8 @@ const signInSchema = z.object({
  * @property {() => Promise<StoredSignIn | undefined>} readSignIn - The sign-in, if there is a usable one.
  * @property {(signIn: StoredSignIn) => Promise<void>} writeSignIn - Saves the sign-in.
  * @property {() => Promise<void>} deleteSignIn - Removes the sign-in, keeping the registration.
+ * @property {() => Promise<void>} deleteClient - Removes the registration, so the next sign-in
+ *   registers again (Atlassian no longer knows the stored one).
  * @property {string} lockPath - The lock file that guards renewing the sign-in.
  */
 
@@ -157,6 +159,9 @@ export function createSignInStore({
     writeSignIn: (signIn) => write(SIGN_IN_FILE, signIn),
     async deleteSignIn() {
       await fs.rm(join(dir, SIGN_IN_FILE), { force: true });
+    },
+    async deleteClient() {
+      await fs.rm(join(dir, CLIENT_FILE), { force: true });
     },
     lockPath: join(dir, 'atlassian-oauth.lock'),
   };
