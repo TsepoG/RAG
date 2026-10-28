@@ -7,6 +7,7 @@
 /** @typedef {import('./recheck.js').Checkers} Checkers */
 
 export { createConfluenceChecker } from './confluence.js';
+export { createMcpConfluenceChecker } from './confluenceMcp.js';
 export { createGithubChecker } from './github.js';
 export { recheckSources } from './recheck.js';
 export { selectForAutoRecheck } from './triggers.js';

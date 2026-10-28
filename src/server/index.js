@@ -22,7 +22,11 @@ import {
 } from '../conversation/index.js';
 import { createGithubApi } from '../github/index.js';
 import { connectMcp } from '../mcp/index.js';
-import { createConfluenceChecker, createGithubChecker } from '../recheck/index.js';
+import {
+  createConfluenceChecker,
+  createGithubChecker,
+  createMcpConfluenceChecker,
+} from '../recheck/index.js';
 import { loadRoles } from '../roles/index.js';
 import { createAnswerMemory } from './answers.js';
 import { buildApp } from './app.js';
@@ -151,7 +155,17 @@ async function main() {
           repos: config.github.repos,
           logger,
         }),
-        confluence: createConfluenceChecker({ atlassian: config.atlassian, logger }),
+        // The REST route refuses a signed-in person's token, so oauth mode checks over MCP.
+        confluence:
+          atlassianAuth === undefined
+            ? createConfluenceChecker({ atlassian: config.atlassian, logger })
+            : createMcpConfluenceChecker({
+                atlassian: config.atlassian,
+                getAtlassianToken: atlassianAuth.tokens.getAtlassianToken,
+                connect: connectMcp,
+                timeoutMs: config.mcp.timeoutMs,
+                logger,
+              }),
       },
       clock,
       afterMinutes: config.conversation.recheckAfterMinutes,

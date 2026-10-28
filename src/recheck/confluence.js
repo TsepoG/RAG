@@ -14,6 +14,9 @@ const PAGE_ID = /^\d+$/;
  * a token) is logged.
  * @typedef {object} ConfluenceChecker
  * @property {(source: import('../citations/index.js').ConfluenceSource) => Promise<import('./github.js').CheckStatus>} check - Checks one page.
+ * @property {<T>(run: (pages: Pick<ConfluenceChecker, 'check'>) => Promise<T>) => Promise<T>} [batch] -
+ *   Runs several checks over one connection, opened when the first check needs it and closed
+ *   afterwards. Only checkers that hold a connection have it.
  */
 
 /**
