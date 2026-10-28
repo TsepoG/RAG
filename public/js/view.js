@@ -205,6 +205,7 @@ export function createView({ refs }) {
       drawTurns(/** @type {HTMLOListElement} */ (refs.messages), turnMemory, state, {
         now,
         openSources,
+        signInNeeded: signIn.needed,
       });
       drawEnd(reason, maxTurns, state, signIn.needed && started);
       updateComposer(form, {

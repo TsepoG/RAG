@@ -167,6 +167,27 @@ describe('the page in oauth mode when someone is signed in', () => {
     expect(refs.live.textContent).toBe('Your Atlassian sign-in has expired.');
   });
 
+  it('keeps the refused turn but offers no Try again until the person signs in again', async () => {
+    let calls = 0;
+    await setup({
+      api: {
+        sendMessage: vi.fn(async ({ onEvent }) => {
+          calls += 1;
+          if (calls > 1) {
+            throw refused();
+          }
+          [done()].forEach(onEvent);
+        }),
+      },
+    });
+    await ask('How do refunds work?');
+
+    await ask('And after 30 days?');
+
+    expect(refs.messages.children).toHaveLength(2);
+    expect(refs.messages.querySelector('[data-action="retry"]')).toBeNull();
+  });
+
   it('shows the expired banner when the sign-in runs out while a question is answered', async () => {
     await setup({
       api: {
