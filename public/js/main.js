@@ -4,10 +4,12 @@ import {
   createConversation,
   deleteConversation,
   fetchConversation,
+  fetchAuthStatus,
   fetchRoles,
   recheckAnswer,
   sendFeedback,
   sendMessage,
+  signOut,
 } from './api.js';
 import { AGE_REFRESH_MS, createChat } from './chat.js';
 import { findRefs } from './refs.js';
@@ -26,6 +28,8 @@ const chat = createChat({
   refs: findRefs(),
   api: {
     fetchRoles,
+    fetchAuthStatus,
+    signOut,
     createConversation,
     sendMessage,
     fetchConversation,

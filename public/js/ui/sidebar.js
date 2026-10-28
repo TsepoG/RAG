@@ -1,6 +1,7 @@
 // @ts-check
 import { el } from '../dom.js';
 import { icon } from './icons.js';
+import { buildSignedInPanel } from './signedInPanel.js';
 
 /** The name of the product, under its mark. */
 export const PRODUCT_NAME = 'Knowledge Assistant';
@@ -35,6 +36,9 @@ export const ROLE_FREE_NOTE =
  * @property {{ turn: number, maxTurns: number, ended: boolean } | undefined} conversation - How far the conversation is, once there is one.
  * @property {number} sourcesUsed - How many different sources the answers cite.
  * @property {boolean} busy - Whether a question is being answered.
+ * @property {boolean} [rolesHidden] - Hides the roles, while the person must sign in first.
+ * @property {{ siteHost: string | undefined }} [account] - Who is signed in to Atlassian, in oauth
+ *   mode; the signed-in panel is shown at the bottom.
  */
 
 /**
@@ -164,15 +168,16 @@ function buildConversationBox({ conversation, sourcesUsed, busy }) {
 }
 
 /**
- * Builds what goes in the sidebar below the brand: the roles, and the box about the conversation.
- * The same content is what the drawer holds on a narrow screen.
+ * Builds what goes in the sidebar below the brand: the roles, the box about the conversation, and
+ * in oauth mode who is signed in. The same content is what the drawer holds on a narrow screen.
  * @param {SidebarInput} input - What the sidebar is drawn from.
  * @returns {HTMLElement} The content.
  */
 export function buildSidebarContent(input) {
   return el('div', { className: 'sidebar__content' }, [
     buildBrand(),
-    buildRoles(input),
+    ...(input.rolesHidden === true ? [] : [buildRoles(input)]),
     ...buildConversationBox(input),
+    ...(input.account === undefined ? [] : [buildSignedInPanel(input.account)]),
   ]);
 }

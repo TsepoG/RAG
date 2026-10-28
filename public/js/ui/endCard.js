@@ -41,6 +41,10 @@ const REASONS = Object.freeze({
     title: 'This conversation was closed',
     body: 'Start a new one to keep going.',
   }),
+  'signed-out': () => ({
+    title: 'You signed out',
+    body: 'Sign in to start a new conversation.',
+  }),
 });
 
 /**

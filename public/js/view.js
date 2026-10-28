@@ -6,7 +6,9 @@ import { buildCopyDialog, selectDialogText } from './ui/copyConversation.js';
 import { buildComposer, updateComposer } from './ui/composer.js';
 import { buildDrawerClose, buildMobileBar, createDrawer } from './ui/drawer.js';
 import { buildEndCard, summariseChecks } from './ui/endCard.js';
+import { buildExpiredBanner } from './ui/expiredBanner.js';
 import { buildSidebarContent, countSourcesUsed } from './ui/sidebar.js';
+import { buildSignIn } from './ui/signIn.js';
 import { refreshAges } from './ui/sources.js';
 import { createToast } from './ui/toast.js';
 import { buildWelcome } from './ui/welcome.js';
@@ -25,7 +27,12 @@ export const DEFAULT_MAX_TURNS = 5;
  * @property {string | undefined} roleId - The role chosen before the first question.
  * @property {Set<string>} openSources - Ids of the answers whose Sources list is open.
  * @property {number} now - The time now, in ms.
+ * @property {import('./signIn.js').SignInView} [signIn] - What to show about the Atlassian sign-in;
+ *   without it, nobody needs to sign in.
  */
+
+/** The sign-in view of a page whose server has no sign-in. */
+const NO_SIGN_IN = Object.freeze({ needed: false, account: undefined });
 
 /**
  * Why a conversation can take no more questions, if it cannot: it is full, or it was closed.
@@ -125,42 +132,53 @@ export function createView({ refs }) {
   }
 
   /**
-   * Draws the welcome screen for a role when the role has changed.
+   * Draws the welcome screen for a role, or the sign-in screen, when what it shows has changed.
    * @param {import('./ui/sidebar.js').RoleSummary | undefined} role - The role.
+   * @param {boolean} signInFirst - Whether the person must sign in before anything else.
    */
-  function drawWelcome(role) {
-    const key = `${role?.id}|${role?.suggestedQuestions?.join('\n')}`;
+  function drawWelcome(role, signInFirst) {
+    const key = signInFirst ? 'sign-in' : `${role?.id}|${role?.suggestedQuestions?.join('\n')}`;
     if (key !== drawn.welcome) {
       drawn.welcome = key;
-      refs.welcome.replaceChildren(buildWelcome(role ?? {}, pick));
+      refs.welcome.replaceChildren(signInFirst ? buildSignIn() : buildWelcome(role ?? {}, pick));
     }
   }
 
   /**
-   * Draws the end card when the conversation can go no further, and removes it otherwise.
+   * Draws the end card when the conversation can go no further, or the expired banner while it
+   * waits for the person to sign in again, and removes them otherwise.
    * @param {string | undefined} reason - Why it ended, if it did.
    * @param {number} maxTurns - The turn limit.
    * @param {import('./chatState.js').ChatState} state - The state.
+   * @param {boolean} expired - Whether the Atlassian sign-in has expired.
    */
-  function drawEnd(reason, maxTurns, state) {
+  function drawEnd(reason, maxTurns, state, expired) {
     const summary = summariseChecks(state.turns);
-    const key = reason === undefined ? '' : JSON.stringify([reason, maxTurns, summary]);
+    let key = expired ? 'expired' : '';
+    if (reason !== undefined) {
+      key = JSON.stringify([reason, maxTurns, summary]);
+    }
     if (key === drawn.end) {
       return;
     }
     drawn.end = key;
-    refs.end.replaceChildren(
-      ...(reason === undefined ? [] : [buildEndCard({ reason, maxTurns, summary })]),
-    );
+    if (reason !== undefined) {
+      refs.end.replaceChildren(buildEndCard({ reason, maxTurns, summary }));
+      return;
+    }
+    refs.end.replaceChildren(...(expired ? [buildExpiredBanner()] : []));
   }
 
   return {
     field,
     form,
     render(input) {
-      const { state, roles, roleId, openSources, now } = input;
+      const { state, roles, roleId, openSources, now, signIn = NO_SIGN_IN } = input;
       const conversation = state.conversation;
       const started = state.turns.length > 0;
+      // Before the first question the sign-in screen takes the welcome's place; after it, the
+      // expired banner takes the question box's.
+      const signInFirst = signIn.needed && !started;
       const reason = endReasonOf(state);
       const busy = isBusy(state);
       const role = roles.find(({ id }) => id === (conversation?.role ?? roleId)) ?? roles[0];
@@ -173,21 +191,28 @@ export function createView({ refs }) {
         conversation: started ? { turn, maxTurns, ended: reason !== undefined } : undefined,
         sourcesUsed: countSourcesUsed(state.turns),
         busy,
+        rolesHidden: signInFirst,
+        account: signIn.account,
       });
       bar.update({
-        roleName: role?.displayName ?? '',
+        roleName: signInFirst ? '' : (role?.displayName ?? ''),
         turnText: started ? `Turn ${turn} of ${maxTurns}` : '',
       });
       setVisible(refs.welcome, !started);
-      drawWelcome(role);
+      drawWelcome(role, signInFirst);
       refs.notice.textContent = state.notice;
       setVisible(refs.notice, state.notice !== '');
       drawTurns(/** @type {HTMLOListElement} */ (refs.messages), turnMemory, state, {
         now,
         openSources,
       });
-      drawEnd(reason, maxTurns, state);
-      updateComposer(form, { turnsUsed: turn, maxTurns, busy, hidden: reason !== undefined });
+      drawEnd(reason, maxTurns, state, signIn.needed && started);
+      updateComposer(form, {
+        turnsUsed: turn,
+        maxTurns,
+        busy,
+        hidden: reason !== undefined || signIn.needed,
+      });
     },
     tick: (now) => refreshAges(refs.messages, now),
     announce: (text) => {

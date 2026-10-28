@@ -25,6 +25,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-28);
+  /* Fills the sidebar, so the signed-in panel can sit at its foot. */
+  min-height: 100%;
 }
 
 .drawer__close {
