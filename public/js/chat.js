@@ -91,6 +91,7 @@ function attribute(element, name) {
  * @param {ChatStorage} deps.storage - What is remembered.
  * @param {{ now: () => number }} deps.clock - The time source.
  * @param {{ writeText: (text: string) => Promise<void> } | undefined} [deps.clipboard] - The clipboard; the browser's by default.
+ * @param {boolean} [deps.showFeedback] - Whether answers offer the thumbs up and down (default true).
  * @returns {{
  *   start: () => Promise<void>,
  *   tick: () => void,
@@ -103,8 +104,9 @@ export function createChat({
   storage,
   clock,
   clipboard = globalThis.navigator?.clipboard,
+  showFeedback,
 }) {
-  const view = createView({ refs });
+  const view = createView({ refs, showFeedback });
   let state = /** @type {import('./chatState.js').ChatState} */ (INITIAL_CHAT);
   /** @type {import('./ui/sidebar.js').RoleSummary[]} */
   let roles = [];

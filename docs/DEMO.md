@@ -145,8 +145,6 @@ whether the assistant admits it.
 - Press **Copy this conversation** in the sidebar. A message says "Conversation copied". Paste it
   into any document: every question, the answer with its citation keys, the confidence and why, and
   a list of sources with links. Say it is for handing a conversation to someone else.
-- Give a thumbs-down with a comment, and say that it goes to a local file without the answer, and
-  can become a test case with `npm run eval:from-feedback`.
 - Say the limits: one person, one conversation at a time, memory for one conversation only (at most
   five questions), answers take tens of seconds to a few minutes, and the status and confidence
   are partly the model's call. The measurements behind that are in [EVAL_LOG.md](EVAL_LOG.md).

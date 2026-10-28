@@ -309,7 +309,8 @@ When the answer has been checked it replaces the draft with:
 - **Show more detail**, which asks for the same answer one step more technically, as a follow-up
   in the conversation (not offered to the Developer role, or when the answer was not found);
 - **thumbs up and down** feedback. A thumbs-down opens a box for a comment and the source that was
-  wrong.
+  wrong. **The thumbs are hidden for now** (`SHOW_FEEDBACK` in `public/js/main.js`); the feedback
+  route and `data/feedback.jsonl` still work, so setting it back to `true` brings them back.
 
 The page is a chat: your question and its answer stay on screen and the next question goes
 underneath. A follow-up can use what was already found, and a citation key such as `C1` means the

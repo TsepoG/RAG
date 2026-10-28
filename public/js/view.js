@@ -73,6 +73,7 @@ function restoreFocus(container, before) {
  * only what changed so focus and what the reader has typed stay where they are.
  * @param {object} deps - What it works with.
  * @param {import('./refs.js').PageRefs} deps.refs - The page's places.
+ * @param {boolean} [deps.showFeedback] - Whether answers offer the thumbs up and down (default true).
  * @returns {{
  *   field: HTMLTextAreaElement,
  *   form: HTMLFormElement,
@@ -86,7 +87,7 @@ function restoreFocus(container, before) {
  *   closeDrawer: () => void,
  * }} The view.
  */
-export function createView({ refs }) {
+export function createView({ refs, showFeedback = true }) {
   const form = buildComposer({
     turnsUsed: 0,
     maxTurns: DEFAULT_MAX_TURNS,
@@ -205,6 +206,7 @@ export function createView({ refs }) {
       drawTurns(/** @type {HTMLOListElement} */ (refs.messages), turnMemory, state, {
         now,
         openSources,
+        showFeedback,
         signInNeeded: signIn.needed,
       });
       drawEnd(reason, maxTurns, state, signIn.needed && started);

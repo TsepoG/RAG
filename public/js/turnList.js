@@ -10,6 +10,7 @@ import { buildProgressCard } from './ui/progress.js';
  * @typedef {object} ListContext
  * @property {number} now - The time now, in ms.
  * @property {Set<string>} openSources - Ids of the answers whose Sources list is open.
+ * @property {boolean} [showFeedback] - Whether answers offer the thumbs up and down (default true).
  * @property {boolean} [signInNeeded] - Whether the Atlassian sign-in must be renewed first; a retry
  *   would only be refused again, so Try again is not offered.
  */
@@ -52,6 +53,7 @@ function buildReply(state, turn, context) {
       canReask: canReask(state, turn),
       canMoreDetail: canShowMoreDetail(state, turn),
       rating: state.ratings[answer.answerId],
+      showFeedback: context.showFeedback,
     });
   }
   if (turn.phase === 'running') {

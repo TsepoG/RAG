@@ -36,6 +36,11 @@ branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`; Phase 8 is `0.3.
   stops with "Sign in through the web app first".
 - Tokens never reach the log, an error, an API response or the page: new redacted keys, `/auth/*`
   query strings left out of the log, `no-store` on the sign-in responses.
+- The thumbs up and down are hidden for now (`SHOW_FEEDBACK` in `public/js/main.js`). The feedback
+  route and file are unchanged.
+- Dependency updates for `npm audit`: `zod` 4.6.7 (with an override so the Copilot SDK uses it too),
+  `fastify` 5.12.7, `sanitize-html` 2.18.1, `happy-dom` 21.0.4 (tests only), and the lockfile fixes
+  for `body-parser`, `fast-uri`, `qs` and `ip-address`.
 - `@modelcontextprotocol/sdk` moved from dev dependencies to dependencies; the app now uses it for
   the site check and the re-check. No new dependency.
 

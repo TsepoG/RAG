@@ -533,6 +533,8 @@ now returns 404 counts as changed (REST only; see the oauth note above). A sourc
 `src/server/feedbackStore.js`, `src/server/answers.js`, `src/eval/feedback.js`,
 `src/eval/report.js`, `src/cli/evalFromFeedback.js`, `src/cli/evalReport.js`.
 
+- **Hidden for now.** `SHOW_FEEDBACK` in `public/js/main.js` is `false`, so the cards show no
+  thumbs. Everything below still works and comes back when it is set to `true`.
 - **In the page:** thumbs up sends at once. Thumbs down opens a form with an optional comment
   ("What was wrong?", up to 1000 characters) and an optional "A source that was wrong", chosen from
   the answer's cited keys. There is no fixed list of reasons; the reason is the free-text comment.
