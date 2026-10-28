@@ -4,6 +4,7 @@
 /** @typedef {import('./discovery.js').Discovery} Discovery */
 /** @typedef {import('./authorize.js').CallbackResult} CallbackResult */
 /** @typedef {import('./authorize.js').TokenSet} TokenSet */
+/** @typedef {import('./identity.js').SiteCheck} SiteCheck */
 /** @typedef {import('./pending.js').StartedSignIn} StartedSignIn */
 /** @typedef {import('./pending.js').TakenSignIn} TakenSignIn */
 /** @typedef {import('./revoke.js').SignOutResult} SignOutResult */
@@ -31,6 +32,7 @@ export {
   parseProtectedResource,
   protectedResourceMetadataUrl,
 } from './discovery.js';
+export { checkSite, RESOURCES_TOOL } from './identity.js';
 export { withLock } from './lock.js';
 export { createPendingSignIns, PENDING_SIGN_IN_MS } from './pending.js';
 export { challengeFor, createPkce, randomToken } from './pkce.js';

@@ -83,7 +83,11 @@ describe('withLock', () => {
 
     await Promise.all([hold('first'), hold('second')]);
 
-    expect(events).toEqual(['first in', 'first out', 'second in', 'second out']);
+    // Either may win, but each must be done before the other comes in.
+    const [winner, loser] = events[0].startsWith('first')
+      ? ['first', 'second']
+      : ['second', 'first'];
+    expect(events).toEqual([`${winner} in`, `${winner} out`, `${loser} in`, `${loser} out`]);
   });
 
   it('gives up when the lock stays held, and leaves the holder its lock', async () => {

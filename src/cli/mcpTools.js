@@ -2,8 +2,12 @@
 import { writeFile } from 'node:fs/promises';
 import { loadConfig, loadEnvFileIfPresent } from '../config/index.js';
 import { AppError, ConfigError } from '../errors/index.js';
-import { buildMcpServers, collectToolReport, renderToolsMarkdown } from '../mcp/index.js';
-import { connectMcp } from './mcpConnect.js';
+import {
+  buildMcpServers,
+  collectToolReport,
+  connectMcp,
+  renderToolsMarkdown,
+} from '../mcp/index.js';
 
 const OUTPUT_FILE = 'docs/mcp-tools.md';
 const FAILURE_EXIT_CODE = 1;

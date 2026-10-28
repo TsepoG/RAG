@@ -3,8 +3,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { loadConfig, loadEnvFileIfPresent } from '../config/index.js';
 import { AppError } from '../errors/index.js';
-import { buildMcpServers, checkSample, parseSampleArgs, rawSamplePath } from '../mcp/index.js';
-import { connectMcp } from './mcpConnect.js';
+import {
+  buildMcpServers,
+  checkSample,
+  connectMcp,
+  parseSampleArgs,
+  rawSamplePath,
+} from '../mcp/index.js';
 import { describeError, EXIT_FAILURE } from './shared.js';
 
 const JSON_INDENT = 2;
