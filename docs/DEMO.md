@@ -37,6 +37,10 @@ Do this once, ahead of the demo.
    welcome screen shows.
 4. Open the page at 1440 pixels wide or full screen. Keep the README's phone screenshot at hand
    in case someone asks about small screens.
+5. **If you show signing in** (oauth mode, see section 1a): set `ATLASSIAN_AUTH_MODE=oauth` and
+   `ATLASSIAN_CLOUD_ID` in `.env`, restart `npm start`, sign in once to check it works, then press
+   **Sign out** so the demo starts on the sign-in screen. Use `http://127.0.0.1:3000`, not
+   `localhost`. Be signed in to Atlassian in the browser already, so the consent page is one click.
 
 ## 1. Introduction (1 minute)
 
@@ -48,6 +52,21 @@ Do this once, ahead of the demo.
   find. The rest of the demo shows each one.
 - Point at **Try asking**: questions that are known to work for the chosen role. Click one: it
   fills the box and does not send.
+
+## 1a. Signing in with your own account (optional, 1 minute, oauth mode only)
+
+Take this minute from section 7 if you use it. It needs no Copilot request.
+
+- The page opens on **Sign in to get started**: no roles and no question box yet. Read the line
+  under it: the assistant reads Confluence with your own access, read-only, and the sign-in stays
+  on this computer.
+- Press **Sign in with Atlassian**. On Atlassian's consent page, point at the permissions: only
+  read and search. Accept.
+- Back on the page, point at the bottom of the sidebar: "Signed in to `<your site>`" and **Sign
+  out**. Say that answers now come only from pages *you* may see, which is the point of the mode:
+  the same question can get a different answer for someone with less access.
+- Say that the sign-in renews itself (Atlassian's token lasts 8 hours), and that if it ever
+  expires the page says so and **Sign in again** brings back the same conversation.
 
 ## 2. A sourced answer (3 minutes)
 
@@ -141,6 +160,9 @@ whether the assistant admits it.
   offers **Start a new conversation**.
 - **Stop.** Press **Esc** while a question runs. The conversation stays open.
 - **The phone layout.** Make the window 390 pixels wide: the sidebar becomes a menu.
+- **Sign out** (oauth mode). Press **Sign out** in the sidebar: a "Signed out" message, the
+  conversation ends and the sign-in screen returns. The tokens are revoked with Atlassian and the
+  sign-in file is deleted.
 
 ## If something goes wrong
 
@@ -151,3 +173,5 @@ whether the assistant admits it.
 - The answer says nothing was found for something you know exists: check that the page is in
   `CONFLUENCE_SPACE_KEYS`; then see Troubleshooting in the README.
 - Nothing loads: check the terminal where `npm start` runs; it prints which setting is wrong.
+- Oauth mode: "Sign-in didn't complete" says why. "Can't reach `<site>`" usually means a
+  different site was chosen on the consent page: press **Try again** and pick the right one.

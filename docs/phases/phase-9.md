@@ -229,33 +229,51 @@ injected `fetch`.
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] In oauth mode: a fresh start shows the sign-in screen; signing in with
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+      *100% on all four measures at the end of Step 11.*
+- [x] In oauth mode: a fresh start shows the sign-in screen; signing in with
       the owner's account returns to the app, shows "Signed in as …", and a
       question is answered with Confluence citations.
-- [ ] Atlassian's consent page asks only for the read scopes listed above
+      *Live checks L1, L2 and L4. The panel says "Signed in to <site host>"
+      instead of a name: `atlassianUserInfo` returns only an `accountId`
+      (approved in planning).*
+- [x] Atlassian's consent page asks only for the read scopes listed above
       (owner confirms with a screenshot).
-- [ ] Renewal: with `expires_at` edited to be near expiry, the next turn renews
+      *L1: only the Read and Search permissions were listed.*
+- [x] Renewal: with `expires_at` edited to be near expiry, the next turn renews
       silently and the conversation carries on.
-- [ ] Expired sign-in: with the refresh token revoked, the next turn shows the
+      *L2: the token was swapped with `restartServer` and the follow-up
+      remembered the earlier answer, so the `auth-expired` fallback was not
+      needed. The first L2 run found a bug (the conversation trusted its own
+      expiry note), fixed before the re-run.*
+- [x] Expired sign-in: with the refresh token revoked, the next turn shows the
       expired banner; **Sign in again** works and the conversation is restored.
-- [ ] Sign out revokes the tokens, deletes the sign-in file, and returns to the
+      *L2 (server side) and L4 (the banner). The refresh token was broken by
+      editing the sign-in file rather than revoked at Atlassian.*
+- [x] Sign out revokes the tokens, deletes the sign-in file, and returns to the
       sign-in screen.
-- [ ] Re-check works in oauth mode through MCP, including one "changed" result
+      *L4. It ends the conversation with the new reason `signed-out`, not
+      `deleted` (approved in planning).*
+- [x] Re-check works in oauth mode through MCP, including one "changed" result
       after the owner edits a cited page.
+      *L3.*
 - [ ] Tokens never appear in logs, API responses, the page or the repo
       (the owner greps the log and the repo; tests prove redaction).
 - [ ] Basic and bearer modes behave exactly as before: tests unchanged, plus one
       bearer-mode smoke conversation.
 - [ ] Smoke eval subset (about 8 cases) in oauth mode shows no regression
       against the latest bearer-mode smoke, within the Phase 7 noise rule.
-- [ ] README (setup for each mode, sign-in, sign-out, where the sign-in is
+- [x] README (setup for each mode, sign-in, sign-out, where the sign-in is
       stored, Windows caveat, troubleshooting), `.env.example`, `docs/DEMO.md`
       (a sign-in moment), `docs/HOW_IT_WORKS.md` (auth section), CHANGELOG and
       ROADMAP are updated.
-- [ ] Phase 8 acceptance boxes ticked to reflect reality, and this file plus
+      *Step 11. `.env.example` was already up to date from Step 2, and the
+      ROADMAP row from Step 1. The README screenshots were not retaken; there
+      is no screenshot of the sign-in screens.*
+- [x] Phase 8 acceptance boxes ticked to reflect reality, and this file plus
       `docs/phase-9-atlassian-signin-decisions.md`, committed in the first
       commit of the branch.
+      *Step 1. "UI matches reference" stays unticked, with a note.*
 - [ ] CI is green; the SonarQube quality gate passes with zero new issues,
       including the security hotspots on the new routes.
 
