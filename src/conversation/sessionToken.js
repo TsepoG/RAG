@@ -27,17 +27,20 @@ import { ALLOWLIST, buildMcpServers, SERVER_KEYS } from '../mcp/index.js';
  * Creates the keeper of the conversations' tokens.
  * - Before a conversation has a session, its token must have three hours left, so it lasts the
  *   whole conversation.
- * - Once it has one, a token that would run out during the next turn is renewed and handed to the
- *   live session by restarting only its Atlassian MCP server. The new entry is built exactly as the
- *   original was, with the same tools and time limit; only the Authorization header differs.
+ * - Once it has one, the provider is asked before every turn for a token that lasts the turn. The
+ *   sign-in file is the one record of the sign-in, so this sees a renewal made by another process,
+ *   a sign-out, or a refresh token that no longer works. Asking is a file read; Atlassian is only
+ *   called when the token is about to run out.
+ * - When the provider hands back a different token, it is given to the live session by restarting
+ *   only its Atlassian MCP server. The new entry is built exactly as the original was, with the same
+ *   tools and time limit; only the Authorization header differs.
  * @param {object} deps - What it needs.
  * @param {Pick<import('../atlassian/index.js').TokenProvider, 'getAtlassianToken'>} deps.atlassianTokens - The provider.
  * @param {import('../config/index.js').AppConfig} deps.config - Validated config.
- * @param {{ now: () => number }} deps.clock - Time source.
  * @param {Pick<import('../logger/index.js').Logger, 'info'>} deps.logger - Where a swap is logged.
  * @returns {SessionTokens} The keeper.
  */
-export function createSessionTokens({ atlassianTokens, config, clock, logger }) {
+export function createSessionTokens({ atlassianTokens, config, logger }) {
   /** @type {WeakMap<import('./conversation.js').Conversation, SessionToken>} */
   const tokens = new WeakMap();
   const turnMarginMs = turnTokenMargin(config.copilot.askTimeoutMs);
@@ -52,11 +55,10 @@ export function createSessionTokens({ atlassianTokens, config, clock, logger }) 
         );
         return;
       }
-      const current = tokens.get(conversation);
-      if (current !== undefined && current.expiresAt - clock.now() > turnMarginMs) {
+      const fresh = await atlassianTokens.getAtlassianToken({ minValidityMs: turnMarginMs });
+      if (fresh.accessToken === tokens.get(conversation)?.accessToken) {
         return;
       }
-      const fresh = await atlassianTokens.getAtlassianToken({ minValidityMs: turnMarginMs });
       const servers = buildMcpServers(config, ALLOWLIST, { atlassianToken: fresh.accessToken });
       await session.rpc.mcp.restartServer({
         serverName: SERVER_KEYS.atlassian,

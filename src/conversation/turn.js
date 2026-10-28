@@ -171,7 +171,7 @@ export function createConversationRunner(deps) {
   const sessionTokens =
     atlassianTokens === undefined
       ? undefined
-      : createSessionTokens({ atlassianTokens, config, clock, logger });
+      : createSessionTokens({ atlassianTokens, config, logger });
 
   /**
    * Makes sure the conversation has an Atlassian token that lasts the next turn, in oauth mode.

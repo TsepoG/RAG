@@ -33,7 +33,6 @@ function setup({
   const keeper = createSessionTokens({
     atlassianTokens: { getAtlassianToken },
     config,
-    clock: { now: () => NOW },
     logger: createLogger({ destination: stream }),
   });
   const withSession = () => {
@@ -70,14 +69,51 @@ describe('createSessionTokens before the session exists', () => {
 });
 
 describe('createSessionTokens once the session exists', () => {
-  it('leaves a token with time to spare alone', async () => {
+  it('asks the provider before every turn, but leaves the session alone when the token is the same', async () => {
     const { keeper, getAtlassianToken, conversation, restartServer, withSession } = setup();
     await keeper.prepare(conversation);
     withSession();
 
     await keeper.prepare(conversation);
 
-    expect(getAtlassianToken).toHaveBeenCalledOnce();
+    expect(getAtlassianToken).toHaveBeenCalledTimes(2);
+    expect(getAtlassianToken).toHaveBeenLastCalledWith({ minValidityMs: 5 * MINUTE });
+    expect(restartServer).not.toHaveBeenCalled();
+  });
+
+  it('follows the sign-in file, not its own note: a token renewed elsewhere is swapped in', async () => {
+    let n = 0;
+    const { keeper, conversation, restartServer, withSession } = setup({
+      // Both tokens have hours left; the second was renewed in the file meanwhile.
+      token: async () => {
+        n += 1;
+        return { accessToken: `fake-token-${n}`, expiresAt: NOW + 8 * HOUR };
+      },
+    });
+    await keeper.prepare(conversation);
+    withSession();
+
+    await keeper.prepare(conversation);
+
+    expect(restartServer).toHaveBeenCalledOnce();
+    expect(keeper.tokenFor(conversation)).toBe('fake-token-2');
+  });
+
+  it('refuses the turn when the sign-in is gone, even if the session token still has hours left', async () => {
+    let n = 0;
+    const { keeper, conversation, restartServer, withSession } = setup({
+      token: async () => {
+        n += 1;
+        if (n > 1) {
+          throw new AtlassianSignInRequiredError();
+        }
+        return { accessToken: 'fake-token-1', expiresAt: NOW + 8 * HOUR };
+      },
+    });
+    await keeper.prepare(conversation);
+    withSession();
+
+    await expect(keeper.prepare(conversation)).rejects.toThrow(AtlassianSignInRequiredError);
     expect(restartServer).not.toHaveBeenCalled();
   });
 
