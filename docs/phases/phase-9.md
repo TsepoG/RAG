@@ -261,8 +261,11 @@ injected `fetch`.
       (the owner greps the log and the repo; tests prove redaction).
 - [ ] Basic and bearer modes behave exactly as before: tests unchanged, plus one
       bearer-mode smoke conversation.
-- [ ] Smoke eval subset (about 8 cases) in oauth mode shows no regression
+- [x] Smoke eval subset (about 8 cases) in oauth mode shows no regression
       against the latest bearer-mode smoke, within the Phase 7 noise rule.
+      *Run `20261028-155909` against the same 8 cases in `20261014-190623`
+      (there was no later bearer smoke run): passed 7 → 6, every measure
+      inside the rule. See `docs/EVAL_LOG.md`, "Smoke in oauth mode".*
 - [x] README (setup for each mode, sign-in, sign-out, where the sign-in is
       stored, Windows caveat, troubleshooting), `.env.example`, `docs/DEMO.md`
       (a sign-in moment), `docs/HOW_IT_WORKS.md` (auth section), CHANGELOG and
