@@ -257,10 +257,19 @@ injected `fetch`.
 - [x] Re-check works in oauth mode through MCP, including one "changed" result
       after the owner edits a cited page.
       *L3.*
-- [ ] Tokens never appear in logs, API responses, the page or the repo
+- [x] Tokens never appear in logs, API responses, the page or the repo
       (the owner greps the log and the repo; tests prove redaction).
-- [ ] Basic and bearer modes behave exactly as before: tests unchanged, plus one
+      *L5: the start of an access token's header (`eyJraWQiOiJh`, which every
+      access token of that shape shares) is in no tracked, untracked or
+      ignored file, in no commit, and not in the oauth smoke eval's log.
+      Redaction, response and page tests cover the rest.*
+- [x] Basic and bearer modes behave exactly as before: tests unchanged, plus one
       bearer-mode smoke conversation.
+      *L5: the owner's bearer-mode conversation, with a follow-up, worked as
+      before. Four existing tests were changed, none for basic or bearer
+      behaviour: the auth-mode list in the config schema test, the logger's
+      secret-key list, the `mcp` index exports and the live discovery test's
+      import (listed in the PR).*
 - [x] Smoke eval subset (about 8 cases) in oauth mode shows no regression
       against the latest bearer-mode smoke, within the Phase 7 noise rule.
       *Run `20261028-155909` against the same 8 cases in `20261014-190623`
