@@ -42,4 +42,11 @@ export { signOut } from './revoke.js';
 export { createSignInFlow } from './signIn.js';
 export { createSignInStore } from './store.js';
 export { exchangeCode, refreshTokens } from './tokenEndpoint.js';
-export { createTokenProvider } from './tokens.js';
+export {
+  createStoredTokenProvider,
+  createTokenProvider,
+  MIN_TURN_TOKEN_MARGIN_MS,
+  SESSION_TOKEN_MARGIN_MS,
+  SIGN_IN_FIRST,
+  turnTokenMargin,
+} from './tokens.js';

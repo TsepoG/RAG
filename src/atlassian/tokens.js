@@ -1,8 +1,36 @@
 // @ts-check
 import { AtlassianSignInRequiredError } from '../errors/index.js';
+import { createDiscovery } from './discovery.js';
 import { describeRefusal } from './http.js';
 import { withLock } from './lock.js';
+import { createSignInStore } from './store.js';
 import { refreshTokens } from './tokenEndpoint.js';
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+/**
+ * How long a token must still be good for when a session is made with it. A conversation lasts at
+ * most a few turns with a 30-minute idle limit, so with an 8-hour token this means a swap in the
+ * middle of a conversation is rare.
+ */
+export const SESSION_TOKEN_MARGIN_MS = 3 * HOUR_MS;
+
+/** The least time a token must still be good for when a turn starts. */
+export const MIN_TURN_TOKEN_MARGIN_MS = 5 * MINUTE_MS;
+
+/** What the CLI and the eval say in oauth mode when nobody has signed in. */
+export const SIGN_IN_FIRST = 'Sign in through the web app first (ATLASSIAN_AUTH_MODE=oauth).';
+
+/**
+ * How long a token must still be good for when a turn starts: long enough for the whole turn, with
+ * a minute to spare, and never less than five minutes.
+ * @param {number} askTimeoutMs - ASK_TIMEOUT_MS, the longest a turn may take.
+ * @returns {number} The margin, in ms.
+ */
+export function turnTokenMargin(askTimeoutMs) {
+  return Math.max(MIN_TURN_TOKEN_MARGIN_MS, askTimeoutMs + MINUTE_MS);
+}
 
 /** Refusals that mean the stored sign-in can never be renewed: it is removed. */
 const DEAD_GRANT = 'invalid_grant';
@@ -179,4 +207,26 @@ export function createTokenProvider({ store, discovery, fetch, clock, logger, lo
         : { signedIn: true, expiresAt: signIn.expiresAt, siteHost: signIn.siteHost };
     },
   };
+}
+
+/**
+ * Creates a provider over the sign-in kept in a folder, with its own discovery. For the commands
+ * (npm run ask, the eval, the MCP tools) that use the sign-in made in the web app.
+ * @param {{ dir: string, logger: Pick<import('../logger/index.js').Logger, 'info' | 'warn'>, fetch?: typeof fetch, clock?: { now: () => number } }} deps -
+ *   The sign-in folder and a logger; fetch and clock default to the real ones.
+ * @returns {TokenProvider} The provider.
+ */
+export function createStoredTokenProvider({
+  dir,
+  logger,
+  fetch: fetchFunction = globalThis.fetch,
+  clock = { now: () => Date.now() },
+}) {
+  return createTokenProvider({
+    store: createSignInStore({ dir, logger }),
+    discovery: createDiscovery({ fetch: fetchFunction }),
+    fetch: fetchFunction,
+    clock,
+    logger,
+  });
 }

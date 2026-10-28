@@ -1,4 +1,5 @@
 // @ts-check
+import { SESSION_TOKEN_MARGIN_MS } from '../atlassian/index.js';
 import { createCitationRegistry } from '../citations/index.js';
 import { buildSessionConfig } from '../copilot/index.js';
 import { AppError, QuestionCancelledError } from '../errors/index.js';
@@ -44,6 +45,8 @@ import {
  * @property {import('../logger/index.js').Logger} logger - Where hooks and cleanup log.
  * @property {{ now: () => number }} [clock] - Time source in milliseconds; defaults to Date.now.
  * @property {typeof fetch} [fetch] - Used to look up commits and CODEOWNERS; defaults to the global fetch.
+ * @property {import('../atlassian/index.js').TokenProvider['getAtlassianToken']} [getAtlassianToken] -
+ *   In oauth mode, gives the signed-in person's token; absent in basic and bearer modes.
  */
 
 /**
@@ -77,12 +80,22 @@ const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
  * @throws {AskTimeoutError} When the question takes longer than ASK_TIMEOUT_MS before it has an answer.
  * @throws {QuestionCancelledError} When `signal` is aborted before the question is answered.
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
+ * @throws {import('../errors/index.js').AtlassianSignInRequiredError} In oauth mode, when there is no
+ *   sign-in or it cannot be renewed.
  */
 export async function askQuestion(
   { question, role: usualRole, detailLevel = 'default', signal, onActivity, onDelta },
   deps,
 ) {
-  const { client, workingDirectory, config, logger, clock = SYSTEM_CLOCK, fetch } = deps;
+  const {
+    client,
+    workingDirectory,
+    config,
+    logger,
+    clock = SYSTEM_CLOCK,
+    fetch,
+    getAtlassianToken,
+  } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
   }
@@ -113,8 +126,20 @@ export async function askQuestion(
   const run = async () => {
     const hooks = buildQuestionHooks({ config, registry, gate, commits, logger, clock });
     const onPermissionRequest = createPermissionHandler({ logger });
+    // One question is far shorter than the margin, so the token lasts it.
+    const atlassianToken =
+      getAtlassianToken === undefined
+        ? undefined
+        : (await getAtlassianToken({ minValidityMs: SESSION_TOKEN_MARGIN_MS })).accessToken;
     open.session = await client.createSession(
-      buildSessionConfig({ config, role, workingDirectory, hooks, onPermissionRequest }),
+      buildSessionConfig({
+        config,
+        role,
+        workingDirectory,
+        hooks,
+        onPermissionRequest,
+        atlassianToken,
+      }),
     );
     events.attach(open.session);
     await open.session.send({ prompt: question });

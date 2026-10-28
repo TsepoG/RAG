@@ -82,6 +82,7 @@ export async function toolReturns(client, toolName, fixture, args) {
  * @param {Record<string, string | undefined>} [options.env] - Environment overrides.
  * @param {typeof fetch} [options.fetchFunction] - The fake fetch.
  * @param {() => number} [options.now] - The clock.
+ * @param {import('../../src/answer/askQuestion.js').AskDeps['getAtlassianToken']} [options.getAtlassianToken] - The signed-in token, in oauth mode.
  * @returns {Promise<{ result: import('../../src/answer/askQuestion.js').AskResult, session: any, client: any, lines: () => Array<Record<string, unknown>> }>}
  *   The result and the fakes.
  */
@@ -98,6 +99,7 @@ export async function ask({
     vi.fn(async () => new Response('', { status: 404 }))
   ),
   now = () => NOW,
+  getAtlassianToken,
 }) {
   const { stream, lines } = createMemoryStream();
   /** @type {any} */
@@ -131,6 +133,7 @@ export async function ask({
       logger: createLogger({ level: 'debug', destination: stream }),
       clock: { now },
       fetch: fetchFunction,
+      getAtlassianToken,
     },
   );
   return { result, session, client, lines };

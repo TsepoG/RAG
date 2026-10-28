@@ -1,5 +1,6 @@
 // @ts-check
 import { FULL_MESSAGE } from '../../conversation/index.js';
+import { AtlassianSignInRequiredError } from '../../errors/index.js';
 import { createMetaStreamFilter } from '../../render/index.js';
 import {
   citedKeysOf,
@@ -65,8 +66,8 @@ const RECHECK_BODY_SCHEMA = Object.freeze({
  * @typedef {object} ConversationRouteDeps
  * @property {ReadonlyMap<string, import('../../roles/index.js').Role>} roles - The loaded roles.
  * @property {import('../../conversation/index.js').ConversationStore} store - The conversations.
- * @property {{ ask: (conversation: import('../../conversation/index.js').Conversation, input: import('../../conversation/index.js').TurnInput) => Promise<import('../../answer/index.js').AskResult & { turn: number }> }} runner -
- *   Asks a question in a conversation.
+ * @property {{ ask: (conversation: import('../../conversation/index.js').Conversation, input: import('../../conversation/index.js').TurnInput) => Promise<import('../../answer/index.js').AskResult & { turn: number }>, prepare?: (conversation: import('../../conversation/index.js').Conversation) => Promise<void> }} runner -
+ *   Asks a question in a conversation; in oauth mode it first makes sure the sign-in lasts the turn.
  * @property {import('../recheckService.js').RecheckService} recheck - Checks sources for changes.
  * @property {import('../answers.js').AnswerMemory} answers - Where answers are remembered for feedback.
  * @property {(markdown: string) => string} renderHtml - Turns markdown into safe HTML.
@@ -233,6 +234,9 @@ export function registerConversationRoutes(
       if (changedKeys === undefined) {
         return reply.code(NOT_FOUND).send(UNKNOWN_ANSWER);
       }
+      if (!(await isReady(conversation))) {
+        return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      }
       reply.hijack();
       await streamTurn(reply.raw, {
         conversation,
@@ -241,6 +245,25 @@ export function registerConversationRoutes(
       return reply;
     },
   );
+
+  /**
+   * Makes sure the sign-in lasts the turn, before the answer starts streaming, so a missing or
+   * expired sign-in is a plain 401. The turn is not used, and the conversation goes on.
+   * @param {import('../../conversation/index.js').Conversation} conversation - The conversation.
+   * @returns {Promise<boolean>} False when the person must sign in again.
+   */
+  async function isReady(conversation) {
+    try {
+      await runner.prepare?.(conversation);
+      return true;
+    } catch (error) {
+      if (error instanceof AtlassianSignInRequiredError) {
+        logger.warn({}, 'refused a question: the Atlassian sign-in is missing or expired');
+        return false;
+      }
+      throw error;
+    }
+  }
 
   /**
    * Finds the sources of an earlier answer that have changed, for a "re-ask with the latest

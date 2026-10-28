@@ -70,7 +70,8 @@ function reportFailure(error) {
  * @param {import('../logger/index.js').Logger} deps.logger - Where to log.
  * @param {{ now: () => number }} deps.clock - Time source.
  * @param {import('../conversation/index.js').ConversationStore} deps.store - The conversations, so signing out ends the open one.
- * @returns {import('./app.js').AppDeps['atlassianAuth']} The sign-in, or undefined outside oauth mode.
+ * @returns {(NonNullable<import('./app.js').AppDeps['atlassianAuth']> & { tokens: import('../atlassian/index.js').TokenProvider }) | undefined}
+ *   The sign-in, or undefined outside oauth mode.
  */
 function buildAtlassianAuth({ config, logger, clock, store }) {
   const { auth, cloudId, siteUrl } = config.atlassian;
@@ -133,6 +134,7 @@ async function main() {
       closeSession: createSessionCloser(logger),
       newId: randomUUID,
     });
+    const atlassianAuth = buildAtlassianAuth({ config, logger, clock, store });
     const runner = createConversationRunner({
       client: handle.client,
       workingDirectory: handle.workingDirectory,
@@ -140,6 +142,7 @@ async function main() {
       logger,
       clock,
       endConversation: (conversation, reason) => store.end(conversation, reason),
+      atlassianTokens: atlassianAuth?.tokens,
     });
     const recheck = createRecheckService({
       checkers: {
@@ -170,11 +173,12 @@ async function main() {
           workingDirectory: handle.workingDirectory,
           config,
           logger,
+          getAtlassianToken: atlassianAuth?.tokens.getAtlassianToken,
         }),
       answers: createAnswerMemory(),
       saveFeedback: (answer, input) => appendFeedback(answer, input, { dir: DATA_DIRECTORY }),
       conversations: { store, runner, recheck },
-      atlassianAuth: buildAtlassianAuth({ config, logger, clock, store }),
+      atlassianAuth,
       staticFiles: await listStaticFiles(PUBLIC_DIRECTORY),
       logger,
     });
