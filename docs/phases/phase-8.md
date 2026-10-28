@@ -327,6 +327,7 @@ animation and the streaming caret.
       conversation (turn 2 with a changed source), answer in progress, not
       found / out of scope, and conversation ended. The owner compares
       screenshots side by side with the mockups.
+      _Not done: the side-by-side comparison with the mockups wasn't carried out._
 - [x] All honesty features from Phases 3–7 are still visible and working:
       chips, confidence and reason, gaps, conflicts, Sources (n), re-check,
       Re-ask, Stop, Show more detail, feedback, role lock, turn cap,
@@ -351,10 +352,12 @@ animation and the streaming caret.
       10-minute manager demo on the new UI. `CHANGELOG.md` has an entry.
       `docs/ROADMAP.md` gains Phase 8.
       _README screenshots are made by `npm run screenshots` with example data, and say so. The DEMO still needs the owner's rehearsal._
-- [ ] Phase 7 acceptance boxes are ticked to reflect reality, and this file
+- [x] Phase 7 acceptance boxes are ticked to reflect reality, and this file
       plus `docs/design/phase-8/` are committed, in the first commit of the
       branch.
-- [ ] CI is green; the SonarQube quality gate passes with zero new issues.
+      _Commit `4565653`, the first on `phase-8-ui`._
+- [x] CI is green; the SonarQube quality gate passes with zero new issues.
+      _Every check on PR #9 passed, SonarCloud included._
 
 ## Copilot request budget
 
