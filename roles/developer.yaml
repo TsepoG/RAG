@@ -30,7 +30,7 @@ phrases:
   notFound: 'No matching documentation or implementation found in the configured spaces and repositories.'
 # Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
 suggestedQuestions:
-  - In what order does the code try XBRL tags to find revenue, and where does that order come from?
-  - Which URL does the code use to download the bulk company facts archive?
-  - How does the EDGAR client limit its request rate and deal with failures?
+  - Give me an overview of how the codebase is structured.
+  - Where should I start reading to understand the main flow?
+  - How do I run and test the project locally?
 version: 2

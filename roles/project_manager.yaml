@@ -39,6 +39,7 @@ phrases:
   outOfScope: "I don't have that information. I can only answer from the team's documentation and the product as built."
 # Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
 suggestedQuestions:
-  - Which releases have been published, and when?
-  - What is the biggest open risk to the project right now?
+  - Give me a summary of the project and where it stands.
+  - What has been released recently?
+  - What are the biggest open risks or decisions?
 version: 2

@@ -336,6 +336,7 @@ animation and the streaming caret.
 - [x] Example questions per role, Copy this conversation, and the time hint
       work as specified.
       _The role field is `suggestedQuestions`, because `examples` was already taken. The hint reads "Most answers take 1–3 minutes" (p25–p75 of run 20261014-190623), not p50–p95 as drafted. Copy also shows a message on screen._
+      _Changed in Phase 10 (owner's decision): the suggested questions are now generic, so they fit any project (for example "Give me an overview of how the codebase is structured."). They are no longer limited to eval-set questions with a correct verdict. The schema limits are unchanged._
 - [x] Geist fonts are served locally with the licence; the CSP is unchanged or
       only tightened.
       _The CSP is unchanged; `.woff2` was added to the static server._

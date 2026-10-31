@@ -29,7 +29,7 @@ examples:
       same three rules, so the specification and the code agree.
 # Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
 suggestedQuestions:
-  - What rule decides whether a company counts as a semiconductor company?
-  - When does the system calculate gross profit itself instead of using the filed number?
-  - Why is the historical universe still survivors only?
+  - Explain what this project does and who it's for.
+  - What are the main business rules, and where are they documented?
+  - Which features are documented, and which pages describe them?
 version: 1

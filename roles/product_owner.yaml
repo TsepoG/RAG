@@ -39,7 +39,7 @@ phrases:
   outOfScope: "I don't have that information. I can only answer from the team's documentation and the product as built."
 # Shown under Try asking on the welcome screen. Each question is one the evaluation showed the assistant can answer.
 suggestedQuestions:
-  - In plain terms, what does Shortlist do?
-  - Can we trust the backtest results yet?
-  - How does the product choose short-term picks?
+  - Explain this project to me in plain terms.
+  - What can the product do today?
+  - What's planned next, according to the documentation?
 version: 2
