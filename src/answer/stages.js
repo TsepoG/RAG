@@ -68,18 +68,34 @@ export function startInterrupt({ askTimeoutMs, signal }) {
 }
 
 /**
+ * Creates the GitHub client a question's lookups share: with the personal access token in token
+ * mode, and with the GitHub CLI's token in gh-cli mode.
+ * @param {{ config: import('../config/index.js').AppConfig, fetch: typeof fetch | undefined, github?: Pick<import('../github/index.js').CliTokenProvider, 'getGithubToken' | 'invalidate'> }} input
+ *   Config, fetch, and the CLI token provider in gh-cli mode.
+ * @returns {import('../github/index.js').GithubApi} The client.
+ */
+export function createLookupApi({ config, fetch, github }) {
+  if (github === undefined) {
+    return createGithubApi({ token: config.github.token, fetch });
+  }
+  return createGithubApi({
+    getToken: () => github.getGithubToken(),
+    invalidate: () => github.invalidate(),
+    fetch,
+  });
+}
+
+/**
  * Creates the lookups a question uses against GitHub: head commits to pin links to, and
  * CODEOWNERS to suggest who to ask.
- * @param {{ config: import('../config/index.js').AppConfig, fetch: typeof fetch | undefined, logger: import('../logger/index.js').Logger }} input - Config, fetch and logger.
+ * @param {{ config: import('../config/index.js').AppConfig, fetch: typeof fetch | undefined, logger: import('../logger/index.js').Logger, github?: Pick<import('../github/index.js').CliTokenProvider, 'getGithubToken' | 'invalidate'> }} input
+ *   Config, fetch, logger, and the CLI token provider in gh-cli mode.
  * @returns {{ commits: ReturnType<typeof createCommitResolver>, owners: ReturnType<typeof createCodeownersLookup> }} The lookups.
  */
-export function createLookups({ config, fetch, logger }) {
-  // The personal access token of token mode.
-  const token = /** @type {string} */ (config.github.token);
-  const api = createGithubApi({ token, fetch });
+export function createLookups({ config, fetch, logger, github }) {
+  const api = createLookupApi({ config, fetch, github });
   return {
     commits: createCommitResolver({
-      token,
       repos: config.github.repos,
       api,
       logger,

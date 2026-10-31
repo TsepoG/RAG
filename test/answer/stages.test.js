@@ -13,6 +13,7 @@ import { createToolGate } from '../../src/mcp/index.js';
 import {
   awaitQuiet,
   buildQuestionHooks,
+  createLookupApi,
   createLookups,
   createNotifier,
   disconnectSession,
@@ -300,5 +301,63 @@ describe('awaitQuiet', () => {
     watch.stop();
 
     expect(listeners()).toBe(0);
+  });
+});
+
+describe('createLookupApi', () => {
+  const FAKE_CLI_TOKEN = 'gho_FAKEfakeFAKEfake0123456789abcdefXYZ';
+
+  /**
+   * A fake fetch that records the Authorization header and answers a repository.
+   * @returns {import('vitest').Mock} The fake.
+   */
+  function repoFetch() {
+    return vi.fn(async () => new Response('{"default_branch":"main"}'));
+  }
+
+  it('uses the personal access token in token mode', async () => {
+    const fetchFunction = repoFetch();
+    const config = loadConfig(validEnv());
+
+    await createLookupApi({ config, fetch: /** @type {any} */ (fetchFunction) }).getJson('/x');
+
+    expect(fetchFunction.mock.calls[0][1].headers.Authorization).toBe(
+      `Bearer ${config.github.token}`,
+    );
+  });
+
+  it('uses the GitHub CLI token in gh-cli mode, and forgets it after a 401', async () => {
+    const fetchFunction = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 401 }))
+      .mockResolvedValue(new Response('{"ok":true}'));
+    const github = { getGithubToken: vi.fn(async () => FAKE_CLI_TOKEN), invalidate: vi.fn() };
+    const config = loadConfig(validEnv({ GITHUB_AUTH_MODE: 'gh-cli', GITHUB_TOKEN: undefined }));
+
+    const api = createLookupApi({ config, fetch: /** @type {any} */ (fetchFunction), github });
+
+    expect(await api.getJson('/x')).toEqual({ ok: true });
+    expect(github.invalidate).toHaveBeenCalledOnce();
+    expect(fetchFunction.mock.calls[1][1].headers.Authorization).toBe(`Bearer ${FAKE_CLI_TOKEN}`);
+  });
+
+  it('gives the lookups the CLI token in gh-cli mode', async () => {
+    const fetchFunction = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{"default_branch":"main"}'))
+      .mockResolvedValue(new Response(`{"sha":"${'a'.repeat(40)}"}`));
+    const github = { getGithubToken: vi.fn(async () => FAKE_CLI_TOKEN), invalidate: vi.fn() };
+    const { logger } = makeLogger();
+    const config = loadConfig(validEnv({ GITHUB_AUTH_MODE: 'gh-cli', GITHUB_TOKEN: undefined }));
+
+    const { commits } = createLookups({
+      config,
+      fetch: /** @type {any} */ (fetchFunction),
+      logger,
+      github,
+    });
+
+    expect(await commits.resolveHead('acme/app')).toBe('a'.repeat(40));
+    expect(github.getGithubToken).toHaveBeenCalledTimes(2);
   });
 });

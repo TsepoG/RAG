@@ -4,7 +4,8 @@ import { createGithubApi, describeFailure } from './api.js';
 /**
  * What the resolver needs, all injected so tests make no network calls.
  * @typedef {object} CommitResolverOptions
- * @property {string} token - The GitHub token (GITHUB_TOKEN); sent only in the Authorization header.
+ * @property {string} [token] - The GitHub token (GITHUB_TOKEN); sent only in the Authorization
+ *   header. Needed only when no `api` is given.
  * @property {ReadonlyArray<string>} repos - Repositories the resolver may ask about (GITHUB_REPOS).
  * @property {typeof fetch} [fetch] - The fetch function; defaults to the global one.
  * @property {import('./api.js').GithubApi} [api] - The GitHub client to use, shared with other
