@@ -37,6 +37,7 @@ import {
 import { loadRoles } from '../roles/index.js';
 import {
   atlassianSignIn,
+  githubCliLogin,
   describeError,
   EXIT_FAILURE,
   loadSettings,
@@ -98,8 +99,8 @@ async function main() {
     const args = parseEvalArguments(process.argv.slice(2));
     const settings = loadSettings();
     const { config, logger } = settings;
-    const signIn = await atlassianSignIn(settings);
-    const { getAtlassianToken } = signIn;
+    const signIn = { ...(await atlassianSignIn(settings)), ...(await githubCliLogin(settings)) };
+    const { getAtlassianToken, githubTokens } = signIn;
     const roles = await loadRoles();
     const all = await loadCases({ roles });
     const cases = selectCases(all, {
@@ -158,6 +159,7 @@ async function main() {
         clock,
         endConversation: (conversation, reason) => store.end(conversation, reason),
         atlassianTokens: getAtlassianToken === undefined ? undefined : { getAtlassianToken },
+        githubTokens,
       });
       const outcome = await runEval({
         cases: runnable,

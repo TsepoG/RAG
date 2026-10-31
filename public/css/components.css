@@ -1141,6 +1141,11 @@ a.source-row__link:hover {
   overflow-wrap: anywhere;
 }
 
+/* When the GitHub CLI also needs attention, its banner follows Atlassian's. */
+.expired-banner + .expired-banner {
+  margin-top: var(--space-12);
+}
+
 .expired-banner {
   display: flex;
   flex-wrap: wrap;

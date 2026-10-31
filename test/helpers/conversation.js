@@ -46,6 +46,7 @@ export const NOW = Date.parse('2026-10-11T00:00:00Z');
  * @param {Error} [options.createFailure] - Makes `createSession` reject.
  * @param {import('../../src/roles/index.js').Role} [options.role] - The role.
  * @param {Pick<import('../../src/atlassian/index.js').TokenProvider, 'getAtlassianToken'>} [options.atlassianTokens] - The signed-in tokens, in oauth mode.
+ * @param {Pick<import('../../src/github/index.js').CliTokenProvider, 'getGithubToken' | 'invalidate'>} [options.githubTokens] - The GitHub CLI's token, in gh-cli mode.
  * @returns {Promise<Harness>} The pieces.
  */
 export async function setupConversation({
@@ -56,6 +57,7 @@ export async function setupConversation({
   createFailure,
   role = TEST_ROLE,
   atlassianTokens,
+  githubTokens,
 } = {}) {
   const { stream, lines } = createMemoryStream();
   const logger = createLogger({ level: 'debug', destination: stream });
@@ -103,6 +105,7 @@ export async function setupConversation({
     endConversation,
     fetch: vi.fn(async () => new Response('', { status: 404 })),
     atlassianTokens,
+    githubTokens,
   });
   return {
     conversation,

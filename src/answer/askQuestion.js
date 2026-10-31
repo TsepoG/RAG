@@ -47,6 +47,8 @@ import {
  * @property {typeof fetch} [fetch] - Used to look up commits and CODEOWNERS; defaults to the global fetch.
  * @property {import('../atlassian/index.js').TokenProvider['getAtlassianToken']} [getAtlassianToken] -
  *   In oauth mode, gives the signed-in person's token; absent in basic and bearer modes.
+ * @property {Pick<import('../github/index.js').CliTokenProvider, 'getGithubToken' | 'invalidate'>} [githubTokens] -
+ *   In gh-cli mode, gives the GitHub CLI's token; absent in token mode.
  */
 
 /**
@@ -82,6 +84,8 @@ const SYSTEM_CLOCK = Object.freeze({ now: () => Date.now() });
  * @throws {CopilotError} When Copilot or the session fails; `cause` has the detail if there is one.
  * @throws {import('../errors/index.js').AtlassianSignInRequiredError} In oauth mode, when there is no
  *   sign-in or it cannot be renewed.
+ * @throws {import('../errors/index.js').GithubSignInRequiredError} In gh-cli mode, when the GitHub
+ *   CLI has no token.
  */
 export async function askQuestion(
   { question, role: usualRole, detailLevel = 'default', signal, onActivity, onDelta },
@@ -95,6 +99,7 @@ export async function askQuestion(
     clock = SYSTEM_CLOCK,
     fetch,
     getAtlassianToken,
+    githubTokens,
   } = deps;
   if (question.trim() === '') {
     throw new AppError('A question is required');
@@ -119,7 +124,7 @@ export async function askQuestion(
   // Per question, so one question's sources, keys and lookups never leak into another's.
   const registry = createCitationRegistry();
   const gate = createToolGate();
-  const { commits, owners } = createLookups({ config, fetch, logger });
+  const { commits, owners } = createLookups({ config, fetch, logger, github: githubTokens });
   // Held in an object because the session is created inside the closure below.
   const open = /** @type {{ session?: AskSession }} */ ({});
 
@@ -131,6 +136,7 @@ export async function askQuestion(
       getAtlassianToken === undefined
         ? undefined
         : (await getAtlassianToken({ minValidityMs: SESSION_TOKEN_MARGIN_MS })).accessToken;
+    const githubToken = await githubTokens?.getGithubToken();
     open.session = await client.createSession(
       buildSessionConfig({
         config,
@@ -139,6 +145,7 @@ export async function askQuestion(
         hooks,
         onPermissionRequest,
         atlassianToken,
+        githubToken,
       }),
     );
     events.attach(open.session);

@@ -19,4 +19,10 @@ export { createCallBudget, createToolHooks } from './hooks.js';
 export { createPermissionHandler } from './permissions.js';
 export { checkSample, parseSampleArgs, RAW_DIRECTORY, rawSamplePath } from './sample.js';
 export { createToolGate, createTurnGate, TOOLS_LOCKED_REASON } from './toolGate.js';
-export { ATLASSIAN_MCP_URL, buildMcpServers, GITHUB_MCP_URL, SERVER_KEYS } from './servers.js';
+export {
+  ATLASSIAN_MCP_URL,
+  buildGithubMcpServer,
+  buildMcpServers,
+  GITHUB_MCP_URL,
+  SERVER_KEYS,
+} from './servers.js';

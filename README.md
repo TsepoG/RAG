@@ -10,9 +10,10 @@ read-only. The project was built in phases (see [docs/ROADMAP.md](docs/ROADMAP.m
 and config, the Copilot and MCP connection, roles and citations, the honesty checks, the local web
 page, an evaluation (see [Evaluation](#evaluation)), conversations (follow-up questions in one
 chat, with checks that cited sources have not changed since they were read; see
-[Conversations](#conversations)), a redesigned page, and last an opt-in sign-in with your own
-Atlassian account (see [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)). The
-change history is in
+[Conversations](#conversations)), a redesigned page, an opt-in sign-in with your own Atlassian
+account (see [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)), and last an
+opt-in way to read GitHub with your own GitHub CLI login (see
+[GitHub through the GitHub CLI](#github-through-the-github-cli-gh-cli-mode)). The change history is in
 [CHANGELOG.md](CHANGELOG.md) and a ten-minute walkthrough is in [docs/DEMO.md](docs/DEMO.md).
 
 ## Quickstart
@@ -23,7 +24,7 @@ change history is in
 3. Sign in to Copilot, for example with `gh auth login` ([Copilot login](#copilot-login)).
 4. `npm start`
 5. Open `http://127.0.0.1:3000`, pick a role and ask a question. In oauth mode, press **Sign in
-   with Atlassian** first.
+   with Atlassian** first. In gh-cli mode, run `gh auth login` in a terminal first.
 
 ## How it fits together
 
@@ -94,6 +95,7 @@ Values already exported in your shell win over `.env`.
 | `npm run models`                                           | List the models your Copilot account can use                                                                   |
 | `npm run mcp:tools`                                        | List both MCP servers' tools and write `docs/mcp-tools.md`                                                     |
 | `npm run mcp:sample -- <tool> '<json args>' [--as <name>]` | Call one allow-listed tool and save its raw result to `test/fixtures/raw/` (git-ignored)                       |
+| `npm run github:check`                                     | Before switching to gh-cli mode: checks your GitHub CLI login against each repo and MCP                        |
 | `npm run fixtures:sanitise`                                | Turn the raw samples into `test/fixtures/mcp/*.json` with no real names or content                             |
 | `npm run test:live`                                        | Live tests against real Copilot, Confluence and GitHub (needs a filled-in `.env`)                              |
 | `npm run eval -- [options]`                                | Run the eval set through the real pipeline (see [Evaluation](#evaluation))                                     |
@@ -117,31 +119,33 @@ The screenshots in this README are copies of some of these. The script is not ru
 Only `src/config` reads the environment. Everything else receives the validated config object.
 Invalid values are reported by variable name, never by value.
 
-| Variable                        | Required      | Default       | Rule                                                                                      |
-| ------------------------------- | ------------- | ------------- | ----------------------------------------------------------------------------------------- |
-| `NODE_ENV`                      | no            | `development` | `development`, `test` or `production`                                                     |
-| `LOG_LEVEL`                     | no            | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                              |
-| `PORT`                          | no            | `3000`        | Integer from 1 to 65535                                                                   |
-| `HOST`                          | no            | `127.0.0.1`   | Listen address; non-loopback needs `ALLOW_REMOTE=true`; must be `127.0.0.1` in oauth mode |
-| `ALLOW_REMOTE`                  | no            | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login                     |
-| `GITHUB_TOKEN`                  | yes           |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos                 |
-| `GITHUB_REPOS`                  | yes           |               | Comma-separated `owner/repo` list, at least one                                           |
-| `ATLASSIAN_SITE_URL`            | yes           |               | `https://<site>.atlassian.net`; a trailing slash is removed                               |
-| `ATLASSIAN_CLOUD_ID`            | oauth         |               | Site cloudId (UUID); when set it is used on every Confluence call                         |
-| `ATLASSIAN_AUTH_MODE`           | no            | `basic`       | `basic` (API token), `bearer` (service-account key) or `oauth` (your sign-in)             |
-| `ATLASSIAN_EMAIL`               | basic         |               | Email of the account that owns the API token; not used in the other modes                 |
-| `ATLASSIAN_API_TOKEN`           | basic, bearer |               | Atlassian API token or service-account API key; not used in `oauth` mode                  |
-| `ATLASSIAN_OAUTH_DIR`           | no            | see rule      | oauth only: absolute folder outside the project; default `~/.role-aware-assistant`        |
-| `CONFLUENCE_SPACE_KEYS`         | yes           |               | Comma-separated space keys, at least one                                                  |
-| `COPILOT_MODEL`                 | no            | none          | Non-empty model name when set; unset uses your account's default                          |
-| `COPILOT_GITHUB_TOKEN`          | no            | none          | Credential for Copilot only; unset uses your logged-in user (see below)                   |
-| `ASK_TIMEOUT_MS`                | no            | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)                   |
-| `MAX_TOOL_CALLS`                | no            | `12`          | Integer from 1 to 50; further tool calls in one question are denied                       |
-| `MCP_TIMEOUT_MS`                | no            | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server                          |
-| `CONVERSATION_MAX_TURNS`        | no            | `5`           | Integer from 1 to 10; questions one conversation may hold                                 |
-| `CONVERSATION_MAX_SOURCE_CHARS` | no            | `250000`      | Integer from 10000 to 5000000; source text one conversation may give the model            |
-| `CONVERSATION_IDLE_MINUTES`     | no            | `30`          | Integer from 1 to 1440; minutes without activity before a conversation closes             |
-| `RECHECK_AFTER_MINUTES`         | no            | `15`          | Integer from 1 to 1440; age after which a cited source is checked again                   |
+| Variable                        | Required      | Default       | Rule                                                                                              |
+| ------------------------------- | ------------- | ------------- | ------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                      | no            | `development` | `development`, `test` or `production`                                                             |
+| `LOG_LEVEL`                     | no            | `info`        | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent`                                      |
+| `PORT`                          | no            | `3000`        | Integer from 1 to 65535                                                                           |
+| `HOST`                          | no            | `127.0.0.1`   | Listen address; non-loopback needs `ALLOW_REMOTE=true`; must be `127.0.0.1` in oauth mode         |
+| `ALLOW_REMOTE`                  | no            | `false`       | `true` lets `HOST` be a non-loopback address; the server has no login                             |
+| `GITHUB_AUTH_MODE`              | no            | `token`       | `token` (the PAT in `GITHUB_TOKEN`) or `gh-cli` (your GitHub CLI login)                           |
+| `GITHUB_TOKEN`                  | token         |               | Fine-grained PAT with read-only Contents and Metadata on the listed repos; ignored in gh-cli mode |
+| `GITHUB_CLI_PATH`               | no            | `gh`          | Absolute path to the `gh` program; by default `gh` is found through `PATH`                        |
+| `GITHUB_REPOS`                  | yes           |               | Comma-separated `owner/repo` list, at least one                                                   |
+| `ATLASSIAN_SITE_URL`            | yes           |               | `https://<site>.atlassian.net`; a trailing slash is removed                                       |
+| `ATLASSIAN_CLOUD_ID`            | oauth         |               | Site cloudId (UUID); when set it is used on every Confluence call                                 |
+| `ATLASSIAN_AUTH_MODE`           | no            | `basic`       | `basic` (API token), `bearer` (service-account key) or `oauth` (your sign-in)                     |
+| `ATLASSIAN_EMAIL`               | basic         |               | Email of the account that owns the API token; not used in the other modes                         |
+| `ATLASSIAN_API_TOKEN`           | basic, bearer |               | Atlassian API token or service-account API key; not used in `oauth` mode                          |
+| `ATLASSIAN_OAUTH_DIR`           | no            | see rule      | oauth only: absolute folder outside the project; default `~/.role-aware-assistant`                |
+| `CONFLUENCE_SPACE_KEYS`         | yes           |               | Comma-separated space keys, at least one                                                          |
+| `COPILOT_MODEL`                 | no            | none          | Non-empty model name when set; unset uses your account's default                                  |
+| `COPILOT_GITHUB_TOKEN`          | no            | none          | Credential for Copilot only; unset uses your logged-in user (see below)                           |
+| `ASK_TIMEOUT_MS`                | no            | `120000`      | Integer from 5000 to 600000; a slower question is aborted (exit code 2)                           |
+| `MAX_TOOL_CALLS`                | no            | `12`          | Integer from 1 to 50; further tool calls in one question are denied                               |
+| `MCP_TIMEOUT_MS`                | no            | `30000`       | Integer from 1000 to 120000; limit for one call to an MCP server                                  |
+| `CONVERSATION_MAX_TURNS`        | no            | `5`           | Integer from 1 to 10; questions one conversation may hold                                         |
+| `CONVERSATION_MAX_SOURCE_CHARS` | no            | `250000`      | Integer from 10000 to 5000000; source text one conversation may give the model                    |
+| `CONVERSATION_IDLE_MINUTES`     | no            | `30`          | Integer from 1 to 1440; minutes without activity before a conversation closes                     |
+| `RECHECK_AFTER_MINUTES`         | no            | `15`          | Integer from 1 to 1440; age after which a cited source is checked again                           |
 
 ### Atlassian access
 
@@ -245,6 +249,76 @@ signed in.
 - If the token stops working in the middle of an answer, the Confluence call fails and the model
   sees an ordinary tool error; the next question then asks you to sign in again.
 - The status of the sign-in is at `GET /api/auth/status` (see [API](#api)).
+
+### GitHub through the GitHub CLI (gh-cli mode)
+
+By default (`GITHUB_AUTH_MODE=token`) the app reads GitHub with the fine-grained token in
+`GITHUB_TOKEN`, exactly as before. With `GITHUB_AUTH_MODE=gh-cli` it uses the login the GitHub
+CLI already holds for you (`gh auth login`) instead: for the GitHub MCP server and for its own
+GitHub calls (the commits that links are pinned to, CODEOWNERS, and re-checks). There is nothing to
+create or paste. Copilot's own login is separate and does not change.
+
+**Read-only depends on the app in this mode.** The GitHub CLI's token can write: it has the
+`repo`, `workflow` and `gist` scopes, and the CLI cannot narrow them. A fine-grained token is
+limited to the listed repositories and to reading; the CLI token is not. In gh-cli mode the
+assistant still never writes, because of the app's own layers (see
+[How read-only is enforced](#how-read-only-is-enforced)): the read-only MCP header, the allow-list of
+six read tools, the permission handler, the scope hook that keeps every call inside
+`GITHUB_REPOS`, and REST calls that only read. None of them changed. Use token mode where that is
+not enough.
+
+**Before switching, on the machine you will use** (for example a work computer):
+
+1. `gh auth login` (once).
+2. If your organisation uses single sign-on: `gh auth refresh -h github.com`, then authorise the
+   organisation in the browser.
+3. `npm run github:check`. It runs in either mode and prints, for each check, PASS or FAIL with
+   what to do:
+   - the `gh` it used (`GITHUB_CLI_PATH` or `gh` from `PATH`) and its version;
+   - the login: account, where the token is kept, scopes, and any single sign-on lines; a warning
+     if `GH_TOKEN` or `GITHUB_TOKEN` is set in your shell, which would make `gh` commands you
+     run use another token;
+   - the token, as its first four characters only (for example `gho_…`);
+   - each repository in `GITHUB_REPOS`: a contents read, the head-commit lookup and the
+     CODEOWNERS lookup, through the app's own client;
+   - the GitHub MCP server: all six read tools present and no write tool, with the read-only
+     headers.
+
+   It ends with PASS (exit code 0) or FAIL. A FAIL that says your organisation blocks the GitHub CLI
+   means: keep `GITHUB_AUTH_MODE=token`.
+
+4. Only if everything passes: set `GITHUB_AUTH_MODE=gh-cli` in `.env`, comment out
+   `GITHUB_TOKEN` (it is ignored in this mode, and startup warns when it is set), and restart.
+
+**On the page.** The signed-in panel at the bottom of the sidebar says "GitHub: <login> (GitHub
+CLI)". When the CLI has no token, the page says so and what to do, with **Check again** (the login
+happens in a terminal, so there is no sign-in link):
+
+| Reason         | What the page says                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Not logged in  | "GitHub CLI isn't logged in. Run `gh auth login` in a terminal, then press Check again."                                                 |
+| Single sign-on | "GitHub needs your organisation authorised. Run `gh auth refresh -h github.com` to authorise your organisation, then press Check again." |
+| `gh` not found | "GitHub CLI not found. Install the GitHub CLI, or set `GITHUB_CLI_PATH`, then press Check again."                                        |
+
+Before the first question this replaces the welcome screen; after it, it replaces the question box
+and the conversation is kept. A refused question does not count toward the turn limit. If the
+Atlassian sign-in is needed too, both are shown, Atlassian first.
+
+**How the token is used.**
+
+- It is read with `gh auth token --hostname github.com`, with no shell, a 5-second limit, and
+  without `GH_TOKEN` or `GITHUB_TOKEN` in `gh`'s environment, so it is always your gh login and
+  never the `GITHUB_TOKEN` from `.env`. The app never writes it anywhere.
+- It is asked for afresh before every question, so a `gh auth logout` or an account switch shows
+  at once (`gh auth logout` does not revoke the token, so a cached one would keep working). A new
+  token is handed to the open conversation without losing what it remembers. The app's own GitHub
+  calls reuse it for up to 5 minutes, and ask again once if GitHub refuses it.
+- It never appears in the log, an error, an API response or the page; only `npm run github:check`
+  shows its first four characters.
+
+**Command line.** `npm run ask`, `npm run eval`, `npm run mcp:tools` and `npm run mcp:sample`
+use the CLI token in gh-cli mode, and stop with "Log in with `gh auth login` first
+(GITHUB_AUTH_MODE=gh-cli)." when there is none.
 
 ### Copilot login
 
@@ -411,10 +485,18 @@ Sign-in routes:
 | `GET /auth/atlassian/start`       | Oauth only. Starts a sign-in and redirects (302) to Atlassian.                                                                                                     |
 | `GET /auth/atlassian/callback`    | Oauth only. Where Atlassian sends the browser back. Saves the sign-in and redirects to `/`, or shows "Sign-in didn't complete".                                    |
 | `POST /api/auth/atlassian/logout` | Oauth only. Body `{}`. Revokes the tokens, deletes the sign-in, ends the open conversation (end reason `signed-out`). Answers `{ signedOut: true, revoked }`.      |
+| `POST /api/auth/github/check`     | gh-cli mode only. Body `{}`. Asks the GitHub CLI again (for **Check again**) and answers with the whole status.                                                    |
 
 In oauth mode, `POST /api/conversations`, `POST /api/ask` and a new message answer 401
 `atlassian_signin_required` while nobody is signed in or the sign-in cannot be renewed. If it runs
 out once an answer has started, the stream ends with an `error` event of kind `signin`.
+
+The status also has a `github` block: `{ mode: 'token', signedIn: true }` in token mode, and in
+gh-cli mode `{ mode: 'gh-cli', signedIn: true, login? }` or `{ mode: 'gh-cli', signedIn: false,
+reason }` with the reason `logged-out`, `sso` or `cli-missing`. In gh-cli mode, the same three routes
+answer 401 `github_signin_required` with `{ code, reason, message }` while the GitHub CLI has no
+token, and a token that stops working once an answer has started ends the stream with an `error`
+event of kind `github-signin`. Neither ever holds a token.
 
 `POST /api/ask` still answers one question on its own, as before; the page uses the conversation
 routes. Conversation and answer ids are random UUIDs, and the conversation routes pass through the
@@ -653,7 +735,9 @@ the repository used; it is marked as synthetic.
 ### How read-only is enforced
 
 Everything the assistant does against Confluence and GitHub is read-only, by several independent
-layers; each one alone would stop a write.
+layers; each one alone would stop a write. In token mode the fine-grained token adds one more, since
+it cannot write at all; in gh-cli mode the GitHub CLI's token can, so these layers are what keeps
+GitHub read-only (see [GitHub through the GitHub CLI](#github-through-the-github-cli-gh-cli-mode)).
 
 1. **Allow-list.** [src/mcp/allowlist.js](src/mcp/allowlist.js) names the only tools Copilot may
    use: Confluence `searchConfluence`, `getConfluenceContent` and
@@ -703,7 +787,7 @@ src/
   errors/    AppError and its subclasses
   eval/      the evaluation: case loading, scoring, request budget, runner, review sheet, report
   fixtures/  the fixture sanitiser and its leak check
-  github/    read-only GitHub REST client; head-commit lookup to pin links; CODEOWNERS reader
+  github/    read-only GitHub REST client; head-commit lookup to pin links; CODEOWNERS reader; GitHub CLI token, status parsing and github:check
   honesty/   answer-meta parsing, confidence caps, uncited-sentence check, who to ask, final rendering
   logger/    pino logger factory with secret redaction
   mcp/       server config, tool allow-list, scope and post-tool hooks, permission handler, discovery
@@ -738,7 +822,8 @@ npm run eval:from-feedback                     # thumbs-down answers become draf
 
 - Run evaluations in `bearer` mode as a rule, so the results do not depend on whose Atlassian
   account is signed in. In oauth mode the eval uses the stored sign-in (see
-  [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)).
+  [Signing in with Atlassian](#signing-in-with-atlassian-oauth-mode)). In gh-cli mode the eval uses
+  the GitHub CLI's login; token mode is the usual choice for the same reason.
 - A case names a role, a question, the expected status and sources, and a short reference answer.
   The runner refuses a case still marked `draft: true`.
 - A case can instead have `turns`: a conversation of 2 to 10 questions, each with its own expectation.
@@ -774,6 +859,7 @@ confidence than it had earned. See the Phase 7 sections of the log.
 - **One person, one machine.** The web server has no login and listens only on the local machine
   unless you set `ALLOW_REMOTE=true`, which is not advised. Credentials come from `.env`. In oauth
   mode there is one Atlassian sign-in per machine, not per browser: whoever opens the page uses it.
+  In gh-cli mode GitHub is read with the GitHub CLI login of whoever runs the server.
 - **Memory lasts one conversation.** Follow-ups can use what was found earlier in the same
   conversation (at most `CONVERSATION_MAX_TURNS` questions), and nothing is kept after it ends or
   the server restarts, except the thumbs-up and thumbs-down you record (`data/feedback.jsonl`, no
@@ -814,6 +900,14 @@ confidence than it had earned. See the Phase 7 sections of the log.
 | Oauth mode: sign-in fails after changing `PORT`                     | The redirect address includes the port, so the app registers itself with Atlassian again on the next sign-in. If it still fails, stop the server, delete `atlassian-client.json` from `ATLASSIAN_OAUTH_DIR` and sign in again; the same happens by itself when Atlassian no longer knows the registration.                                                                                                                                                   |
 | Oauth mode: "Your Atlassian sign-in has expired"                    | The refresh token was revoked, expired or replaced. Press **Sign in again**; the conversation is kept. The log line `could not renew the Atlassian sign-in` gives the reason without the token.                                                                                                                                                                                                                                                              |
 | Oauth mode: "Sign in through the web app first"                     | `npm run ask`, `eval`, `mcp:tools` and `mcp:sample` use the web page's sign-in. Sign in at `http://127.0.0.1:<PORT>` once, using the same `ATLASSIAN_OAUTH_DIR`.                                                                                                                                                                                                                                                                                             |
+| gh-cli mode: "GitHub CLI isn't logged in"                           | Run `gh auth login` in a terminal, then press **Check again**; the conversation is kept. `gh auth status` shows whether the CLI is logged in.                                                                                                                                                                                                                                                                                                                |
+| gh-cli mode: "GitHub needs your organisation authorised"            | Your organisation uses single sign-on. Run `gh auth refresh -h github.com`, authorise the organisation in the browser, then press **Check again**.                                                                                                                                                                                                                                                                                                           |
+| gh-cli mode: "GitHub CLI not found"                                 | Install the GitHub CLI, or set `GITHUB_CLI_PATH` to the full path of `gh` (for example `C:Program FilesGitHub CLIgh.exe`), then restart and press **Check again**.                                                                                                                                                                                                                                                                                           |
+| `github:check`: "your organisation blocks the GitHub CLI"           | The organisation restricts which apps may read its data, and the GitHub CLI is not allowed. Keep `GITHUB_AUTH_MODE=token`.                                                                                                                                                                                                                                                                                                                                   |
+| `github:check`: MCP fails                                           | The organisation's Copilot or MCP policy may refuse the GitHub MCP server with this login. Keep `GITHUB_AUTH_MODE=token`.                                                                                                                                                                                                                                                                                                                                    |
+| `github:check` warns about `GH_TOKEN` or `GITHUB_TOKEN`             | That variable is set in your shell, so `gh` commands you run use it instead of your login. The app ignores it; unset it to avoid confusion.                                                                                                                                                                                                                                                                                                                  |
+| gh-cli mode: "GITHUB_TOKEN is set but not used" at startup          | `GITHUB_TOKEN` is ignored in gh-cli mode. Comment it out in `.env`, or switch back to `GITHUB_AUTH_MODE=token`.                                                                                                                                                                                                                                                                                                                                              |
+| gh-cli mode: "Log in with `gh auth login` first" from a command     | `npm run ask`, `eval`, `mcp:tools` and `mcp:sample` use the GitHub CLI's login in gh-cli mode. Run `gh auth login`.                                                                                                                                                                                                                                                                                                                                          |
 
 ## Quality gates
 

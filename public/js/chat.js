@@ -8,10 +8,13 @@ import {
   isBusy,
   next,
 } from './chatState.js';
+import { createGithubActions } from './githubActions.js';
 import { orderRoles } from './roleOrder.js';
 import {
   createSignInState,
   EXPIRED_MESSAGE,
+  isGithubSignInError,
+  isGithubSignInEvent,
   isSignInError,
   isSignInEvent,
   SIGN_OUT_FAILED,
@@ -51,6 +54,8 @@ const ROLES_FAILED = 'The roles could not be loaded.';
  * @property {typeof import('./api.js').fetchAuthStatus} [fetchAuthStatus] - Says whether someone
  *   is signed in to Atlassian; without it, nobody needs to sign in.
  * @property {typeof import('./api.js').signOut} [signOut] - Signs out of Atlassian.
+ * @property {typeof import('./api.js').checkGithub} [checkGithub] - Looks at the GitHub CLI again,
+ *   in gh-cli mode.
  */
 
 /**
@@ -121,6 +126,14 @@ export function createChat({
   function render() {
     view.render({ state, roles, roleId, openSources, now: clock.now(), signIn: signIn.view() });
   }
+
+  const github = createGithubActions({
+    api,
+    signIn,
+    announce: (text) => view.announce(text),
+    notice: (text) => dispatch({ type: 'notice', text }),
+    render: () => render(),
+  });
 
   /** Shows that the Atlassian sign-in is needed: the sign-in screen, or the expired banner. */
   function needSignIn() {
@@ -200,6 +213,10 @@ export function createChat({
         needSignIn();
         return false;
       }
+      if (isGithubSignInError(error)) {
+        github.need(/** @type {ApiError} */ (error).reason);
+        return false;
+      }
       dispatch({
         type: 'notice',
         text: error instanceof ApiError ? error.message : 'The conversation could not be started.',
@@ -230,6 +247,9 @@ export function createChat({
     }
     if (isSignInError(error)) {
       needSignIn();
+    }
+    if (isGithubSignInError(error)) {
+      github.need(/** @type {ApiError} */ (error).reason);
     }
   }
 
@@ -262,6 +282,9 @@ export function createChat({
           }
           if (isSignInEvent(event)) {
             needSignIn();
+          }
+          if (isGithubSignInEvent(event)) {
+            github.need();
           }
         },
       });
@@ -572,6 +595,8 @@ export function createChat({
       stop();
     } else if (action === 'sign-out') {
       void signOutNow();
+    } else if (action === 'check-github') {
+      void github.check();
     }
   }
 
@@ -616,7 +641,7 @@ export function createChat({
         stop();
       }
     });
-    for (const place of [refs.sidebar, refs.end, view.form]) {
+    for (const place of [refs.sidebar, refs.welcome, refs.end, view.form]) {
       place.addEventListener('click', onPageClick);
     }
     refs.messages.addEventListener('click', onMessagesClick);

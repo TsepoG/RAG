@@ -93,18 +93,30 @@ function isLocalhost(host) {
  */
 
 /**
- * Registers `GET /api/auth/status`, in every mode. In basic and bearer modes the service account
- * is always "signed in"; in oauth mode the answer comes from the sign-in file, with no network
- * call. It never holds a token.
- * @param {import('fastify').FastifyInstance} app - The app.
+ * What the status route says about Atlassian. In basic and bearer modes the service account is
+ * always "signed in"; in oauth mode the answer comes from the sign-in file, with no network call.
+ * It never holds a token.
  * @param {{ mode: string, tokens?: Pick<import('../../atlassian/index.js').TokenProvider, 'status'> }} deps - The mode, and the provider in oauth mode.
+ * @returns {Promise<Record<string, unknown>>} The Atlassian part of the status.
  */
-export function registerAuthStatusRoute(app, { mode, tokens }) {
+export async function atlassianStatus({ mode, tokens }) {
+  if (tokens === undefined) {
+    return { mode, signedIn: true };
+  }
+  return { mode, ...(await tokens.status()) };
+}
+
+/**
+ * Registers `GET /api/auth/status`, in every mode: the Atlassian status, and, when the app has the
+ * GitHub side, the GitHub one under `github`. It never holds a token.
+ * @param {import('fastify').FastifyInstance} app - The app.
+ * @param {{ mode: string, tokens?: Pick<import('../../atlassian/index.js').TokenProvider, 'status'>, github?: import('./githubAuth.js').GithubAuth }} deps -
+ *   The Atlassian mode, its provider in oauth mode, and the GitHub side.
+ */
+export function registerAuthStatusRoute(app, { mode, tokens, github }) {
   app.get(STATUS_PATH, async () => {
-    if (tokens === undefined) {
-      return { mode, signedIn: true };
-    }
-    return { mode, ...(await tokens.status()) };
+    const status = await atlassianStatus({ mode, tokens });
+    return github === undefined ? status : { ...status, github: await github.status() };
   });
 }
 

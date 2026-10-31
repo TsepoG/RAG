@@ -175,6 +175,36 @@ export class AtlassianSignInRequiredError extends AppError {
 }
 
 /**
+ * Why gh-cli mode has no GitHub token to use: the CLI is not logged in (or its token was refused),
+ * the organisation needs single sign-on authorisation, or the GitHub CLI cannot be found.
+ * @typedef {'logged-out' | 'sso' | 'cli-missing'} GithubSignInReason
+ */
+
+/** What the person is told for each reason; none of it comes from gh or GitHub. */
+const GITHUB_SIGN_IN_MESSAGES = Object.freeze({
+  'logged-out': "GitHub CLI isn't logged in. Run `gh auth login` in a terminal.",
+  sso: 'Run `gh auth refresh -h github.com` to authorise your organisation.',
+  'cli-missing': 'GitHub CLI not found — install it or set GITHUB_CLI_PATH.',
+});
+
+/**
+ * Thrown when gh-cli mode needs the GitHub CLI's token and there is none that works. The web layer
+ * answers it with a 401 and the code `github_signin_required`, and the conversation goes on.
+ */
+export class GithubSignInRequiredError extends AppError {
+  /**
+   * Creates the error for a reason; the message is fixed for that reason.
+   * @param {GithubSignInReason} reason - Why there is no token to use.
+   * @param {{ cause?: unknown }} [options] - The error being wrapped, if any.
+   */
+  constructor(reason, options) {
+    super(GITHUB_SIGN_IN_MESSAGES[reason], options);
+    /** @type {GithubSignInReason} */
+    this.reason = reason;
+  }
+}
+
+/**
  * Why signing in to Atlassian did not complete. The sign-in error page has a sentence for each.
  * @typedef {'cancelled' | 'expired' | 'missing-permissions' | 'wrong-site' | 'failed'} AtlassianAuthReason
  */

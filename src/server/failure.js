@@ -3,6 +3,7 @@ import {
   AskTimeoutError,
   AtlassianSignInRequiredError,
   CopilotError,
+  GithubSignInRequiredError,
   QuestionCancelledError,
 } from '../errors/index.js';
 
@@ -10,7 +11,8 @@ import {
  * What the page is told when a question fails. The message is written for the person and holds
  * nothing from the error itself, which can name a path, a token or a tool's reply.
  * @typedef {object} Failure
- * @property {'timeout' | 'cancelled' | 'copilot' | 'signin' | 'internal'} kind - What sort of failure it was.
+ * @property {'timeout' | 'cancelled' | 'copilot' | 'signin' | 'github-signin' | 'internal'} kind - What
+ *   sort of failure it was: `signin` for the Atlassian sign-in, `github-signin` for the GitHub CLI.
  * @property {string} message - What to show.
  */
 
@@ -31,6 +33,10 @@ export function describeFailure(error) {
       kind: 'signin',
       message: 'Your Atlassian sign-in has expired. Sign in again to keep going.',
     };
+  }
+  if (error instanceof GithubSignInRequiredError) {
+    // Fixed for each reason, and written for the person: nothing in it comes from gh or GitHub.
+    return { kind: 'github-signin', message: error.message };
   }
   if (error instanceof CopilotError) {
     return { kind: 'copilot', message: 'Copilot could not answer just now. Please try again.' };

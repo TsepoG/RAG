@@ -4,9 +4,14 @@ import { createAnswerHtmlRenderer } from '../render/index.js';
 import { createGuardHook, createGuardPolicy } from './guards.js';
 import { createSecurityHeadersHook } from './headers.js';
 import { registerAskRoute } from './routes/ask.js';
-import { registerAtlassianAuthRoutes, registerAuthStatusRoute } from './routes/atlassianAuth.js';
+import {
+  atlassianStatus,
+  registerAtlassianAuthRoutes,
+  registerAuthStatusRoute,
+} from './routes/atlassianAuth.js';
 import { registerConversationRoutes } from './routes/conversations.js';
 import { registerFeedbackRoute } from './routes/feedback.js';
+import { registerGithubCheckRoute } from './routes/githubAuth.js';
 import { registerInfoRoutes } from './routes/info.js';
 import { createStaticHandler } from './static.js';
 
@@ -31,6 +36,9 @@ const GITHUB_HOST = 'github.com';
  *   The conversations, the runner that asks in them and the re-check; the routes are left out without it.
  * @property {Omit<import('./routes/atlassianAuth.js').AtlassianAuthRouteDeps, 'policy' | 'port' | 'siteHost' | 'logger'>} [atlassianAuth] -
  *   The sign-in, in oauth mode only: its routes are added, and questions wait for a sign-in.
+ * @property {import('./routes/githubAuth.js').GithubAuth} [githubAuth] - The GitHub side: its state is
+ *   added to the status, and in gh-cli mode questions wait for the GitHub CLI's token and "Check
+ *   again" is offered.
  * @property {ReadonlyMap<string, import('./static.js').StaticFile>} staticFiles - Files to serve.
  * @property {import('../logger/index.js').Logger} logger - Where to log.
  */
@@ -49,6 +57,7 @@ export function buildApp({
   saveFeedback,
   conversations,
   atlassianAuth,
+  githubAuth,
   staticFiles,
   logger,
 }) {
@@ -82,7 +91,14 @@ export function buildApp({
       : async () => (await atlassianAuth.tokens.status()).signedIn;
 
   registerInfoRoutes(app, { roles });
-  registerAuthStatusRoute(app, { mode: config.atlassian.auth.mode, tokens: atlassianAuth?.tokens });
+  const atlassian = { mode: config.atlassian.auth.mode, tokens: atlassianAuth?.tokens };
+  registerAuthStatusRoute(app, { ...atlassian, github: githubAuth });
+  if (githubAuth?.mode === 'gh-cli') {
+    registerGithubCheckRoute(app, {
+      githubAuth,
+      atlassianStatus: () => atlassianStatus(atlassian),
+    });
+  }
   if (atlassianAuth !== undefined) {
     registerAtlassianAuthRoutes(app, {
       ...atlassianAuth,
@@ -92,7 +108,7 @@ export function buildApp({
       logger,
     });
   }
-  registerAskRoute(app, { roles, ask, answers, renderHtml, logger, isSignedIn });
+  registerAskRoute(app, { roles, ask, answers, renderHtml, logger, isSignedIn, githubAuth });
   registerFeedbackRoute(app, { answers, save: saveFeedback });
   if (conversations !== undefined) {
     registerConversationRoutes(app, {
@@ -102,6 +118,7 @@ export function buildApp({
       renderHtml,
       logger,
       isSignedIn,
+      githubAuth,
     });
   }
   app.get('/*', createStaticHandler(staticFiles));

@@ -5,8 +5,9 @@ import {
   MIN_TURN_TOKEN_MARGIN_MS,
   SIGN_IN_FIRST,
 } from '../atlassian/index.js';
-import { AppError, ConfigError } from '../errors/index.js';
+import { AppError, ConfigError, GithubSignInRequiredError } from '../errors/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../copilot/index.js';
+import { createCliTokenProvider } from '../github/index.js';
 import { createLogger } from '../logger/index.js';
 
 /** Exit code for configuration, sign-in and Copilot failures, and for a missing question. */
@@ -87,18 +88,54 @@ export async function atlassianSignIn({ config, logger }) {
   return { getAtlassianToken: provider.getAtlassianToken };
 }
 
+/** What the commands say in gh-cli mode when the GitHub CLI is not logged in. */
+export const GITHUB_CLI_FIRST = 'Log in with `gh auth login` first (GITHUB_AUTH_MODE=gh-cli).';
+
 /**
- * The options for building the MCP servers' entries: in oauth mode, the signed-in token.
+ * In gh-cli mode, gives the commands the GitHub CLI's token provider, after checking it has a
+ * token; in token mode, nothing.
+ * @param {{ config: import('../config/index.js').AppConfig, logger: import('../logger/index.js').Logger }} settings
+ *   Config and logger from {@link loadSettings}.
+ * @returns {Promise<{ githubTokens?: import('../github/index.js').CliTokenProvider }>} The provider,
+ *   in gh-cli mode.
+ * @throws {AppError} In gh-cli mode, when the GitHub CLI is missing or not logged in.
+ */
+export async function githubCliLogin({ config, logger }) {
+  const { mode, cliPath } = config.github;
+  if (mode !== 'gh-cli') {
+    return {};
+  }
+  const githubTokens = createCliTokenProvider({ cliPath, logger });
+  try {
+    await githubTokens.getGithubToken();
+  } catch (error) {
+    if (error instanceof GithubSignInRequiredError && error.reason !== 'cli-missing') {
+      throw new AppError(GITHUB_CLI_FIRST, { cause: error });
+    }
+    throw error;
+  }
+  return { githubTokens };
+}
+
+/**
+ * The options for building the MCP servers' entries: in oauth mode, the signed-in token, and in
+ * gh-cli mode, the GitHub CLI's token.
  * @param {{ config: import('../config/index.js').AppConfig, logger: import('../logger/index.js').Logger }} settings
  *   Config and logger from {@link loadSettings}.
  * @returns {Promise<import('../mcp/servers.js').McpServerOptions>} The options.
- * @throws {AppError} In oauth mode, when nobody has signed in through the web app.
+ * @throws {AppError} In oauth mode, when nobody has signed in through the web app, and in gh-cli
+ *   mode, when the GitHub CLI is missing or not logged in.
  */
 export async function serverOptions(settings) {
   const { getAtlassianToken } = await atlassianSignIn(settings);
-  if (getAtlassianToken === undefined) {
-    return {};
-  }
-  const { accessToken } = await getAtlassianToken({ minValidityMs: MIN_TURN_TOKEN_MARGIN_MS });
-  return { atlassianToken: accessToken };
+  const { githubTokens } = await githubCliLogin(settings);
+  const atlassianToken =
+    getAtlassianToken === undefined
+      ? undefined
+      : (await getAtlassianToken({ minValidityMs: MIN_TURN_TOKEN_MARGIN_MS })).accessToken;
+  const githubToken = await githubTokens?.getGithubToken();
+  return {
+    ...(atlassianToken === undefined ? {} : { atlassianToken }),
+    ...(githubToken === undefined ? {} : { githubToken }),
+  };
 }

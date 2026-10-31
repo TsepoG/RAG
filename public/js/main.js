@@ -1,6 +1,7 @@
 // @ts-check
 import {
   ApiError,
+  checkGithub,
   createConversation,
   deleteConversation,
   fetchConversation,
@@ -34,6 +35,7 @@ const chat = createChat({
     fetchRoles,
     fetchAuthStatus,
     signOut,
+    checkGithub,
     createConversation,
     sendMessage,
     fetchConversation,
