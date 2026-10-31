@@ -16,7 +16,7 @@ scope, a changed source, not found) and note their timings.
 
 | # | Role | Conversation | Question | Shows | Eval time |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Product Owner | 1 | How does the product choose short-term picks? (the third **Try asking** suggestion) | a sourced answer with a confidence level, the step list, citations | about 75 s |
+| 1 | Product Owner | 1 | How does the product choose short-term picks? (typed in) | a sourced answer with a confidence level, the step list, citations | about 75 s |
 | 2 | Product Owner | 1 | What is the weather like tomorrow? | out of scope | about 25 s |
 | 3 | Business Analyst | 2 | Which service supplies the currency exchange rates the system uses? | not found, and where it looked | about 80 s |
 
@@ -50,8 +50,10 @@ Do this once, ahead of the demo.
   for a developer and a product owner.
 - Point at the three tiles: every answer is sourced, says how sure it is, admits what it cannot
   find. The rest of the demo shows each one.
-- Point at **Try asking**: questions that are known to work for the chosen role. Click one: it
-  fills the box and does not send.
+- Point at **Try asking**: general questions to start with for the chosen role, such as "Explain
+  this project to me in plain terms." Click one: it fills the box and does not send. Clear it
+  before section 2. (With more than one repository in `GITHUB_REPOS`, these general questions may
+  cover them all, or the assistant may ask which project you mean.)
 
 ## 1a. Signing in with your own account (optional, 1 minute, oauth mode only)
 
@@ -70,7 +72,7 @@ Take this minute from section 7 if you use it. It needs no Copilot request.
 
 ## 2. A sourced answer (3 minutes)
 
-**Conversation 1 · Product Owner.** Choose **Product Owner**, click **How does the product choose
+**Conversation 1 · Product Owner.** Choose **Product Owner**, type **How does the product choose
 short-term picks?** and press **Ask**. (About 75 seconds.)
 
 While it runs, talk through the **step list** under the question:
