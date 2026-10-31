@@ -215,6 +215,21 @@ async function checkRepo(deps, repo) {
 }
 
 /**
+ * Says why the tools could not be listed: the error, and what it wraps, which is where the server's
+ * own answer is. Each part loses its closing full stop, so the line ends with one.
+ * @param {unknown} error - What was thrown.
+ * @returns {string} The reason, not yet masked.
+ */
+function describeListFailure(error) {
+  const parts = [];
+  for (let current = error; current !== undefined && parts.length < 2;) {
+    parts.push(current instanceof Error ? current.message : String(current));
+    current = current instanceof Error ? current.cause : undefined;
+  }
+  return parts.map((part) => part.trim().replace(/\.$/, '')).join(': ');
+}
+
+/**
  * Lists the GitHub MCP server's tools with the CLI token and checks them.
  * @param {CheckDeps} deps - What the check works with.
  * @param {string} token - The CLI token.
@@ -225,8 +240,7 @@ async function checkMcp({ listTools, readTools, isWriteTool }, token) {
   try {
     names = await listTools(token);
   } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return [`FAIL MCP: ${safe(detail)}. ${MCP_FIX}`];
+    return [`FAIL MCP: ${safe(describeListFailure(error))}. ${MCP_FIX}`];
   }
   const missing = readTools.filter((tool) => !names.includes(tool));
   const writes = names.filter((name) => isWriteTool(name));

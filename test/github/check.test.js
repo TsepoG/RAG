@@ -340,6 +340,23 @@ describe('runGithubCheck on the MCP server', () => {
     expect(failing.text).not.toContain(FAKE_TOKEN);
     expect(odd.text).toContain('FAIL MCP: refused.');
   });
+
+  it('gives the reason under a wrapped error, and ends each sentence once', async () => {
+    const { text } = await check(
+      deps({
+        listTools: vi.fn(async () => {
+          throw new Error('Could not list the tools of the "github_repos" MCP server.', {
+            cause: new Error('HTTP 403: SAML enforcement.'),
+          });
+        }),
+      }),
+    );
+
+    expect(text).toContain(
+      `FAIL MCP: Could not list the tools of the "github_repos" MCP server: HTTP 403: SAML enforcement. ${MCP_FIX}`,
+    );
+    expect(text).not.toContain('..');
+  });
 });
 
 describe('recordFailures', () => {

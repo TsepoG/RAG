@@ -12,7 +12,7 @@ import {
 } from '../github/index.js';
 import {
   ALLOWLIST,
-  buildMcpServers,
+  buildGithubMcpServer,
   connectMcp,
   isWriteToolName,
   listServerTools,
@@ -77,9 +77,7 @@ async function main() {
       api: createGithubApi({ getToken: () => provider.getGithubToken(), fetch: recorder.fetch }),
       lastFailure: recorder.lastFailure,
       listTools: async (token) => {
-        const endpoint = buildMcpServers(ghCliConfig, {}, { githubToken: token })[
-          SERVER_KEYS.github
-        ];
+        const endpoint = buildGithubMcpServer(ghCliConfig, [], token);
         const tools = await listServerTools(SERVER_KEYS.github, endpoint, connectMcp);
         return tools.map(({ name }) => name);
       },

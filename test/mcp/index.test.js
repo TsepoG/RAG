@@ -12,6 +12,7 @@ describe('mcp public entry point', () => {
       'RAW_DIRECTORY',
       'SERVER_KEYS',
       'TOOLS_LOCKED_REASON',
+      'buildGithubMcpServer',
       'buildMcpServers',
       'checkSample',
       'classifyTool',

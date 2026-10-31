@@ -79,6 +79,28 @@ function githubAuthorization({ mode, token }, githubToken) {
 }
 
 /**
+ * Builds the GitHub entry on its own: the same entry `buildMcpServers` makes, for the app's own MCP
+ * calls that need only GitHub (`npm run github:check`), so they do not need an Atlassian sign-in.
+ * @param {import('../config/index.js').AppConfig} config - Validated config.
+ * @param {ReadonlyArray<string>} tools - Read-only tools to expose.
+ * @param {string | undefined} githubToken - The CLI's token, in gh-cli mode.
+ * @returns {import('@github/copilot-sdk').MCPHTTPServerConfig} The entry.
+ * @throws {GithubSignInRequiredError} In gh-cli mode, when no token is given.
+ */
+export function buildGithubMcpServer(config, tools, githubToken) {
+  return {
+    type: HTTP_SERVER_TYPE,
+    url: GITHUB_MCP_URL,
+    headers: {
+      Authorization: githubAuthorization(config.github, githubToken),
+      ...GITHUB_READONLY_HEADERS,
+    },
+    tools: [...tools],
+    timeout: config.mcp.timeoutMs,
+  };
+}
+
+/**
  * Builds the `mcpServers` entries for a Copilot session: Atlassian (Confluence) and GitHub.
  * The result holds credentials in its headers, so it must only ever be logged through the logger.
  * @param {import('../config/index.js').AppConfig} config - Validated config.
@@ -100,15 +122,10 @@ export function buildMcpServers(config, toolNames, { atlassianToken, githubToken
       tools: [...(toolNames[SERVER_KEYS.atlassian] ?? [])],
       timeout: timeoutMs,
     },
-    [SERVER_KEYS.github]: {
-      type: HTTP_SERVER_TYPE,
-      url: GITHUB_MCP_URL,
-      headers: {
-        Authorization: githubAuthorization(config.github, githubToken),
-        ...GITHUB_READONLY_HEADERS,
-      },
-      tools: [...(toolNames[SERVER_KEYS.github] ?? [])],
-      timeout: timeoutMs,
-    },
+    [SERVER_KEYS.github]: buildGithubMcpServer(
+      config,
+      toolNames[SERVER_KEYS.github] ?? [],
+      githubToken,
+    ),
   };
 }

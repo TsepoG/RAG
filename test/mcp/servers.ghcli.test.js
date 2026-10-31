@@ -2,7 +2,12 @@
 import { describe, expect, it } from 'vitest';
 import { loadConfig } from '../../src/config/index.js';
 import { GithubSignInRequiredError } from '../../src/errors/index.js';
-import { ALLOWLIST, buildMcpServers, SERVER_KEYS } from '../../src/mcp/index.js';
+import {
+  ALLOWLIST,
+  buildGithubMcpServer,
+  buildMcpServers,
+  SERVER_KEYS,
+} from '../../src/mcp/index.js';
 import { FAKE_GITHUB_TOKEN, validEnv } from '../helpers/env.js';
 
 const FAKE_CLI_TOKEN = 'gho_FAKEfakeFAKEfake0123456789abcdefXYZ';
@@ -35,6 +40,29 @@ describe('buildMcpServers in token mode', () => {
     );
     expect(buildMcpServers(config, ALLOWLIST)[SERVER_KEYS.github].headers?.Authorization).toBe(
       `Bearer ${FAKE_GITHUB_TOKEN}`,
+    );
+  });
+});
+
+describe('buildGithubMcpServer', () => {
+  it('builds the GitHub entry alone, even in Atlassian oauth mode with nobody signed in', () => {
+    const config = loadConfig(
+      validEnv({
+        GITHUB_AUTH_MODE: 'gh-cli',
+        GITHUB_TOKEN: undefined,
+        ATLASSIAN_AUTH_MODE: 'oauth',
+        ATLASSIAN_EMAIL: undefined,
+        ATLASSIAN_API_TOKEN: undefined,
+        ATLASSIAN_CLOUD_ID: '0f1e2d3c-4b5a-4968-8776-655443322110',
+      }),
+    );
+
+    expect(buildGithubMcpServer(config, [], FAKE_CLI_TOKEN)).toEqual(
+      buildMcpServers(
+        config,
+        {},
+        { atlassianToken: 'fake-atlassian', githubToken: FAKE_CLI_TOKEN },
+      )[SERVER_KEYS.github],
     );
   });
 });
