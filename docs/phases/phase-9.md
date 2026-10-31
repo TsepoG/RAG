@@ -286,8 +286,11 @@ injected `fetch`.
       `docs/phase-9-atlassian-signin-decisions.md`, committed in the first
       commit of the branch.
       *Step 1. "UI matches reference" stays unticked, with a note.*
-- [ ] CI is green; the SonarQube quality gate passes with zero new issues,
+- [x] CI is green; the SonarQube quality gate passes with zero new issues,
       including the security hotspots on the new routes.
+      *PR #15: all six checks green (lint, typecheck, test, audit, sonarqube,
+      SonarCloud Code Analysis); SonarCloud reported 0 new issues and 0
+      security hotspots. Merged and tagged `v0.4.0`.*
 
 ## Copilot request budget
 
