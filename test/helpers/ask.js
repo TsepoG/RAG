@@ -83,6 +83,7 @@ export async function toolReturns(client, toolName, fixture, args) {
  * @param {typeof fetch} [options.fetchFunction] - The fake fetch.
  * @param {() => number} [options.now] - The clock.
  * @param {import('../../src/answer/askQuestion.js').AskDeps['getAtlassianToken']} [options.getAtlassianToken] - The signed-in token, in oauth mode.
+ * @param {import('../../src/answer/askQuestion.js').AskDeps['githubTokens']} [options.githubTokens] - The GitHub CLI's token, in gh-cli mode.
  * @returns {Promise<{ result: import('../../src/answer/askQuestion.js').AskResult, session: any, client: any, lines: () => Array<Record<string, unknown>> }>}
  *   The result and the fakes.
  */
@@ -100,6 +101,7 @@ export async function ask({
   ),
   now = () => NOW,
   getAtlassianToken,
+  githubTokens,
 }) {
   const { stream, lines } = createMemoryStream();
   /** @type {any} */
@@ -134,6 +136,7 @@ export async function ask({
       clock: { now },
       fetch: fetchFunction,
       getAtlassianToken,
+      githubTokens,
     },
   );
   return { result, session, client, lines };

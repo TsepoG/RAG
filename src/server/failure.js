@@ -3,6 +3,7 @@ import {
   AskTimeoutError,
   AtlassianSignInRequiredError,
   CopilotError,
+  GithubSignInRequiredError,
   QuestionCancelledError,
 } from '../errors/index.js';
 
@@ -31,6 +32,10 @@ export function describeFailure(error) {
       kind: 'signin',
       message: 'Your Atlassian sign-in has expired. Sign in again to keep going.',
     };
+  }
+  if (error instanceof GithubSignInRequiredError) {
+    // Fixed for each reason, and written for the person: nothing in it comes from gh or GitHub.
+    return { kind: 'signin', message: error.message };
   }
   if (error instanceof CopilotError) {
     return { kind: 'copilot', message: 'Copilot could not answer just now. Please try again.' };

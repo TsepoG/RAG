@@ -53,6 +53,8 @@ import { buildTurnNote } from './turnNote.js';
  * @property {typeof fetch} [fetch] - Used to look up commits and CODEOWNERS; defaults to the global fetch.
  * @property {Pick<import('../atlassian/index.js').TokenProvider, 'getAtlassianToken'>} [atlassianTokens] -
  *   The signed-in person's tokens, in oauth mode only; absent in basic and bearer modes.
+ * @property {Pick<import('../github/index.js').CliTokenProvider, 'getGithubToken' | 'invalidate'>} [githubTokens] -
+ *   The GitHub CLI's token, in gh-cli mode only; absent in token mode.
  */
 
 /**
@@ -153,6 +155,8 @@ function watchMemory(session, logger) {
  * @throws {CopilotError} (from `ask`) When Copilot or the session fails; the conversation ends.
  * @throws {import('../errors/index.js').AtlassianSignInRequiredError} (from `prepare` and `ask`) In oauth
  *   mode, when there is no sign-in or it cannot be renewed; no turn is used and the conversation goes on.
+ * @throws {import('../errors/index.js').GithubSignInRequiredError} (from `prepare` and `ask`) In gh-cli
+ *   mode, when the GitHub CLI has no token; no turn is used and the conversation goes on.
  */
 export function createConversationRunner(deps) {
   const {
@@ -164,17 +168,19 @@ export function createConversationRunner(deps) {
     fetch,
     clock,
     atlassianTokens,
+    githubTokens,
   } = deps;
   /** @type {WeakMap<import('./conversation.js').Conversation, Runtime>} */
   const runtimes = new WeakMap();
-  // Only in oauth mode: the other modes put a fixed credential in the session config.
+  // Only in oauth or gh-cli mode: the other modes put a fixed credential in the session config.
   const sessionTokens =
-    atlassianTokens === undefined
+    atlassianTokens === undefined && githubTokens === undefined
       ? undefined
-      : createSessionTokens({ atlassianTokens, config, logger });
+      : createSessionTokens({ atlassianTokens, githubTokens, config, logger });
 
   /**
-   * Makes sure the conversation has an Atlassian token that lasts the next turn, in oauth mode.
+   * Makes sure the conversation has the tokens the next turn needs: Atlassian's in oauth mode,
+   * GitHub's in gh-cli mode.
    * @param {import('./conversation.js').Conversation} conversation - The conversation.
    * @returns {Promise<void>}
    */
@@ -191,7 +197,7 @@ export function createConversationRunner(deps) {
     const switchable = createSwitchableRegistry(conversation.registry.turnView());
     const gate = createTurnGate();
     const budget = createCallBudget();
-    const { commits, owners } = createLookups({ config, fetch, logger });
+    const { commits, owners } = createLookups({ config, fetch, logger, github: githubTokens });
     const hooks = buildQuestionHooks({
       config,
       registry: switchable.registry,
@@ -224,7 +230,7 @@ export function createConversationRunner(deps) {
         workingDirectory,
         hooks: runtime.hooks,
         onPermissionRequest: createPermissionHandler({ logger }),
-        atlassianToken: sessionTokens?.tokenFor(conversation),
+        ...sessionTokens?.tokensFor(conversation),
       }),
     );
     conversation.setSession(session);

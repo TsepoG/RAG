@@ -14,6 +14,7 @@ import { buildSystemMessage } from './systemMessage.js';
  * @property {import('@github/copilot-sdk').PermissionHandler} onPermissionRequest - Answers
  *   every permission request.
  * @property {string} [atlassianToken] - The signed-in person's access token, in oauth mode.
+ * @property {string} [githubToken] - The GitHub CLI's token, in gh-cli mode.
  */
 
 /** Names the application in the User-Agent of requests made for the session. */
@@ -40,6 +41,7 @@ export function buildSessionConfig({
   hooks,
   onPermissionRequest,
   atlassianToken,
+  githubToken,
 }) {
   const { model } = config.copilot;
   return {
@@ -57,7 +59,7 @@ export function buildSessionConfig({
         cloudId: config.atlassian.cloudId,
       }),
     },
-    mcpServers: buildMcpServers(config, ALLOWLIST, { atlassianToken }),
+    mcpServers: buildMcpServers(config, ALLOWLIST, { atlassianToken, githubToken }),
     availableTools: toAvailableTools(),
     excludedTools: [...EXCLUDED_TOOLS],
     workingDirectory,

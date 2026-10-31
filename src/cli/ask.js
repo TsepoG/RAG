@@ -12,6 +12,7 @@ import { AppError, AskTimeoutError } from '../errors/index.js';
 import { getRole, loadRoles } from '../roles/index.js';
 import {
   atlassianSignIn,
+  githubCliLogin,
   describeError,
   EXIT_FAILURE,
   EXIT_TIMEOUT,
@@ -39,7 +40,7 @@ async function main() {
       process.stderr.write(`No --role given; answering as ${role.id}.\n`);
     }
     const settings = loadSettings();
-    const signIn = await atlassianSignIn(settings);
+    const signIn = { ...(await atlassianSignIn(settings)), ...(await githubCliLogin(settings)) };
     process.stderr.write(`Asking as ${role.displayName}...\n`);
     const result = await withCopilot(settings, ({ client, workingDirectory }) =>
       askQuestion({ question, role }, { client, workingDirectory, ...settings, ...signIn }),

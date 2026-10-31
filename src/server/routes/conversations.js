@@ -1,6 +1,6 @@
 // @ts-check
 import { FULL_MESSAGE } from '../../conversation/index.js';
-import { AtlassianSignInRequiredError } from '../../errors/index.js';
+import { AtlassianSignInRequiredError, GithubSignInRequiredError } from '../../errors/index.js';
 import { createMetaStreamFilter } from '../../render/index.js';
 import {
   citedKeysOf,
@@ -16,6 +16,7 @@ import { toolEventToProgress } from '../progress.js';
 import { openEventStream } from '../sse.js';
 import { MAX_QUESTION_LENGTH } from './ask.js';
 import { SIGN_IN_REQUIRED, UNAUTHORIZED } from './atlassianAuth.js';
+import { githubSignInRequired } from './githubAuth.js';
 
 const NOT_FOUND = 404;
 const CONFLICT = 409;
@@ -234,8 +235,9 @@ export function registerConversationRoutes(
       if (changedKeys === undefined) {
         return reply.code(NOT_FOUND).send(UNKNOWN_ANSWER);
       }
-      if (!(await isReady(conversation))) {
-        return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      const refusal = await refusalFor(conversation);
+      if (refusal !== undefined) {
+        return reply.code(UNAUTHORIZED).send(refusal);
       }
       reply.hijack();
       await streamTurn(reply.raw, {
@@ -247,19 +249,24 @@ export function registerConversationRoutes(
   );
 
   /**
-   * Makes sure the sign-in lasts the turn, before the answer starts streaming, so a missing or
-   * expired sign-in is a plain 401. The turn is not used, and the conversation goes on.
+   * Makes sure the sign-in and the GitHub CLI token last the turn, before the answer starts
+   * streaming, so a missing or expired one is a plain 401. The turn is not used, and the
+   * conversation goes on.
    * @param {import('../../conversation/index.js').Conversation} conversation - The conversation.
-   * @returns {Promise<boolean>} False when the person must sign in again.
+   * @returns {Promise<object | undefined>} The 401 body, or undefined when the turn can go ahead.
    */
-  async function isReady(conversation) {
+  async function refusalFor(conversation) {
     try {
       await runner.prepare?.(conversation);
-      return true;
+      return undefined;
     } catch (error) {
       if (error instanceof AtlassianSignInRequiredError) {
         logger.warn({}, 'refused a question: the Atlassian sign-in is missing or expired');
-        return false;
+        return SIGN_IN_REQUIRED;
+      }
+      if (error instanceof GithubSignInRequiredError) {
+        logger.warn({ reason: error.reason }, 'refused a question: the GitHub CLI has no token');
+        return githubSignInRequired(error);
       }
       throw error;
     }
