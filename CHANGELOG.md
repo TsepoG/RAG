@@ -2,7 +2,34 @@
 
 One entry per phase. Dates are those of the merge or, for Phase 6, of the last change on its
 branch. The MVP is `0.1.0` (Phases 1 to 6); Phase 7 is `0.2.0`; Phase 8 is `0.3.0`; Phase 9 is
-`0.4.0`, to be tagged after it is merged.
+`0.4.0`; Phase 10 is `0.5.0`, to be tagged after it is merged.
+
+## Phase 10: GitHub through the GitHub CLI login (2026-10-31)
+
+- A new, opt-in `GITHUB_AUTH_MODE=gh-cli`. The GitHub MCP server and the app's own GitHub calls
+  (pinned commit links, CODEOWNERS, re-check) use the token from the person's `gh auth login`
+  instead of `GITHUB_TOKEN`. `token` mode is the default and is unchanged; a regression test holds
+  its config to what it was.
+- The token is read with `gh auth token --hostname github.com` (no shell, 5-second limit, never
+  `--show-token`), without `GH_TOKEN` or `GITHUB_TOKEN` in `gh`'s environment, so it is always the
+  gh login. It is asked for afresh before every question, so a logout or account switch shows at
+  once, and a changed token is swapped into the open conversation with `restartServer`. The app's
+  own calls reuse it for 5 minutes and try once more after a 401. Optional `GITHUB_CLI_PATH` names
+  the `gh` program.
+- The page: "GitHub: <login> (GitHub CLI)" in the signed-in panel, and, when the CLI has no token,
+  a sign-in screen or banner that says what to do (`gh auth login`, `gh auth refresh -h github.com`
+  for single sign-on, or install the CLI) with **Check again**. The conversation is kept and a
+  refused question is not counted. Both services' blocks show when both need attention.
+- New: `GET /api/auth/status` has a `github` block; `POST /api/auth/github/check`; 401
+  `github_signin_required` with a reason; a stream error of kind `github-signin`.
+- New command `npm run github:check`, for any machine before switching: the `gh` used and its
+  version, the login, scopes and SSO lines (with a warning when `GH_TOKEN` or `GITHUB_TOKEN` is set
+  in the shell), and for each repository a contents read, a commit lookup and a CODEOWNERS lookup,
+  plus the GitHub MCP tool list, each PASS or FAIL with the fix. It prints only the token's first
+  four characters.
+- The CLI token can write (`repo`, `workflow`, `gist`), so in gh-cli mode GitHub is read-only only
+  through the app's layers, which did not change. The README says so plainly.
+- No new dependency.
 
 ## Phase 9: Sign in with Atlassian (2026-10-28)
 

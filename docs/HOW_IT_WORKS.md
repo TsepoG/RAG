@@ -1,7 +1,7 @@
 # How it works
 
-This document describes the system as the code stands at commit `3a270d9` (Phase 9, Atlassian sign-in,
-on its branch). It is
+This document describes the system as the code stands at commit `879c605` (Phase 10, GitHub through
+the GitHub CLI login, on its branch). It is
 taken from the code, not from the phase briefs; where they differ, the code is what is described.
 Paths are relative to the repository root. Where a point could not be confirmed from the code, it
 says **Not found in code**.
@@ -118,11 +118,12 @@ Both are remote HTTP MCP servers (`servers.js`); nothing is started locally.
 | Key | URL | Auth | Allow-listed tools |
 | --- | --- | --- | --- |
 | `atlassian` | `https://mcp.atlassian.com/v2/mcp` | `Basic email:token` (default), `Bearer token`, or in oauth mode `Bearer <signed-in access token>` | `searchConfluence`, `getConfluenceContent`, `getAccessibleAtlassianResources` |
-| `github_repos` | `https://api.githubcopilot.com/mcp/` | `Bearer GITHUB_TOKEN`, plus `X-MCP-Readonly: true`, `X-MCP-Toolsets: repos` | `search_code`, `get_file_contents`, `get_commit`, `list_commits`, `list_releases`, `get_latest_release` |
+| `github_repos` | `https://api.githubcopilot.com/mcp/` | `Bearer GITHUB_TOKEN`, or in gh-cli mode `Bearer <GitHub CLI token>`, plus `X-MCP-Readonly: true`, `X-MCP-Toolsets: repos` | `search_code`, `get_file_contents`, `get_commit`, `list_commits`, `list_releases`, `get_latest_release` |
 
 Each call has a timeout of `MCP_TIMEOUT_MS` (default 30000). In oauth mode only the `Authorization`
 header differs; the allow-list, hooks, permission handler and cloudId injection are the same
-(`buildMcpServers(config, toolNames, { atlassianToken })`). Comments in `allowlist.js` give why
+(`buildMcpServers(config, toolNames, { atlassianToken, githubToken })`); the same holds for GitHub in
+gh-cli mode ([section 12](#12-github-through-the-github-cli-gh-cli-mode)). Comments in `allowlist.js` give why
 other tools are left out: Rovo `search` and Teamwork Graph tools cannot be limited to a space,
 `executeRead`/`discover` are gateways to hundreds of operations, Jira tools are out of scope, and
 `search_repositories`, `search_commits` and `list_repository_collaborators` are not limited to
@@ -240,7 +241,8 @@ the cited sources also move to "also consulted" and the Sources list is empty.
   `https://github.com/<repo>/blob/<sha>/<path>` (`/tree/` for folders, `/commit/<sha>` for a
   commit). The SHA comes from the tool result (the resource URI for a file, an entry's `html_url`
   for a folder). If the result has none, the app looks up the head of the default branch with two
-  read-only REST calls (`commits.js`). If that fails too, the link uses `HEAD` and the source is
+  read-only REST calls (`commits.js`; with the GitHub CLI's token in gh-cli mode). If that fails
+  too, the link uses `HEAD` and the source is
   marked not pinned; the terminal prints "latest on the default branch, not pinned to a commit".
   The page shows `commit <short sha>` for a pinned file.
 
@@ -485,6 +487,8 @@ A re-check compares a cited source with its live version directly. It never asks
   sorted entries, a release list by its newest tag, all read at the ref the model read. The baseline
   is the fingerprint stored when the source was fetched. With no stored fingerprint the app fetches
   the same path at the pinned commit as the baseline; with neither, the result is "couldn't check".
+  In gh-cli mode the requests carry the GitHub CLI's token; a refused token is replaced once, and
+  a token GitHub still refuses gives "couldn't check", never "changed".
 
 **Outcomes:** `unchanged`, `changed`, or `unavailable` (shown as "Couldn't check"). A source that
 now returns 404 counts as changed (REST only; see the oauth note above). A source that cannot be reached is never reported as changed.
@@ -633,6 +637,11 @@ What the system does not do today, as the code shows:
   stops working in the middle of an answer reaches the model as an ordinary tool error; only the
   next question is refused. Atlassian does not advertise the `iss` callback parameter today, so
   that check is built but does not run.
+- **GitHub through the GitHub CLI (gh-cli mode)** uses a token that can write (`repo`, `workflow`,
+  `gist`); only the app's layers keep GitHub read-only. A token that stops working in the middle
+  of an answer reaches the model as an ordinary tool error; only the next question is refused.
+  Organisation single sign-on, app restrictions and Copilot or MCP policy can only be tested on
+  the machine that will use it, with `npm run github:check`.
 
 ---
 
@@ -722,3 +731,83 @@ sidebar ends with "Signed in to `<site>`" and **Sign out**. A 401 `atlassian_sig
 an `error` event of kind `signin`, replaces the question box with "Your Atlassian sign-in has
 expired." and **Sign in again**; the failed turn offers no Try again until then. Signing in again
 returns to `/`, which restores the conversation as a reload does.
+
+---
+
+## 12. GitHub through the GitHub CLI (gh-cli mode)
+
+**Files:** `src/config/githubSchema.js`, `src/github/cliToken.js`, `src/github/cliStatus.js`,
+`src/github/api.js`, `src/github/check.js`, `src/mcp/servers.js`,
+`src/conversation/sessionToken.js`, `src/server/routes/githubAuth.js`, `src/cli/githubCheck.js`,
+`public/js/signIn.js`, `public/js/githubActions.js`, `public/js/ui/githubLogin.js`,
+`public/js/ui/attention.js`.
+
+With `GITHUB_AUTH_MODE=gh-cli` the GitHub MCP server and the app's own GitHub calls use the token
+the GitHub CLI holds for the person (`gh auth login`), instead of `GITHUB_TOKEN`. Token mode is the
+default and is unchanged: its config is exactly what it was, and every token-mode path passes the
+personal access token as before.
+
+**Config** (`githubSchema.js`). The raw `GITHUB_AUTH_MODE` picks what the shared schemas see: in
+gh-cli mode they are given a fixed stand-in for `GITHUB_TOKEN`, so its rules do not apply, and the
+result becomes `github: { mode: 'gh-cli', token: undefined, repos, cliPath, tokenIgnored }`. A
+`GITHUB_TOKEN` that is set anyway never enters the config; startup logs one warning
+(`configWarnings`). `GITHUB_CLI_PATH`, when set, must be absolute.
+
+**The token** (`cliToken.js`). `createCliTokenProvider` runs `gh auth token --hostname github.com`
+with `execFile` (no shell, a 5 s limit, no window) in an environment without `GH_TOKEN` or
+`GITHUB_TOKEN` (`buildGithubCliEnv` in `src/config`), because `gh` prints those variables instead of
+the login when they are set. It never uses `--show-token`.
+
+- `getGithubToken()` reuses the token for 5 minutes; `getGithubToken({ fresh: true })` asks `gh`
+  again. Callers that ask at the same time share one run of `gh`. A failure is not kept.
+- A `gh` that cannot start (ENOENT or EINVAL) is `GithubSignInRequiredError('cli-missing')`; a
+  non-zero exit, a timeout or empty output is `'logged-out'`. `gh`'s stderr is logged only through
+  `maskSecrets`.
+- `getLogin()` runs `gh api user --jq .login` once for each token, for the page.
+
+**Where it is used.**
+
+- **Sessions** (`sessionToken.js`). Before every turn the runner asks `gh` afresh, because
+  `gh auth logout` does not revoke the token and a cached one would hide the logout. If the token
+  differs from the one the session holds (a new login, another account), only `github_repos` is
+  restarted with `restartServer`, with an entry built by `buildGithubMcpServer`: the same tools,
+  time limit and read-only headers, only a new `Authorization`. In oauth mode the Atlassian token
+  is checked first, as in section 11, and both servers can be swapped in one turn. A missing token
+  refuses the turn with 401 `github_signin_required` before it starts; it is not counted and the
+  conversation goes on. `askQuestion` takes the cached token before its session.
+- **The app's own calls** (`api.js`). `createGithubApi({ getToken, invalidate })` asks for the
+  token on every request. A 401 forgets it and retries once with a fresh one; a second 401 is
+  `GithubSignInRequiredError('logged-out')`, and a 403 with `X-GitHub-SSO` is `'sso'`. Without
+  `invalidate` (token mode) every failure is reported as before.
+
+**Status and Check again** (`routes/githubAuth.js`). `GET /api/auth/status` adds
+`github: { mode, signedIn, login?, reason? }`. `POST /api/auth/github/check` (gh-cli mode only, body
+`{}`, the usual `/api` guards) forgets the cached token, asks `gh` again and returns the whole
+status. `POST /api/conversations` and `POST /api/ask` answer 401 `github_signin_required` with
+`{ code, reason, message }` while there is no token, after the Atlassian check.
+
+**The page.** In gh-cli mode the panel adds "GitHub: <login> (GitHub CLI)" (without Sign out when
+Atlassian uses a service account). With no token, the sign-in screen (before the first question)
+or the banner (after it) says what to do for the reason, with the command as code and a **Check
+again** button, because the login happens in a terminal. A refusal carries the reason; a failure
+in the middle of an answer (an `error` event of kind `github-signin`) reloads the status to learn
+it. When both services need attention, both blocks show, Atlassian first.
+
+**`npm run github:check`** (`check.js`, wiring in `src/cli/githubCheck.js`). It runs in either mode,
+always with the CLI token, and reports:
+
+- the `gh` used and its version;
+- `gh auth status`: account, source, scopes and SSO lines, with a warning when `GH_TOKEN` or
+  `GITHUB_TOKEN` is set in the shell (read before `.env` is loaded);
+- the token's first four characters;
+- for each repository, a contents read, the head-commit lookup and the CODEOWNERS lookup through
+  the app's client, where `recordFailures` keeps the status, the SSO header and GitHub's message
+  so `classifyFailure` can pick the fix (`logged-out`, `sso`, `blocked`, `not-found`);
+- one MCP tool listing with `buildGithubMcpServer`, which must show the six read tools and no
+  write tool.
+
+The exit code is 0 only when everything passes.
+
+**Read-only.** The CLI token has `repo`, `workflow` and `gist`, so in this mode the allow-list, the
+permission handler, the scope hook, the read-only MCP header and GET-only REST calls are what keep
+GitHub read-only. None of them changed for this mode.

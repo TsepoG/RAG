@@ -183,30 +183,42 @@ public/js/ui/…               # panel line, banner and sign-in text variants
 
 ## Acceptance criteria
 
-- [ ] `npm run verify` passes; coverage ≥ 90% on all four measures.
-- [ ] On this machine, in gh-cli mode, with `GITHUB_TOKEN` removed from `.env`:
+- [x] `npm run verify` passes; coverage ≥ 90% on all four measures.
+      *100% on all four measures at the end of Step 9.*
+- [x] On this machine, in gh-cli mode, with `GITHUB_TOKEN` removed from `.env`:
       a question about the RAG repo is answered with GitHub citations, and the
       panel shows "GitHub: TsepoG (GitHub CLI)".
-- [ ] `gh auth logout` makes the next turn show the GitHub banner; then
+      *L1 (`npm run ask`, G citations to `TsepoG/RAG` pinned to `6479dc0`) and
+      L2 (the panel). `GITHUB_TOKEN` was commented out rather than deleted.*
+- [x] `gh auth logout` makes the next turn show the GitHub banner; then
       `gh auth login` and **Check again** recover without losing the
       conversation.
-- [ ] Re-check of a GitHub source works in gh-cli mode, including one
+      *L2. The pre-turn check asks `gh` afresh (approved in planning), so the
+      logout showed on the very next turn; the refused turn was not counted.*
+- [x] Re-check of a GitHub source works in gh-cli mode, including one
       "changed" result after the owner pushes a small change to a cited file.
-- [ ] `npm run github:check` passes on this machine for the configured repos,
+      *L3: `docs/mcp-tools.md` (one word changed on `main`, `41b1366`) was marked
+      "Changed since this answer".*
+- [x] `npm run github:check` passes on this machine for the configured repos,
       and its output contains only the token prefix.
+      *L4, after a fix: the first run failed MCP because the check built the
+      Atlassian entry too, which needs an Atlassian sign-in in oauth mode.*
 - [ ] Token mode behaves exactly as before: tests unchanged (plus the
       regression test), and one token-mode smoke conversation.
 - [ ] A fake token never appears in logs, responses or the page (tests), and
       the owner greps the log and the repo for `gho_` fragments before the PR.
 - [ ] Smoke eval subset (about 8 cases) in gh-cli mode shows no regression
       against the latest token-mode smoke, within the Phase 7 noise rule.
-- [ ] README: modes; the read-only caveat for gh-cli; the work-computer steps
+- [x] README: modes; the read-only caveat for gh-cli; the work-computer steps
       (`gh auth login`, `gh auth refresh` for SSO, `npm run github:check`,
       then switch); and troubleshooting. `.env.example`, `docs/HOW_IT_WORKS.md`
       (auth section), CHANGELOG and ROADMAP are updated too.
-- [ ] Phase 9 acceptance boxes are ticked to reflect reality, and this file plus
+      *Step 9 (`.env.example` in Step 2, the ROADMAP row in Step 1;
+      HOW_IT_WORKS has a new section 12).*
+- [x] Phase 9 acceptance boxes are ticked to reflect reality, and this file plus
       `docs/phase-10-github-cli-decisions.md` are committed in the first commit
       of the branch.
+      *Step 1 (`126f73d`).*
 - [ ] CI is green; the SonarQube quality gate passes with zero new issues
       (including any hotspot on `execFile`).
 
