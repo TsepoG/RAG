@@ -629,3 +629,38 @@ signed-in token.
   signed-in account sees.
 - `dev-rate-limit-clarify` still answers instead of asking which limit is meant, as in bearer mode.
 - Median time to an answer 67.1 s (the same cases in bearer mode: 77.2 s); 95th percentile 81.1 s.
+
+## Smoke in gh-cli mode (2026-10-31)
+
+The 8 smoke cases with `GITHUB_AUTH_MODE=gh-cli` (GitHub read with the owner's GitHub CLI login),
+compared with the same 8 cases in `20261028-155909`, which used token mode with the same Atlassian
+oauth sign-in. Only how GitHub is read differs between the two runs.
+
+| | |
+| --- | --- |
+| Run | `20261031-132731` |
+| Path | conversation, the 8 smoke cases |
+| Model asked for | `gpt-6-luna`; the only model that answered |
+| Timeout | `ASK_TIMEOUT_MS=240000` |
+| Commit | `8838f5197a33`, base prompt hash unchanged |
+| Requests | 10 for 8 cases; no question failed |
+| Verdicts | drafted by Claude Code, reviewed and accepted by the owner |
+
+### Against the noise rule
+
+| Measure | Token mode (`20261028-155909`) | gh-cli | Rule | Result |
+| --- | --- | --- | --- | --- |
+| Cases passed | 6 of 8 | 8 of 8 | net loss of more than 5 (over 38) is a regression | none (net +2) |
+| Status exactly as expected | 75% (6 of 8) | 100% (8 of 8) | no drop of more than 13 points | met |
+| Declined when it should | 2 of 2 | 2 of 2 | no drop of more than 13 points | met |
+| Answered cases that are correct | 83% (4 correct, 2 partial of 6) | 90% (4 correct, 1 partial of 5) | no drop of more than 13 points | met |
+
+**No regression beyond noise.** The gains are not claimed as an effect of gh-cli mode: one run of 8
+cases cannot separate them from the measured variation.
+
+- `dev-rate-limit-clarify`: answered → `clarify`, as the case expects, for the first time.
+- `oos-pm-next-year-releases`: `not_found` → `out_of_scope` again; it has flipped between the
+  two before.
+- `qa-split-tests` still leaves out both Tesla splits (partial), now at `medium`.
+- Confidence changed on 5 cases, within the usual variation.
+- Median time to an answer 41.4 s (the same cases in token mode: 67.1 s); 95th percentile 71.3 s.

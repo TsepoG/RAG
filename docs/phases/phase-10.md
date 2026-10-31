@@ -203,12 +203,21 @@ public/js/ui/…               # panel line, banner and sign-in text variants
       and its output contains only the token prefix.
       *L4, after a fix: the first run failed MCP because the check built the
       Atlassian entry too, which needs an Atlassian sign-in in oauth mode.*
-- [ ] Token mode behaves exactly as before: tests unchanged (plus the
+- [x] Token mode behaves exactly as before: tests unchanged (plus the
       regression test), and one token-mode smoke conversation.
-- [ ] A fake token never appears in logs, responses or the page (tests), and
+      *L5: the owner's token-mode conversation, with a follow-up, worked as
+      before. No existing test was changed for token-mode behaviour; two
+      export-list tests (`test/github/index.test.js`, `test/mcp/index.test.js`)
+      gained the new exports (listed in the PR).*
+- [x] A fake token never appears in logs, responses or the page (tests), and
       the owner greps the log and the repo for `gho_` fragments before the PR.
-- [ ] Smoke eval subset (about 8 cases) in gh-cli mode shows no regression
+      *L5: `git grep gho_` found only the prefix in docs and fake test tokens;
+      across all history, every `gho_` string is a known fake (checked without
+      printing them); the gh-cli eval log had none.*
+- [x] Smoke eval subset (about 8 cases) in gh-cli mode shows no regression
       against the latest token-mode smoke, within the Phase 7 noise rule.
+      *Run `20261031-132731` against `20261028-155909`: passed 6 → 8, every
+      measure inside the rule. See `docs/EVAL_LOG.md`, "Smoke in gh-cli mode".*
 - [x] README: modes; the read-only caveat for gh-cli; the work-computer steps
       (`gh auth login`, `gh auth refresh` for SSO, `npm run github:check`,
       then switch); and troubleshooting. `.env.example`, `docs/HOW_IT_WORKS.md`
