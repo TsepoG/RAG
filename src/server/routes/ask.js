@@ -32,6 +32,8 @@ const HAS_TEXT = '\\S';
  * @property {Pick<import('../../logger/index.js').Logger, 'info' | 'warn' | 'error'>} logger - Where to log.
  * @property {() => Promise<boolean>} [isSignedIn] - In oauth mode, whether someone is signed in to
  *   Atlassian; a question is refused with a 401 until they are. Absent in the other modes.
+ * @property {import('./githubAuth.js').GithubAuth} [githubAuth] - The GitHub side; in gh-cli mode a
+ *   question is refused with a 401 while the GitHub CLI has no token.
  */
 
 /**
@@ -83,7 +85,10 @@ function rememberAnswer(answers, question, result) {
  * @param {import('fastify').FastifyInstance} app - The app.
  * @param {AskRouteDeps} deps - Dependencies.
  */
-export function registerAskRoute(app, { roles, ask, answers, renderHtml, logger, isSignedIn }) {
+export function registerAskRoute(
+  app,
+  { roles, ask, answers, renderHtml, logger, isSignedIn, githubAuth },
+) {
   let busy = false;
   app.post(
     '/api/ask',
@@ -92,6 +97,10 @@ export function registerAskRoute(app, { roles, ask, answers, renderHtml, logger,
       const { question, role: roleId, detailLevel } = /** @type {RequestBody} */ (request.body);
       if (isSignedIn !== undefined && !(await isSignedIn())) {
         return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      }
+      const refusal = await githubAuth?.refusal();
+      if (refusal !== undefined) {
+        return reply.code(UNAUTHORIZED).send(refusal);
       }
       if (busy) {
         return reply

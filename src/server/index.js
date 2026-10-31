@@ -11,7 +11,7 @@ import {
   redirectUriFor,
   signOut,
 } from '../atlassian/index.js';
-import { loadConfig, loadEnvFileIfPresent, redactConfig } from '../config/index.js';
+import { configWarnings, loadConfig, loadEnvFileIfPresent, redactConfig } from '../config/index.js';
 import { createCopilotClient, ensureAuthenticated } from '../copilot/index.js';
 import { AppError, ConfigError } from '../errors/index.js';
 import { createLogger } from '../logger/index.js';
@@ -20,7 +20,7 @@ import {
   createConversationStore,
   createSessionCloser,
 } from '../conversation/index.js';
-import { createGithubApi } from '../github/index.js';
+import { createCliTokenProvider, createGithubApi } from '../github/index.js';
 import { connectMcp } from '../mcp/index.js';
 import {
   createConfluenceChecker,
@@ -30,6 +30,7 @@ import {
 import { loadRoles } from '../roles/index.js';
 import { createAnswerMemory } from './answers.js';
 import { buildApp } from './app.js';
+import { createGithubAuth } from './routes/githubAuth.js';
 import { appendFeedback } from './feedbackStore.js';
 import { createRecheckService } from './recheckService.js';
 import { listStaticFiles } from './static.js';
@@ -123,6 +124,13 @@ async function main() {
   const config = loadConfig();
   const logger = createLogger({ level: config.logLevel, name: APP_NAME });
   logger.info({ config: redactConfig(config) }, 'startup');
+  configWarnings(config).forEach((warning) => logger.warn({}, warning));
+  // Only in gh-cli mode: token mode puts GITHUB_TOKEN in the session config and the requests.
+  const githubTokens =
+    config.github.mode === 'gh-cli'
+      ? createCliTokenProvider({ cliPath: config.github.cliPath, logger })
+      : undefined;
+  const githubAuth = createGithubAuth({ tokens: githubTokens });
   const roles = await loadRoles();
   const handle = await createCopilotClient(config, { logger });
   try {
@@ -147,12 +155,18 @@ async function main() {
       clock,
       endConversation: (conversation, reason) => store.end(conversation, reason),
       atlassianTokens: atlassianAuth?.tokens,
+      githubTokens,
     });
     const recheck = createRecheckService({
       checkers: {
         github: createGithubChecker({
-          // The personal access token of token mode.
-          api: createGithubApi({ token: /** @type {string} */ (config.github.token) }),
+          api:
+            githubTokens === undefined
+              ? createGithubApi({ token: config.github.token })
+              : createGithubApi({
+                  getToken: () => githubTokens.getGithubToken(),
+                  invalidate: () => githubTokens.invalidate(),
+                }),
           repos: config.github.repos,
           logger,
         }),
@@ -189,11 +203,13 @@ async function main() {
           config,
           logger,
           getAtlassianToken: atlassianAuth?.tokens.getAtlassianToken,
+          githubTokens,
         }),
       answers: createAnswerMemory(),
       saveFeedback: (answer, input) => appendFeedback(answer, input, { dir: DATA_DIRECTORY }),
       conversations: { store, runner, recheck },
       atlassianAuth,
+      githubAuth,
       staticFiles: await listStaticFiles(PUBLIC_DIRECTORY),
       logger,
     });

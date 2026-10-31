@@ -75,6 +75,8 @@ const RECHECK_BODY_SCHEMA = Object.freeze({
  * @property {Pick<import('../../logger/index.js').Logger, 'info' | 'warn' | 'error'>} logger - Where to log.
  * @property {() => Promise<boolean>} [isSignedIn] - In oauth mode, whether someone is signed in to
  *   Atlassian; a conversation cannot be started until they are. Absent in the other modes.
+ * @property {import('./githubAuth.js').GithubAuth} [githubAuth] - The GitHub side; in gh-cli mode a
+ *   conversation cannot be started while the GitHub CLI has no token.
  */
 
 /**
@@ -114,7 +116,7 @@ function buildRecheckPayload(conversation, outcome, renderHtml, alwaysShow = [])
  */
 export function registerConversationRoutes(
   app,
-  { roles, store, runner, recheck, answers, renderHtml, logger, isSignedIn },
+  { roles, store, runner, recheck, answers, renderHtml, logger, isSignedIn, githubAuth },
 ) {
   /**
    * Finds the live conversation of a request, noting that it was used.
@@ -142,6 +144,10 @@ export function registerConversationRoutes(
     async (request, reply) => {
       if (isSignedIn !== undefined && !(await isSignedIn())) {
         return reply.code(UNAUTHORIZED).send(SIGN_IN_REQUIRED);
+      }
+      const refusal = await githubAuth?.refusal();
+      if (refusal !== undefined) {
+        return reply.code(UNAUTHORIZED).send(refusal);
       }
       const { role: roleId } = /** @type {{ role: string }} */ (request.body);
       const role = /** @type {import('../../roles/index.js').Role} */ (roles.get(roleId));
