@@ -6,7 +6,7 @@ In the Arguments column, * marks a required argument. Hooks read these names, so
 the server shows up here first.
 
 A tool is classed "read" only when its name has no write verb and the server does not mark it
-destructive or not read-only. The allow-lists in `src/mcp/allowlist.js` are a hand-reviewed
+destructive or not read-only. The allow-lists in `src/mcp/allowlist.js` are a hand-checked
 subset of the read tools below. The GitHub server is asked for read-only tools, so it lists
 no write tools at all.
 
