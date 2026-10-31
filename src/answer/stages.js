@@ -74,10 +74,12 @@ export function startInterrupt({ askTimeoutMs, signal }) {
  * @returns {{ commits: ReturnType<typeof createCommitResolver>, owners: ReturnType<typeof createCodeownersLookup> }} The lookups.
  */
 export function createLookups({ config, fetch, logger }) {
-  const api = createGithubApi({ token: config.github.token, fetch });
+  // The personal access token of token mode.
+  const token = /** @type {string} */ (config.github.token);
+  const api = createGithubApi({ token, fetch });
   return {
     commits: createCommitResolver({
-      token: config.github.token,
+      token,
       repos: config.github.repos,
       api,
       logger,

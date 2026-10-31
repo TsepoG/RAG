@@ -151,7 +151,8 @@ async function main() {
     const recheck = createRecheckService({
       checkers: {
         github: createGithubChecker({
-          api: createGithubApi({ token: config.github.token }),
+          // The personal access token of token mode.
+          api: createGithubApi({ token: /** @type {string} */ (config.github.token) }),
           repos: config.github.repos,
           logger,
         }),

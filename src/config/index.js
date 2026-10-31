@@ -4,7 +4,12 @@ import { ConfigError } from '../errors/index.js';
 import { REDACTED_VALUE } from '../logger/index.js';
 import { configSchema, ENV_VARIABLE_NAMES } from './schema.js';
 
+export { DEFAULT_GITHUB_CLI, GH_CLI_MODE, TOKEN_MODE } from './githubSchema.js';
 export { isLoopbackHost } from './schema.js';
+
+/** Said at startup when gh-cli mode finds a GITHUB_TOKEN it will not use. */
+export const IGNORED_GITHUB_TOKEN_WARNING =
+  'GITHUB_TOKEN is set but not used: GITHUB_AUTH_MODE is gh-cli, so GitHub is read with the GitHub CLI login';
 
 /**
  * The validated application settings, grouped by system.
@@ -69,7 +74,11 @@ export function redactConfig(config) {
   const { apiToken } = config.atlassian;
   return {
     ...config,
-    github: { ...config.github, token: REDACTED_VALUE },
+    // gh-cli mode has no token in the config, so none is suggested.
+    github: {
+      ...config.github,
+      token: config.github.token === undefined ? undefined : REDACTED_VALUE,
+    },
     // An unset token (oauth mode has none) stays unset, so the log doesn't suggest one is configured.
     atlassian: {
       ...config.atlassian,
@@ -81,6 +90,16 @@ export function redactConfig(config) {
       githubToken: githubToken === undefined ? undefined : REDACTED_VALUE,
     },
   };
+}
+
+/**
+ * The warnings about the settings that are worth logging once at startup: they are valid, but
+ * probably not what was meant.
+ * @param {AppConfig} config - Validated config.
+ * @returns {string[]} One line for each warning; none when all is as expected.
+ */
+export function configWarnings(config) {
+  return config.github.tokenIgnored === true ? [IGNORED_GITHUB_TOKEN_WARNING] : [];
 }
 
 /**
@@ -103,7 +122,7 @@ export function encodeBasicCredentials(email, apiToken) {
  */
 export function listSecrets(config) {
   return [
-    config.github.token,
+    ...(config.github.token === undefined ? [] : [config.github.token]),
     ...atlassianSecrets(config.atlassian),
     ...(config.copilot.githubToken === undefined ? [] : [config.copilot.githubToken]),
   ];

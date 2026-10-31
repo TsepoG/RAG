@@ -2,6 +2,12 @@
 import { z } from 'zod';
 import { DEFAULT_LOG_LEVEL } from '../logger/index.js';
 import {
+  GITHUB_ENV_NAMES,
+  githubConfig,
+  inputForMode,
+  readGithubSettings,
+} from './githubSchema.js';
+import {
   isOauthMode,
   OAUTH_MODE,
   oauthAuth,
@@ -221,7 +227,10 @@ function atlassianAuth({ ATLASSIAN_AUTH_MODE: mode, ATLASSIAN_EMAIL: email }) {
  * Names of every environment variable the app reads, for code that must know what to strip.
  * @type {ReadonlyArray<string>}
  */
-export const ENV_VARIABLE_NAMES = Object.freeze(Object.keys(oauthEnvSchema.shape));
+export const ENV_VARIABLE_NAMES = Object.freeze([
+  ...Object.keys(oauthEnvSchema.shape),
+  ...GITHUB_ENV_NAMES,
+]);
 
 /**
  * How the app authenticates to Atlassian: a personal API token with its email, a service-account
@@ -302,20 +311,36 @@ const oauthSchema = oauthEnvSchemaWithRules.transform((env) =>
 );
 
 /**
- * Schema for the process environment. Parsing yields the nested, typed config object. The mode is
- * read first, so basic and bearer modes are validated exactly as they always were and only oauth
- * mode gets the oauth rules.
+ * Parses the settings every GitHub mode shares, picking the Atlassian schema by mode.
+ * @param {unknown} input - The environment to parse.
+ * @returns {ReturnType<typeof serviceAccountSchema.safeParse> | ReturnType<typeof oauthSchema.safeParse>} The result.
+ */
+function parseShared(input) {
+  return isOauthMode(input) ? oauthSchema.safeParse(input) : serviceAccountSchema.safeParse(input);
+}
+
+/**
+ * Schema for the process environment. Parsing yields the nested, typed config object. The modes
+ * are read first, so token mode and the basic and bearer modes are validated exactly as they always
+ * were; only oauth mode gets the oauth rules, and only gh-cli mode goes without GITHUB_TOKEN.
  */
 export const configSchema = z.unknown().transform((input, context) => {
-  const result = isOauthMode(input)
-    ? oauthSchema.safeParse(input)
-    : serviceAccountSchema.safeParse(input);
-  if (!result.success) {
-    // Only the path and the message are passed on; they are all loadConfig reports.
-    result.error.issues.forEach(({ path, message }) =>
-      context.addIssue({ code: 'custom', path, message }),
+  const isRecord = typeof input === 'object' && input !== null;
+  const raw = isRecord ? /** @type {Record<string, unknown>} */ (input) : {};
+  const github = readGithubSettings(raw);
+  const settings = github.ok ? github.settings : undefined;
+  // Anything but an object goes to the shared schemas as it is, which reject it as before.
+  const result = parseShared(isRecord ? inputForMode(raw) : input);
+  // Only the path and the message are passed on; they are all loadConfig reports.
+  const issues = [
+    ...(result.success ? [] : result.error.issues),
+    ...(github.ok ? [] : github.issues),
+  ];
+  if (!result.success || settings === undefined) {
+    issues.forEach(({ path, message }) =>
+      context.addIssue({ code: 'custom', path: [...path], message }),
     );
     return z.NEVER;
   }
-  return result.data;
+  return { ...result.data, github: githubConfig(result.data.github, settings, raw) };
 });
