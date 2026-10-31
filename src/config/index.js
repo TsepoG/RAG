@@ -2,6 +2,7 @@
 import { existsSync } from 'node:fs';
 import { ConfigError } from '../errors/index.js';
 import { REDACTED_VALUE } from '../logger/index.js';
+import { DEFAULT_GITHUB_CLI, readGithubSettings } from './githubSchema.js';
 import { configSchema, ENV_VARIABLE_NAMES } from './schema.js';
 
 export { DEFAULT_GITHUB_CLI, GH_CLI_MODE, TOKEN_MODE } from './githubSchema.js';
@@ -183,6 +184,29 @@ export function buildGithubCliEnv(env = process.env) {
     }
   }
   return cliEnv;
+}
+
+/**
+ * Names the variables that would replace the gh login for `gh` commands run in this shell. Read
+ * before .env is loaded, so only what the person set in their shell counts.
+ * @param {Record<string, string | undefined>} [env] - Variables to look at; defaults to process.env.
+ * @returns {string[]} The names that are set, upper-cased; empty when none is.
+ */
+export function githubTokenVariables(env = process.env) {
+  return Object.entries(env)
+    .filter(([name, value]) => (value ?? '') !== '' && GH_LOGIN_OVERRIDES.has(name.toUpperCase()))
+    .map(([name]) => name.toUpperCase());
+}
+
+/**
+ * The gh program GITHUB_CLI_PATH names, in either mode: `npm run github:check` runs in token mode
+ * too, before the switch, and must use the same gh the app will.
+ * @param {Record<string, string | undefined>} [env] - Variables to read; defaults to process.env.
+ * @returns {string} GITHUB_CLI_PATH when it is set and valid, otherwise `gh`.
+ */
+export function githubCliPath(env = process.env) {
+  const result = readGithubSettings(env);
+  return result.ok ? result.settings.cliPath : DEFAULT_GITHUB_CLI;
 }
 
 /**

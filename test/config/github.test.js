@@ -2,6 +2,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildGithubCliEnv,
+  githubCliPath,
+  githubTokenVariables,
   buildRuntimeEnv,
   configWarnings,
   IGNORED_GITHUB_TOKEN_WARNING,
@@ -214,5 +216,30 @@ describe('buildGithubCliEnv', () => {
 
   it('reads this process by default', () => {
     expect(buildGithubCliEnv()).not.toHaveProperty('GITHUB_TOKEN');
+  });
+});
+
+describe('githubTokenVariables', () => {
+  it('names the variables set that would replace the gh login, in upper case', () => {
+    expect(
+      githubTokenVariables({ PATH: '/bin', gh_token: 'x', GITHUB_TOKEN: 'y', GH_HOST: 'z' }),
+    ).toEqual(['GH_TOKEN', 'GITHUB_TOKEN']);
+    expect(githubTokenVariables({ GH_TOKEN: '', GITHUB_TOKEN: undefined })).toEqual([]);
+  });
+
+  it('reads this process by default', () => {
+    expect(Array.isArray(githubTokenVariables())).toBe(true);
+  });
+});
+
+describe('githubCliPath', () => {
+  it('gives GITHUB_CLI_PATH in either mode, and gh otherwise', () => {
+    expect(githubCliPath({ GITHUB_CLI_PATH: GH_PATH })).toBe(GH_PATH);
+    expect(githubCliPath({})).toBe('gh');
+    expect(githubCliPath({ GITHUB_CLI_PATH: 'relative/gh' })).toBe('gh');
+  });
+
+  it('reads this process by default', () => {
+    expect(typeof githubCliPath()).toBe('string');
   });
 });

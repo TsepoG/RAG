@@ -8,6 +8,14 @@
 /** @typedef {import('./cliStatus.js').FailureKind} FailureKind */
 
 export { createGithubApi, describeFailure, isNotFound } from './api.js';
+export {
+  CLI_MISSING,
+  FIXES,
+  MCP_FIX,
+  recordFailures,
+  runGithubCheck,
+  TOKEN_PREFIX_LENGTH,
+} from './check.js';
 export { classifyFailure, parseAuthStatus } from './cliStatus.js';
 export {
   createCliTokenProvider,
