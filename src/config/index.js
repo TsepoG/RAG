@@ -161,6 +161,31 @@ export function buildRuntimeEnv(env = process.env) {
 }
 
 /**
+ * Variables that make `gh auth token` print themselves instead of the gh login. The app's own
+ * GITHUB_TOKEN from .env has one of these names, so without this gh-cli mode could quietly use the
+ * personal access token, or another account.
+ */
+const GH_LOGIN_OVERRIDES = new Set(['GH_TOKEN', 'GITHUB_TOKEN']);
+
+/**
+ * Builds the environment the GitHub CLI runs in, in gh-cli mode: this process's own, without the
+ * variables that would replace the gh login. Names are compared in upper case, because Windows
+ * treats them so.
+ * @param {Record<string, string | undefined>} [env] - Variables to filter; defaults to process.env.
+ * @returns {Record<string, string>} A new object; the input is left unchanged.
+ */
+export function buildGithubCliEnv(env = process.env) {
+  /** @type {Record<string, string>} */
+  const cliEnv = {};
+  for (const [name, value] of Object.entries(env)) {
+    if (value !== undefined && !GH_LOGIN_OVERRIDES.has(name.toUpperCase())) {
+      cliEnv[name] = value;
+    }
+  }
+  return cliEnv;
+}
+
+/**
  * Options for {@link loadEnvFileIfPresent}; each default can be replaced in tests.
  * @typedef {object} EnvFileOptions
  * @property {string} [path] - File to load.

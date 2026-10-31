@@ -1,6 +1,7 @@
 // @ts-check
 import { describe, expect, it } from 'vitest';
 import {
+  buildGithubCliEnv,
   buildRuntimeEnv,
   configWarnings,
   IGNORED_GITHUB_TOKEN_WARNING,
@@ -190,5 +191,28 @@ describe('redactConfig and listSecrets in gh-cli mode', () => {
       FAKE_ATLASSIAN_TOKEN,
       Buffer.from(`dev@acme.example:${FAKE_ATLASSIAN_TOKEN}`).toString('base64'),
     ]);
+  });
+});
+
+describe('buildGithubCliEnv', () => {
+  it('keeps the environment gh needs but drops the variables that would replace its login', () => {
+    const env = {
+      PATH: '/usr/bin',
+      HOME: '/home/dev',
+      GH_TOKEN: 'from-the-shell',
+      GITHUB_TOKEN: FAKE_GITHUB_TOKEN,
+      github_token: FAKE_GITHUB_TOKEN,
+      EMPTY: undefined,
+    };
+
+    expect(buildGithubCliEnv(env)).toEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/dev',
+    });
+    expect(env.GITHUB_TOKEN).toBe(FAKE_GITHUB_TOKEN);
+  });
+
+  it('reads this process by default', () => {
+    expect(buildGithubCliEnv()).not.toHaveProperty('GITHUB_TOKEN');
   });
 });
