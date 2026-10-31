@@ -12,7 +12,7 @@ describe('describeFailure for a missing GitHub CLI token', () => {
         { cause: new Error('gho_FAKEfakeFAKEfake0123456789abcdefXYZ') },
       );
 
-      expect(describeFailure(error)).toEqual({ kind: 'signin', message: error.message });
+      expect(describeFailure(error)).toEqual({ kind: 'github-signin', message: error.message });
       expect(describeFailure(error).message).not.toContain('gho_');
     },
   );

@@ -17,14 +17,20 @@ export class ApiError extends Error {
    * @param {string} message - What to show.
    * @param {number} [status] - The HTTP status, when the server answered at all.
    * @param {string} [code] - The code the server gave for what went wrong, such as `conversation_ended`.
+   * @param {string} [reason] - Why, when the server says: for `github_signin_required`, what the person
+   *   has to do (`logged-out`, `sso` or `cli-missing`).
    */
-  constructor(message, status, code) {
+  constructor(message, status, code, reason) {
     super(message);
     this.name = 'ApiError';
     /** @type {number | undefined} */
     this.status = status;
     /** @type {string | undefined} */
     this.code = code;
+    if (reason !== undefined) {
+      /** @type {string | undefined} */
+      this.reason = reason;
+    }
   }
 }
 
@@ -41,19 +47,23 @@ export class ApiError extends Error {
 /**
  * Reads the message and the code the server put in an error response.
  * @param {Response} response - A response that is not ok.
- * @returns {Promise<{ message: string, code: string | undefined }>} The message the server gave,
+ * @returns {Promise<{ message: string, code: string | undefined, reason: string | undefined }>} The message the server gave,
  *   or the status text, and its code if it gave one.
  */
 async function describeError(response) {
   try {
     const body = await response.json();
     if (typeof body?.message === 'string') {
-      return { message: body.message, code: typeof body.code === 'string' ? body.code : undefined };
+      return {
+        message: body.message,
+        code: typeof body.code === 'string' ? body.code : undefined,
+        reason: typeof body.reason === 'string' ? body.reason : undefined,
+      };
     }
   } catch {
     // The body was not JSON; fall through to the status text.
   }
-  return { message: response.statusText || FALLBACK_MESSAGE, code: undefined };
+  return { message: response.statusText || FALLBACK_MESSAGE, code: undefined, reason: undefined };
 }
 
 /**
@@ -76,8 +86,8 @@ async function send(fetchFunction, path, init) {
     throw new ApiError(FALLBACK_MESSAGE);
   }
   if (!response.ok) {
-    const { message, code } = await describeError(response);
-    throw new ApiError(message, response.status, code);
+    const { message, code, reason } = await describeError(response);
+    throw new ApiError(message, response.status, code, reason);
   }
   return response;
 }
@@ -274,6 +284,17 @@ export async function sendFeedback(feedback, fetchFunction = (...args) => fetch(
  * @property {boolean} signedIn - Whether a sign-in is there.
  * @property {string} [siteHost] - The Atlassian site the sign-in reaches, in oauth mode.
  * @property {number} [expiresAt] - When the current token runs out, in ms; it is renewed by itself.
+ * @property {GithubStatus} [github] - How GitHub is read, and in gh-cli mode whether the GitHub CLI
+ *   has a token and whose.
+ */
+
+/**
+ * What the server says about GitHub. It never holds a token.
+ * @typedef {object} GithubStatus
+ * @property {string} mode - `token` or `gh-cli`.
+ * @property {boolean} signedIn - Whether there is a token to use.
+ * @property {string} [login] - The GitHub CLI's account, when gh can say.
+ * @property {string} [reason] - Why there is no token: `logged-out`, `sso` or `cli-missing`.
  */
 
 /**
@@ -284,6 +305,17 @@ export async function sendFeedback(feedback, fetchFunction = (...args) => fetch(
  */
 export async function fetchAuthStatus(fetchFunction = (...args) => fetch(...args)) {
   const response = await send(fetchFunction, '/auth/status', { headers: { Accept: JSON_TYPE } });
+  return response.json();
+}
+
+/**
+ * Asks the server to look at the GitHub CLI again, after the person logged in in a terminal.
+ * @param {FetchFunction} [fetchFunction] - Replaces `fetch`.
+ * @returns {Promise<AuthStatus>} The status, GitHub's looked at afresh.
+ * @throws {ApiError} When the server cannot be reached or refuses.
+ */
+export async function checkGithub(fetchFunction = (...args) => fetch(...args)) {
+  const response = await send(fetchFunction, '/auth/github/check', postJson({}));
   return response.json();
 }
 

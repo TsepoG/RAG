@@ -37,7 +37,7 @@ export const ROLE_FREE_NOTE =
  * @property {number} sourcesUsed - How many different sources the answers cite.
  * @property {boolean} busy - Whether a question is being answered.
  * @property {boolean} [rolesHidden] - Hides the roles, while the person must sign in first.
- * @property {{ siteHost: string | undefined }} [account] - Who is signed in to Atlassian, in oauth
+ * @property {import('./signedInPanel.js').PanelAccount} [account] - Who is signed in to Atlassian, in oauth
  *   mode; the signed-in panel is shown at the bottom.
  */
 

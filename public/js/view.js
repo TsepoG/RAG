@@ -6,9 +6,13 @@ import { buildCopyDialog, selectDialogText } from './ui/copyConversation.js';
 import { buildComposer, updateComposer } from './ui/composer.js';
 import { buildDrawerClose, buildMobileBar, createDrawer } from './ui/drawer.js';
 import { buildEndCard, summariseChecks } from './ui/endCard.js';
-import { buildExpiredBanner } from './ui/expiredBanner.js';
+import {
+  attentionOf,
+  buildAttentionBanners,
+  buildSignInScreens,
+  panelAccountOf,
+} from './ui/attention.js';
 import { buildSidebarContent, countSourcesUsed } from './ui/sidebar.js';
-import { buildSignIn } from './ui/signIn.js';
 import { refreshAges } from './ui/sources.js';
 import { createToast } from './ui/toast.js';
 import { buildWelcome } from './ui/welcome.js';
@@ -27,8 +31,8 @@ export const DEFAULT_MAX_TURNS = 5;
  * @property {string | undefined} roleId - The role chosen before the first question.
  * @property {Set<string>} openSources - Ids of the answers whose Sources list is open.
  * @property {number} now - The time now, in ms.
- * @property {import('./signIn.js').SignInView} [signIn] - What to show about the Atlassian sign-in;
- *   without it, nobody needs to sign in.
+ * @property {import('./signIn.js').SignInView} [signIn] - What to show about the Atlassian sign-in
+ *   and the GitHub CLI's login; without it, nobody needs to sign in.
  */
 
 /** The sign-in view of a page whose server has no sign-in. */
@@ -136,12 +140,17 @@ export function createView({ refs, showFeedback = true }) {
    * Draws the welcome screen for a role, or the sign-in screen, when what it shows has changed.
    * @param {import('./ui/sidebar.js').RoleSummary | undefined} role - The role.
    * @param {boolean} signInFirst - Whether the person must sign in before anything else.
+   * @param {import('./ui/attention.js').Attention} attention - What needs their attention.
    */
-  function drawWelcome(role, signInFirst) {
-    const key = signInFirst ? 'sign-in' : `${role?.id}|${role?.suggestedQuestions?.join('\n')}`;
+  function drawWelcome(role, signInFirst, attention) {
+    const key = signInFirst
+      ? `sign-in|${JSON.stringify(attention)}`
+      : `${role?.id}|${role?.suggestedQuestions?.join('\n')}`;
     if (key !== drawn.welcome) {
       drawn.welcome = key;
-      refs.welcome.replaceChildren(signInFirst ? buildSignIn() : buildWelcome(role ?? {}, pick));
+      refs.welcome.replaceChildren(
+        ...(signInFirst ? buildSignInScreens(attention) : [buildWelcome(role ?? {}, pick)]),
+      );
     }
   }
 
@@ -151,11 +160,12 @@ export function createView({ refs, showFeedback = true }) {
    * @param {string | undefined} reason - Why it ended, if it did.
    * @param {number} maxTurns - The turn limit.
    * @param {import('./chatState.js').ChatState} state - The state.
-   * @param {boolean} expired - Whether the Atlassian sign-in has expired.
+   * @param {boolean} expired - Whether a sign-in has expired: Atlassian's, or the GitHub CLI's login.
+   * @param {import('./ui/attention.js').Attention} attention - What needs attention.
    */
-  function drawEnd(reason, maxTurns, state, expired) {
+  function drawEnd(reason, maxTurns, state, expired, attention) {
     const summary = summariseChecks(state.turns);
-    let key = expired ? 'expired' : '';
+    let key = expired ? `expired|${JSON.stringify(attention)}` : '';
     if (reason !== undefined) {
       key = JSON.stringify([reason, maxTurns, summary]);
     }
@@ -167,7 +177,7 @@ export function createView({ refs, showFeedback = true }) {
       refs.end.replaceChildren(buildEndCard({ reason, maxTurns, summary }));
       return;
     }
-    refs.end.replaceChildren(...(expired ? [buildExpiredBanner()] : []));
+    refs.end.replaceChildren(...(expired ? buildAttentionBanners(attention) : []));
   }
 
   return {
@@ -180,6 +190,7 @@ export function createView({ refs, showFeedback = true }) {
       // Before the first question the sign-in screen takes the welcome's place; after it, the
       // expired banner takes the question box's.
       const signInFirst = signIn.needed && !started;
+      const attention = attentionOf(signIn);
       const reason = endReasonOf(state);
       const busy = isBusy(state);
       const role = roles.find(({ id }) => id === (conversation?.role ?? roleId)) ?? roles[0];
@@ -193,14 +204,14 @@ export function createView({ refs, showFeedback = true }) {
         sourcesUsed: countSourcesUsed(state.turns),
         busy,
         rolesHidden: signInFirst,
-        account: signIn.account,
+        account: panelAccountOf(signIn),
       });
       bar.update({
         roleName: signInFirst ? '' : (role?.displayName ?? ''),
         turnText: started ? `Turn ${turn} of ${maxTurns}` : '',
       });
       setVisible(refs.welcome, !started);
-      drawWelcome(role, signInFirst);
+      drawWelcome(role, signInFirst, attention);
       refs.notice.textContent = state.notice;
       setVisible(refs.notice, state.notice !== '');
       drawTurns(/** @type {HTMLOListElement} */ (refs.messages), turnMemory, state, {
@@ -209,7 +220,7 @@ export function createView({ refs, showFeedback = true }) {
         showFeedback,
         signInNeeded: signIn.needed,
       });
-      drawEnd(reason, maxTurns, state, signIn.needed && started);
+      drawEnd(reason, maxTurns, state, signIn.needed && started, attention);
       updateComposer(form, {
         turnsUsed: turn,
         maxTurns,
